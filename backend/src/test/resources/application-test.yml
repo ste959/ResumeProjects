@@ -1,0 +1,12 @@
+# Test profile: in-memory H2 (inherited from base config) with the background execution
+# simulator switched off so tests drive fills deterministically through the API/service.
+oms:
+  execution:
+    simulator:
+      enabled: false
+  kafka:
+    enabled: false
+
+logging:
+  level:
+    com.bonddesk.oms: WARN

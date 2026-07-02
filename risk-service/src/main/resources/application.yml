@@ -1,0 +1,32 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: risk-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: risk-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        # The OMS publishes plain JSON with no type headers, so pin the target type here.
+        spring.json.value.default.type: com.bonddesk.risk.OrderEvent
+        spring.json.use.type.headers: false
+        spring.json.trusted.packages: com.bonddesk.risk
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+oms:
+  kafka:
+    topic: order-events
+
+logging:
+  level:
+    com.bonddesk.risk: INFO

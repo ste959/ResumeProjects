@@ -1,0 +1,19 @@
+# Build tooling that lives in the repo dir but shouldn't be committed
+apache-maven-*/
+
+# Java
+target/
+*.class
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env / editor
+.env
+.env.local
+.DS_Store
+.idea/
+.vscode/
+*.log
