@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api/client';
 import type { Security } from './api/types';
+import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { Blotter } from './components/Blotter';
 import { OrderTicket } from './components/OrderTicket';
 import { Positions } from './components/Positions';
@@ -9,7 +10,7 @@ import { usePolling } from './hooks/usePolling';
 
 const PORTFOLIO = 'PORT-DEMO';
 
-type Tab = 'trading' | 'risk';
+type Tab = 'trading' | 'risk' | 'analytics';
 
 export default function App() {
   const [securities, setSecurities] = useState<Security[]>([]);
@@ -19,6 +20,9 @@ export default function App() {
   const orders = usePolling(api.orders, 2000);
   const positions = usePolling(useCallback(() => api.positions(PORTFOLIO), []), 2000);
   const risk = usePolling(api.riskSummary, 2000);
+  const deskSummary = usePolling(api.deskSummary, 3000);
+  const execQuality = usePolling(api.executionQuality, 3000);
+  const topSecurities = usePolling(useCallback(() => api.topSecurities(6), []), 3000);
 
   useEffect(() => {
     api.securities().then(setSecurities).catch((e) => setSecError(String(e)));
@@ -48,6 +52,9 @@ export default function App() {
           <button className={tab === 'risk' ? 'active' : ''} onClick={() => setTab('risk')}>
             Risk
           </button>
+          <button className={tab === 'analytics' ? 'active' : ''} onClick={() => setTab('analytics')}>
+            Analytics
+          </button>
         </nav>
         <div className="status-strip">
           <span className={`dot ${connected ? 'live' : 'down'}`} />
@@ -62,7 +69,7 @@ export default function App() {
         </div>
       )}
 
-      {tab === 'trading' ? (
+      {tab === 'trading' && (
         <main className="layout">
           <aside className="sidebar">
             <OrderTicket securities={securities} portfolio={PORTFOLIO} onSubmitted={refresh} />
@@ -72,13 +79,30 @@ export default function App() {
             <Positions positions={positions.data ?? []} />
           </section>
         </main>
-      ) : (
+      )}
+
+      {tab === 'risk' && (
         <main className="risk-main">
           <div className="risk-intro">
             <span className={`dot ${risk.error == null ? 'live' : 'down'}`} />
             Aggregated by the <b>risk microservice</b> from the Kafka <code>order-events</code> stream
           </div>
           <RiskDashboard summary={risk.data} />
+        </main>
+      )}
+
+      {tab === 'analytics' && (
+        <main className="risk-main">
+          <div className="risk-intro">
+            <span className={`dot ${deskSummary.error == null ? 'live' : 'down'}`} />
+            Reporting &amp; TCA computed by the backend in <b>hand-written SQL</b> (joins, aggregates,
+            window functions)
+          </div>
+          <AnalyticsPanel
+            summary={deskSummary.data}
+            execQuality={execQuality.data ?? []}
+            topSecurities={topSecurities.data ?? []}
+          />
         </main>
       )}
     </div>

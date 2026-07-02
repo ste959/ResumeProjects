@@ -80,6 +80,33 @@ export interface CreateOrderRequest {
   limitPrice?: number | null;
 }
 
+export interface DeskSummary {
+  totalOrders: number;
+  filledOrders: number;
+  workingOrders: number;
+  rejectedOrders: number;
+  totalFilledFace: number;
+  fillRatePct: number;
+}
+
+export interface ExecutionQuality {
+  cusip: string;
+  description: string;
+  side: OrderSide;
+  orderCount: number;
+  filledFace: number;
+  avgFillPrice: number;
+  benchmarkPrice: number;
+  slippageBps: number;
+}
+
+export interface SecurityVolume {
+  cusip: string;
+  description: string;
+  tradedFace: number;
+  fillCount: number;
+}
+
 export interface PortfolioRisk {
   portfolio: string;
   orderCount: number;

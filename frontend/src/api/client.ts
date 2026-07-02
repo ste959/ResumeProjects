@@ -1,9 +1,12 @@
 import type {
   CreateOrderRequest,
   DeskRiskSummary,
+  DeskSummary,
+  ExecutionQuality,
   Order,
   Position,
   Security,
+  SecurityVolume,
   ApiError,
 } from './types';
 
@@ -64,4 +67,9 @@ export const api = {
 
   // Served by the risk microservice (via the /risk proxy), not the OMS backend.
   riskSummary: () => request<DeskRiskSummary>('/summary', undefined, RISK_BASE),
+
+  // Reporting layer (raw SQL on the backend).
+  deskSummary: () => request<DeskSummary>('/analytics/desk-summary'),
+  executionQuality: () => request<ExecutionQuality[]>('/analytics/execution-quality'),
+  topSecurities: (limit = 6) => request<SecurityVolume[]>(`/analytics/top-securities?limit=${limit}`),
 };

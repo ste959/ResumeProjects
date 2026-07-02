@@ -10,7 +10,7 @@
 ![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-event--driven-231F20)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
-![Tests](https://img.shields.io/badge/tests-31%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-32%20passing-brightgreen)
 
 A full-stack, event-driven **Order & Execution Management System (OEMS)** for trading
 fixed-income instruments (bonds), built to mirror the engineering surface of a Charles
@@ -75,11 +75,11 @@ the same numbers).
 | **Java** backend APIs | `backend/` — Spring Boot 3.3, Java 21 |
 | **JavaScript/TypeScript + React** UI | `frontend/` — React 18 + TypeScript + Vite |
 | **API development (Spring Boot)** | REST controllers, DTO validation, OpenAPI/Swagger |
-| **Relational databases (SQL)** | PostgreSQL + JPA/Hibernate + **Flyway** migrations |
-| **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions |
+| **Relational databases (SQL)** | PostgreSQL, **Flyway** migrations, **hand-written analytical SQL** (joins, `GROUP BY`, CTEs, window functions) via `JdbcTemplate` for the reporting/TCA layer |
+| **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions, transaction cost analysis |
 | **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → separate `risk-service` consumer |
 | **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
-| **Test automation (unit/integration)** | 28 tests: JUnit 5, Mockito, MockMvc, AssertJ |
+| **Test automation (unit/integration)** | 32 tests: JUnit 5, Mockito, MockMvc, AssertJ |
 | **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
 | **Data structures & algorithms** | State-machine transitions, weighted-average cost, streaming aggregation |
 
@@ -161,14 +161,36 @@ kubectl -n bonddesk get pods
 | `POST` | `/api/orders/{ref}/fills` | Report a fill |
 | `POST` | `/api/orders/{ref}/cancel` | Cancel a working order |
 | `GET` | `/api/portfolios/{portfolio}/positions` | Positions with mark-to-market |
+| `GET` | `/api/analytics/desk-summary` | Order counts, fill rate, filled notional (aggregate SQL) |
+| `GET` | `/api/analytics/execution-quality` | TCA: avg fill vs. benchmark, slippage (bps) by security/side |
+| `GET` | `/api/analytics/top-securities?limit=` | Highest-volume securities |
+| `GET` | `/api/analytics/daily-volume` | Daily volume + running total (window function) |
 | `GET` | `/api/risk/summary` | *(risk-service :8081)* Desk risk aggregated from events |
+
+---
+
+## SQL & the reporting layer
+
+The **transactional** side (orders, fills, positions) is persisted through JPA/Hibernate.
+The **reporting** side is deliberately written in **hand-crafted SQL** via `JdbcTemplate`
+(`AnalyticsService`) — a realistic split that keeps analytical queries explicit and tunable:
+
+- **Joins + aggregation** across `orders`, `execution`, and `security` for transaction cost analysis
+- **Conditional aggregation** (`CASE WHEN …`) for the one-pass desk summary / fill-rate
+- **A CTE + window function** (`SUM(…) OVER (ORDER BY day)`) for daily volume with a running total
+- **`GROUP BY … ORDER BY … LIMIT`** for top-volume securities
+- **Flyway** owns schema evolution: `V1__schema.sql` (tables) and `V2__analytics.sql`
+  (supporting indexes + a `v_execution_quality` reporting **view**)
+
+All analytical SQL is written to run unchanged on **PostgreSQL** (prod) and **H2** in
+PostgreSQL-compatibility mode (dev/test), and is covered by integration tests.
 
 ---
 
 ## Testing
 
 ```bash
-cd backend      && ./mvnw test    # 25 tests
+cd backend      && ./mvnw test    # 32 tests
 cd risk-service && ./mvnw test    #  3 tests
 cd frontend     && npm run build  # tsc typecheck + production build
 ```
