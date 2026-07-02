@@ -1,5 +1,6 @@
 import type {
   CreateOrderRequest,
+  DeskRiskSummary,
   Order,
   Position,
   Security,
@@ -9,6 +10,8 @@ import type {
 // In dev, requests go to /api and Vite proxies them to the backend. In a built
 // deployment, VITE_API_BASE can point at the API gateway.
 const BASE = (import.meta.env.VITE_API_BASE ?? '') + '/api';
+// The risk microservice is exposed under /risk by the dev proxy and nginx.
+const RISK_BASE = (import.meta.env.VITE_API_BASE ?? '') + '/risk';
 
 /** Error carrying the parsed {@link ApiError} body so callers can show field errors. */
 export class HttpError extends Error {
@@ -18,8 +21,8 @@ export class HttpError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(BASE + path, {
+async function request<T>(path: string, init?: RequestInit, base: string = BASE): Promise<T> {
+  const res = await fetch(base + path, {
     headers: { 'Content-Type': 'application/json' },
     ...init,
   });
@@ -58,4 +61,7 @@ export const api = {
 
   positions: (portfolio: string) =>
     request<Position[]>(`/portfolios/${encodeURIComponent(portfolio)}/positions`),
+
+  // Served by the risk microservice (via the /risk proxy), not the OMS backend.
+  riskSummary: () => request<DeskRiskSummary>('/summary', undefined, RISK_BASE),
 };

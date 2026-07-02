@@ -4,16 +4,21 @@ import type { Security } from './api/types';
 import { Blotter } from './components/Blotter';
 import { OrderTicket } from './components/OrderTicket';
 import { Positions } from './components/Positions';
+import { RiskDashboard } from './components/RiskDashboard';
 import { usePolling } from './hooks/usePolling';
 
 const PORTFOLIO = 'PORT-DEMO';
 
+type Tab = 'trading' | 'risk';
+
 export default function App() {
   const [securities, setSecurities] = useState<Security[]>([]);
   const [secError, setSecError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>('trading');
 
   const orders = usePolling(api.orders, 2000);
   const positions = usePolling(useCallback(() => api.positions(PORTFOLIO), []), 2000);
+  const risk = usePolling(api.riskSummary, 2000);
 
   useEffect(() => {
     api.securities().then(setSecurities).catch((e) => setSecError(String(e)));
@@ -36,6 +41,14 @@ export default function App() {
             <p>Fixed Income Order &amp; Execution Management</p>
           </div>
         </div>
+        <nav className="tabs">
+          <button className={tab === 'trading' ? 'active' : ''} onClick={() => setTab('trading')}>
+            Trading Desk
+          </button>
+          <button className={tab === 'risk' ? 'active' : ''} onClick={() => setTab('risk')}>
+            Risk
+          </button>
+        </nav>
         <div className="status-strip">
           <span className={`dot ${connected ? 'live' : 'down'}`} />
           {connected ? 'Live · auto-refresh 2s' : 'Backend unreachable'}
@@ -49,15 +62,25 @@ export default function App() {
         </div>
       )}
 
-      <main className="layout">
-        <aside className="sidebar">
-          <OrderTicket securities={securities} portfolio={PORTFOLIO} onSubmitted={refresh} />
-        </aside>
-        <section className="content">
-          <Blotter orders={orders.data ?? []} onChanged={refresh} />
-          <Positions positions={positions.data ?? []} />
-        </section>
-      </main>
+      {tab === 'trading' ? (
+        <main className="layout">
+          <aside className="sidebar">
+            <OrderTicket securities={securities} portfolio={PORTFOLIO} onSubmitted={refresh} />
+          </aside>
+          <section className="content">
+            <Blotter orders={orders.data ?? []} onChanged={refresh} />
+            <Positions positions={positions.data ?? []} />
+          </section>
+        </main>
+      ) : (
+        <main className="risk-main">
+          <div className="risk-intro">
+            <span className={`dot ${risk.error == null ? 'live' : 'down'}`} />
+            Aggregated by the <b>risk microservice</b> from the Kafka <code>order-events</code> stream
+          </div>
+          <RiskDashboard summary={risk.data} />
+        </main>
+      )}
     </div>
   );
 }

@@ -80,6 +80,21 @@ export interface CreateOrderRequest {
   limitPrice?: number | null;
 }
 
+export interface PortfolioRisk {
+  portfolio: string;
+  orderCount: number;
+  workingOrders: number;
+  rejectedOrders: number;
+  filledFace: number;
+}
+
+export interface DeskRiskSummary {
+  totalOrders: number;
+  totalFilledFace: number;
+  ordersByStatus: Record<string, number>;
+  portfolios: PortfolioRisk[];
+}
+
 export interface ApiError {
   timestamp: string;
   status: number;

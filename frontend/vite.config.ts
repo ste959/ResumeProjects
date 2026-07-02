@@ -12,6 +12,13 @@ export default defineConfig({
         target: process.env.VITE_API_TARGET ?? 'http://localhost:8080',
         changeOrigin: true,
       },
+      // Risk service lives on :8081; expose it under /risk so the browser stays
+      // single-origin. /risk/summary -> http://localhost:8081/api/risk/summary
+      '/risk': {
+        target: process.env.VITE_RISK_TARGET ?? 'http://localhost:8081',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/risk/, '/api/risk'),
+      },
     },
   },
 });

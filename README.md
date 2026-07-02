@@ -1,4 +1,16 @@
-# BondDesk OMS — Fixed Income Order & Execution Management System
+# Fixed Income Trading Platform
+
+> **BondDesk OMS** — a full-stack, event-driven Order & Execution Management System for bonds.
+
+[![CI](https://github.com/ste959/FixedIncomeTradingPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/ste959/FixedIncomeTradingPlatform/actions/workflows/ci.yml)
+![Java 21](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F)
+![React 18](https://img.shields.io/badge/React-18-61DAFB)
+![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6)
+![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-event--driven-231F20)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
+![Tests](https://img.shields.io/badge/tests-31%20passing-brightgreen)
 
 A full-stack, event-driven **Order & Execution Management System (OEMS)** for trading
 fixed-income instruments (bonds), built to mirror the engineering surface of a Charles
