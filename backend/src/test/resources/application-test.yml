@@ -1,9 +1,9 @@
-# Test profile: in-memory H2 (inherited from base config) with the background execution
-# simulator switched off so tests drive fills deterministically through the API/service.
+# Test profile: in-memory H2 (inherited from base config) with the matching engine and
+# its market-maker switched off, so lifecycle tests drive fills deterministically through
+# the API/service. The engine itself is covered by its own unit + property tests.
 oms:
-  execution:
-    simulator:
-      enabled: false
+  matching:
+    enabled: false
   kafka:
     enabled: false
 

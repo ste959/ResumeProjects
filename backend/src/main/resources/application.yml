@@ -48,12 +48,12 @@ oms:
   kafka:
     enabled: false
     topic: order-events
-  execution:
-    simulator:
-      enabled: true
-      interval-ms: 2000
-    # Origin patterns allowed to call the API from a browser. "*" port covers the Vite
-    # dev server (:5173) and the nginx-served UI (:8088). Set to your real domain in prod.
+  matching:
+    enabled: true          # route orders to the CLOB matching engine
+    liquidity:
+      interval-ms: 1500     # market-maker quote-refresh cadence
+  # Origin patterns allowed to call the API from a browser. "*" port covers the Vite
+  # dev server (:5173) and the nginx-served UI (:8088). Set to your real domain in prod.
   cors:
     allowed-origins: http://localhost:*
 

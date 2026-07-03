@@ -19,10 +19,10 @@ export function AnalyticsPanel({ summary, execQuality, topSecurities }: Props) {
     <div className="risk">
       <div className="kpi-row">
         <Kpi label="Total Orders" value={summary ? fmtQty(summary.totalOrders) : '—'} />
-        <Kpi label="Fill Rate" value={summary ? `${summary.fillRatePct.toFixed(1)}%` : '—'} accent="#3fb950" />
-        <Kpi label="Filled Notional (face)" value={summary ? fmtMoney(summary.totalFilledFace) : '—'} accent="#388bfd" />
+        <Kpi label="Fill Rate" value={summary ? `${summary.fillRatePct.toFixed(1)}%` : '—'} accent="#059669" />
+        <Kpi label="Filled Notional (face)" value={summary ? fmtMoney(summary.totalFilledFace) : '—'} accent="#1d4ed8" />
         <Kpi label="Rejected" value={summary ? fmtQty(summary.rejectedOrders) : '—'}
-             accent={summary && summary.rejectedOrders > 0 ? '#f85149' : undefined} />
+             accent={summary && summary.rejectedOrders > 0 ? '#dc2626' : undefined} />
       </div>
 
       <div className="panel">

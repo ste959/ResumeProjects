@@ -13,6 +13,7 @@ import com.bonddesk.oms.event.OrderEventPublisher;
 import com.bonddesk.oms.exception.BadRequestException;
 import com.bonddesk.oms.exception.InvalidStateTransitionException;
 import com.bonddesk.oms.exception.NotFoundException;
+import com.bonddesk.oms.matching.MatchingGateway;
 import com.bonddesk.oms.repository.OrderRepository;
 import com.bonddesk.oms.repository.SecurityRepository;
 import org.slf4j.Logger;
@@ -45,16 +46,18 @@ public class OrderService {
     private final ComplianceService compliance;
     private final PositionService positions;
     private final OrderEventPublisher events;
+    private final MatchingGateway matching;
     private final Clock clock;
 
     public OrderService(OrderRepository orders, SecurityRepository securities,
                         ComplianceService compliance, PositionService positions,
-                        OrderEventPublisher events, Clock clock) {
+                        OrderEventPublisher events, MatchingGateway matching, Clock clock) {
         this.orders = orders;
         this.securities = securities;
         this.compliance = compliance;
         this.positions = positions;
         this.events = events;
+        this.matching = matching;
         this.clock = clock;
     }
 
@@ -143,12 +146,16 @@ public class OrderService {
         return finish(order, OrderEvent.Type.ORDER_STAGED);
     }
 
-    /** Send the order to an execution venue (STAGED → ROUTED). */
+    /** Send the order to the matching engine (STAGED → ROUTED); marketable quantity fills now. */
     @Transactional
     public Order route(String orderRef) {
         Order order = get(orderRef);
         transitionTo(order, OrderStatus.ROUTED);
-        return finish(order, OrderEvent.Type.ORDER_ROUTED);
+        Order routed = finish(order, OrderEvent.Type.ORDER_ROUTED);
+        // Submit to the book. Any fills are recorded synchronously via DeskFillEvent →
+        // FillRecorder → recordFill, mutating this same (managed) order before we return.
+        matching.route(routed);
+        return routed;
     }
 
     /** Cancel any non-terminal order. */
@@ -157,7 +164,9 @@ public class OrderService {
         Order order = get(orderRef);
         transitionTo(order, OrderStatus.CANCELLED);
         order.setStatusReason(reason == null || reason.isBlank() ? "Cancelled by user" : reason);
-        return finish(order, OrderEvent.Type.ORDER_CANCELLED);
+        Order cancelled = finish(order, OrderEvent.Type.ORDER_CANCELLED);
+        matching.cancel(cancelled); // pull any resting remainder from the book
+        return cancelled;
     }
 
     /**

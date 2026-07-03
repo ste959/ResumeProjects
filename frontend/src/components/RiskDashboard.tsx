@@ -12,13 +12,13 @@ import { fmtMoney, fmtQty } from '../util/format';
 // same state reads the same colour everywhere. Colour is never the only cue — every
 // status is labelled in the legend and table.
 const STATUS_ORDER: { key: string; label: string; color: string }[] = [
-  { key: 'NEW', label: 'New', color: '#8b949e' },
-  { key: 'STAGED', label: 'Staged', color: '#388bfd' },
-  { key: 'ROUTED', label: 'Routed', color: '#a371f7' },
-  { key: 'PARTIALLY_FILLED', label: 'Partially Filled', color: '#d29922' },
-  { key: 'FILLED', label: 'Filled', color: '#3fb950' },
-  { key: 'CANCELLED', label: 'Cancelled', color: '#6e7681' },
-  { key: 'REJECTED', label: 'Rejected', color: '#f85149' },
+  { key: 'NEW', label: 'New', color: '#94a3b8' },
+  { key: 'STAGED', label: 'Staged', color: '#1d4ed8' },
+  { key: 'ROUTED', label: 'Routed', color: '#7c3aed' },
+  { key: 'PARTIALLY_FILLED', label: 'Partially Filled', color: '#f59e0b' },
+  { key: 'FILLED', label: 'Filled', color: '#059669' },
+  { key: 'CANCELLED', label: 'Cancelled', color: '#cbd5e1' },
+  { key: 'REJECTED', label: 'Rejected', color: '#dc2626' },
 ];
 
 export function RiskDashboard({ summary }: { summary: DeskRiskSummary | null }) {
@@ -40,9 +40,9 @@ export function RiskDashboard({ summary }: { summary: DeskRiskSummary | null }) 
     <div className="risk">
       <div className="kpi-row">
         <Kpi label="Total Orders" value={fmtQty(total)} />
-        <Kpi label="Filled Notional (face)" value={fmtMoney(summary.totalFilledFace)} accent="#3fb950" />
-        <Kpi label="Working Orders" value={fmtQty(working)} accent="#388bfd" />
-        <Kpi label="Rejected" value={fmtQty(rejected)} accent={rejected > 0 ? '#f85149' : undefined} />
+        <Kpi label="Filled Notional (face)" value={fmtMoney(summary.totalFilledFace)} accent="#059669" />
+        <Kpi label="Working Orders" value={fmtQty(working)} accent="#1d4ed8" />
+        <Kpi label="Rejected" value={fmtQty(rejected)} accent={rejected > 0 ? '#dc2626' : undefined} />
       </div>
 
       <div className="panel">

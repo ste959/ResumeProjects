@@ -10,7 +10,8 @@
 ![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-event--driven-231F20)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
-![Tests](https://img.shields.io/badge/tests-32%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-50%20passing-brightgreen)
+![Matching engine](https://img.shields.io/badge/matching%20engine-3.3M%20ord%2Fs-blueviolet)
 
 A full-stack, event-driven **Order & Execution Management System (OEMS)** for trading
 fixed-income instruments (bonds), built to mirror the engineering surface of a Charles
@@ -43,7 +44,7 @@ consumes the stream to maintain a live view of desk exposure.
                          │  │ Order lifecycle FSM │  │◀──────▶│  execution · pos.  │
                          │  │ Compliance engine   │  │ Flyway └───────────────────┘
                          │  │ Position keeper     │  │
-                         │  │ Execution simulator │  │
+                         │  │ CLOB matching engine│  │
                          │  └─────────┬───────────┘  │
                          └────────────┼──────────────┘
                                       │ publishes OrderEvent
@@ -79,9 +80,10 @@ the same numbers).
 | **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions, transaction cost analysis |
 | **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → separate `risk-service` consumer |
 | **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
-| **Test automation (unit/integration)** | 32 tests: JUnit 5, Mockito, MockMvc, AssertJ |
+| **Test automation (unit/integration)** | 50 tests: JUnit 5, Mockito, MockMvc, AssertJ, **jqwik property-based** |
 | **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
-| **Data structures & algorithms** | State-machine transitions, weighted-average cost, streaming aggregation |
+| **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
+| **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
 
 ---
 
@@ -111,12 +113,61 @@ a real desk's audit trail.
 
 ---
 
+## Matching engine (the exchange core)
+
+Routed orders are matched by a real **central limit order book** (`backend/.../matching/`),
+not a random fill simulator. It implements strict **price-time priority**:
+
+- Price levels in `TreeMap`s (best price O(1) to read, any level O(log n) to find); each
+  level is a FIFO `ArrayDeque` for time priority. Cancels are lazy → O(1).
+- Prices are **integer ticks** and quantities are `long`s, so the hot path does only
+  integer arithmetic — no `BigDecimal`, no per-compare allocation.
+- Handles limit/market orders, partial fills, price improvement to the aggressor, and
+  cancel; the book is a **single-threaded core** (concurrency handled by a lock per book).
+- An automated **market-maker** (`LiquidityProvider`) keeps a two-sided book in every
+  security, so the desk always trades against genuine resting liquidity. Fills flow back
+  to the OMS as Spring events, keeping the engine free of any persistence dependency.
+
+**Correctness — property-based tests (jqwik).** Hundreds of randomized order flows assert
+the invariants a real exchange depends on: the book is *never crossed*, *quantity is
+conserved* across matches, *no order ever trades through its limit*, and resting quantity
+always reconciles. (One of these caught a real modeling bug during development.)
+
+**Performance — benchmark.** Single-threaded, no I/O
+(`java -cp target/classes com.bonddesk.oms.matching.MatchingBenchmark`):
+
+```
+throughput   : ~3,300,000 orders/sec
+latency p50  : ~150 ns      p99 : ~1.9 µs      p99.9 : ~4.7 µs
+```
+
+> Design note: the demo records fills synchronously inside the routing transaction for
+> simplicity. A production HFT path would decouple matching from persistence via an
+> append-only event queue so the matching core never blocks on I/O — the benchmark above
+> measures that pure core.
+
+---
+
+## Bond analytics (from first principles)
+
+`backend/.../pricing/BondMath` computes fixed-income risk from discounted cash flows —
+hand-rolled to show the numerical method, not a library call:
+
+- **Yield to maturity** via **Newton–Raphson** (analytic derivative, not finite-difference)
+- **Accrued interest** (30/360), clean vs. **dirty price**
+- **Macaulay & modified duration**, **convexity**, and **DV01**
+
+Exposed at `GET /api/securities/{cusip}/analytics`; covered by tests asserting
+par/discount/premium yield relationships, accrued interest, and price round-tripping.
+
+---
+
 ## Running it
 
 ### Option A — Local dev (needs only a JDK 21 and Node 20)
 
 ```bash
-# 1) OMS backend (in-memory H2, background execution simulator on) → :8080
+# 1) OMS backend (in-memory H2, CLOB matching engine + market-maker on) → :8080
 cd backend && ./mvnw spring-boot:run
 
 # 2) Trader UI (Vite dev server, proxies /api to :8080) → :5173
@@ -124,7 +175,7 @@ cd frontend && npm install && npm run dev
 ```
 
 Open **http://localhost:5173** — stage an order, click **Stage → Route**, and watch the
-execution simulator fill it and build your position. API docs at
+matching engine fill it against the market-maker's book and build your position. API docs at
 **http://localhost:8080/swagger-ui.html**.
 
 ### Option B — Full stack with Docker Compose (Postgres + Kafka + risk service)
@@ -154,6 +205,7 @@ kubectl -n bonddesk get pods
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/securities` | List bonds (reference data) |
+| `GET` | `/api/securities/{cusip}/analytics` | Bond analytics: YTM, accrued, duration, convexity, DV01 |
 | `GET` | `/api/orders` | The blotter (filter by `?status=` or `?portfolio=`) |
 | `POST` | `/api/orders` | Stage a new order (runs compliance) |
 | `POST` | `/api/orders/{ref}/stage` | Release order (`NEW → STAGED`) |
@@ -190,15 +242,17 @@ PostgreSQL-compatibility mode (dev/test), and is covered by integration tests.
 ## Testing
 
 ```bash
-cd backend      && ./mvnw test    # 32 tests
+cd backend      && ./mvnw test    # 50 tests
 cd risk-service && ./mvnw test    #  3 tests
 cd frontend     && npm run build  # tsc typecheck + production build
 ```
 
-Coverage includes: the order-status **state machine**, the **weighted-average cost** logic
-(add / reduce / close / flip), the **compliance** rules (restricted, rating, notional),
-the full **HTTP layer** (MockMvc: validation 400s, compliance 201-REJECTED, lifecycle,
-404/409 handling), and **idempotent** risk aggregation over the event stream.
+Coverage includes: the **matching engine** (unit + jqwik property invariants), the
+order-status **state machine**, the **weighted-average cost** logic (add / reduce / close /
+flip), the **bond math** (YTM / duration / convexity / accrued), the **compliance** rules
+(restricted, rating, notional), the full **HTTP layer** (MockMvc: validation 400s,
+compliance 201-REJECTED, lifecycle, 404/409/CORS), and **idempotent** risk aggregation over
+the event stream.
 
 ---
 
@@ -206,7 +260,13 @@ the full **HTTP layer** (MockMvc: validation 400s, compliance 201-REJECTED, life
 
 ```
 bonddesk-oms/
-├── backend/            # Spring Boot OMS: domain, compliance, services, REST, Flyway
+├── backend/            # Spring Boot OMS
+│   └── src/main/java/com/bonddesk/oms/
+│       ├── matching/   #   CLOB matching engine, market-maker, benchmark
+│       ├── pricing/    #   bond math (YTM, duration, convexity, DV01)
+│       ├── analytics/  #   raw-SQL reporting / TCA
+│       ├── compliance/ #   pluggable pre-trade rules
+│       └── ...         #   domain, services, controllers, events, Flyway
 ├── risk-service/       # Spring Boot Kafka consumer: desk-risk aggregation microservice
 ├── frontend/           # React + TypeScript trader UI (Vite)
 ├── k8s/                # Kubernetes manifests (namespace, pg, kafka, services, ingress)

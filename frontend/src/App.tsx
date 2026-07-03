@@ -58,7 +58,8 @@ export default function App() {
         </nav>
         <div className="status-strip">
           <span className={`dot ${connected ? 'live' : 'down'}`} />
-          {connected ? 'Live · auto-refresh 2s' : 'Backend unreachable'}
+          {connected ? 'LIVE' : 'OFFLINE'}
+          <Clock />
           <span className="portfolio-tag">{PORTFOLIO}</span>
         </div>
       </header>
@@ -107,4 +108,14 @@ export default function App() {
       )}
     </div>
   );
+}
+
+/** Live ticking clock for the terminal header. */
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return <span className="mono">{now.toLocaleTimeString('en-GB', { hour12: false })}</span>;
 }

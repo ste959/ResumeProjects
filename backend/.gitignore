@@ -6,3 +6,6 @@ target/
 .idea/
 *.iml
 .vscode/
+
+# jqwik failure-sample cache
+.jqwik-database

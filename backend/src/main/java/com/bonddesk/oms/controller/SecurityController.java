@@ -1,6 +1,8 @@
 package com.bonddesk.oms.controller;
 
 import com.bonddesk.oms.dto.SecurityResponse;
+import com.bonddesk.oms.pricing.BondAnalyticsResponse;
+import com.bonddesk.oms.pricing.PricingService;
 import com.bonddesk.oms.service.SecurityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,9 +21,11 @@ import java.util.List;
 public class SecurityController {
 
     private final SecurityService securities;
+    private final PricingService pricing;
 
-    public SecurityController(SecurityService securities) {
+    public SecurityController(SecurityService securities, PricingService pricing) {
         this.securities = securities;
+        this.pricing = pricing;
     }
 
     @GetMapping
@@ -34,5 +38,11 @@ public class SecurityController {
     @Operation(summary = "Fetch a single bond by CUSIP")
     public SecurityResponse get(@PathVariable String cusip) {
         return SecurityResponse.from(securities.get(cusip));
+    }
+
+    @GetMapping("/{cusip}/analytics")
+    @Operation(summary = "Bond risk analytics: YTM, accrued, duration, convexity, DV01")
+    public BondAnalyticsResponse analytics(@PathVariable String cusip) {
+        return pricing.report(securities.get(cusip));
     }
 }
