@@ -1,5 +1,6 @@
 package com.bonddesk.oms.analytics;
 
+import com.bonddesk.oms.AbstractPostgresIntegrationTest;
 import com.bonddesk.oms.domain.Order;
 import com.bonddesk.oms.domain.OrderSide;
 import com.bonddesk.oms.domain.OrderType;
@@ -8,8 +9,6 @@ import com.bonddesk.oms.dto.CreateOrderRequest;
 import com.bonddesk.oms.service.OrderService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -17,13 +16,11 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Exercises the raw-SQL analytics layer end to end against H2. Uses MICROSOFT
- * (594918BR4, benchmark 68.40) — a security no other test trades — so the TCA numbers
- * are deterministic regardless of what else is in the shared test database.
+ * Exercises the raw-SQL analytics layer end to end against a real PostgreSQL. Uses
+ * MICROSOFT (594918BR4, benchmark 68.40) — a security no other test trades — so the TCA
+ * numbers are deterministic regardless of what else is in the shared test database.
  */
-@SpringBootTest
-@ActiveProfiles("test")
-class AnalyticsServiceIntegrationTest {
+class AnalyticsServiceIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private static final String MSFT = "594918BR4"; // AAA, benchmark clean price 68.40
 

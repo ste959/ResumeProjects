@@ -52,8 +52,43 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Unit tests (Vitest + React Testing Library)
+        run: npm test
       - name: Typecheck & build
         run: npm run build
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the full stack
+        run: docker compose up --build -d
+      - name: Wait for the API (via the UI proxy) to be ready
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8088/api/securities >/dev/null && exit 0
+            sleep 5
+          done
+          echo "Stack did not come up in time"; docker compose logs --tail=80; exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Playwright + browser
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run E2E against the running stack
+        working-directory: frontend
+        run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:8088
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
 
   docker-build:
     name: Docker images build

@@ -80,7 +80,7 @@ the same numbers).
 | **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions, transaction cost analysis |
 | **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → separate `risk-service` consumer |
 | **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
-| **Test automation (unit/integration)** | 50 tests: JUnit 5, Mockito, MockMvc, AssertJ, **jqwik property-based** |
+| **Test automation (unit/integration/UI)** | 50 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + **Vitest/RTL** component tests + **Playwright** E2E |
 | **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
 | **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
 | **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
@@ -242,17 +242,23 @@ PostgreSQL-compatibility mode (dev/test), and is covered by integration tests.
 ## Testing
 
 ```bash
-cd backend      && ./mvnw test    # 50 tests
-cd risk-service && ./mvnw test    #  3 tests
-cd frontend     && npm run build  # tsc typecheck + production build
+cd backend      && ./mvnw test         # 50 tests (unit + integration)
+cd risk-service && ./mvnw test         #  3 tests
+cd frontend     && npm test            #  8 component tests (Vitest + RTL)
+cd frontend     && npm run test:e2e    #  Playwright E2E (needs the stack running)
 ```
 
-Coverage includes: the **matching engine** (unit + jqwik property invariants), the
-order-status **state machine**, the **weighted-average cost** logic (add / reduce / close /
-flip), the **bond math** (YTM / duration / convexity / accrued), the **compliance** rules
-(restricted, rating, notional), the full **HTTP layer** (MockMvc: validation 400s,
-compliance 201-REJECTED, lifecycle, 404/409/CORS), and **idempotent** risk aggregation over
-the event stream.
+**Backend** — the **matching engine** (unit + jqwik property invariants), the order-status
+**state machine**, the **weighted-average cost** logic, the **bond math** (YTM / duration /
+convexity / accrued), the **compliance** rules, the full **HTTP layer** (MockMvc: validation
+400s, compliance 201-REJECTED, lifecycle, 404/409/CORS), and **idempotent** risk aggregation.
+Integration tests run against a **real PostgreSQL via Testcontainers** (exercising the actual
+Flyway migrations + Hibernate `validate`), not H2 — pass `-Dtest.postgres.url=...` to target an
+existing database instead.
+
+**Frontend** — **Vitest + React Testing Library** component tests (order ticket validation +
+compliance-reject banner, blotter rendering + lifecycle actions), plus a **Playwright** E2E
+that drives stage → route → fill through the real UI and API. All wired into CI.
 
 ---
 

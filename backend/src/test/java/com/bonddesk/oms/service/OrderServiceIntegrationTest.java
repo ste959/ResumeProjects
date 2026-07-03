@@ -6,12 +6,11 @@ import com.bonddesk.oms.domain.OrderStatus;
 import com.bonddesk.oms.domain.OrderType;
 import com.bonddesk.oms.domain.Position;
 import com.bonddesk.oms.domain.TimeInForce;
+import com.bonddesk.oms.AbstractPostgresIntegrationTest;
 import com.bonddesk.oms.dto.CreateOrderRequest;
 import com.bonddesk.oms.exception.InvalidStateTransitionException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -19,10 +18,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Exercises compliance-at-entry and the full order lifecycle against a real database. */
-@SpringBootTest
-@ActiveProfiles("test")
-class OrderServiceIntegrationTest {
+/** Exercises compliance-at-entry and the full order lifecycle against a real PostgreSQL. */
+class OrderServiceIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private static final String TREASURY = "912828YK0";   // AAA, price ~97.82
     private static final String HIGH_YIELD = "122017PZ2"; // B+ (sub-investment-grade)
