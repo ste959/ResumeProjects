@@ -71,6 +71,36 @@ public final class BondMath {
         return new BondAnalytics(y, accrued, dirty, macaulay, modified, convexity, dv01);
     }
 
+    /**
+     * The inverse of {@link #analyze}: the clean price per 100 par that a given yield
+     * implies. Used by the RFQ dealer-quote engine, which prices bonds from a yield
+     * (curve + credit spread) rather than solving a yield from a price.
+     *
+     * @param yield annual yield to maturity as a decimal (0.045 = 4.5%)
+     */
+    public static double cleanPriceFromYield(LocalDate settlement, LocalDate maturity,
+                                             double couponRate, double yield) {
+        if (!maturity.isAfter(settlement)) {
+            throw new IllegalArgumentException("maturity must be after settlement");
+        }
+        List<LocalDate> schedule = futureCouponDates(settlement, maturity);
+        LocalDate lastCoupon = schedule.get(0).minusMonths(12 / FREQ);
+
+        double couponPmt = couponRate / FREQ * FACE;
+        int accruedDays = days30360(lastCoupon, settlement);
+        double w = 1.0 - (double) accruedDays / DAYS_IN_PERIOD;
+        double accrued = couponPmt * accruedDays / DAYS_IN_PERIOD;
+
+        double per = yield / FREQ;
+        double dirty = 0;
+        for (int k = 0; k < schedule.size(); k++) {
+            double t = w + k;
+            double cf = couponPmt + (k == schedule.size() - 1 ? FACE : 0.0);
+            dirty += cf * Math.pow(1 + per, -t);
+        }
+        return dirty - accrued;
+    }
+
     /** Newton–Raphson on dirtyPrice(y) − target, with an analytic derivative. */
     private static double solveYtm(double[] times, double[] cashflows, double target, double guess) {
         double y = guess > 0 ? guess : 0.05;

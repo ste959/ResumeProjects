@@ -66,4 +66,22 @@ class BondMathTest {
         assertThat(repriced.dirtyPrice() - repriced.accruedInterest()).isCloseTo(clean, within(1e-6));
         assertThat(a.yieldToMaturity()).isGreaterThan(0.035); // priced below par → yield above coupon
     }
+
+    @Test
+    void cleanPriceFromYieldIsTheInverseOfYtm() {
+        // Price from a yield, then solve the yield back from that price — they must agree.
+        double yield = 0.0475;
+        double clean = BondMath.cleanPriceFromYield(SETTLE, MATURITY, 0.04, yield);
+        BondAnalytics a = BondMath.analyze(SETTLE, MATURITY, 0.04, clean);
+        assertThat(a.yieldToMaturity()).isCloseTo(yield, within(1e-8));
+    }
+
+    @Test
+    void higherYieldMeansLowerPrice() {
+        double low = BondMath.cleanPriceFromYield(SETTLE, MATURITY, 0.04, 0.03);
+        double high = BondMath.cleanPriceFromYield(SETTLE, MATURITY, 0.04, 0.06);
+        assertThat(low).isGreaterThan(high);
+        // At a yield equal to the coupon, a bond prices at par.
+        assertThat(BondMath.cleanPriceFromYield(SETTLE, MATURITY, 0.04, 0.04)).isCloseTo(100.0, within(1e-6));
+    }
 }

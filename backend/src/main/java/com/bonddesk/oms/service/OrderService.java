@@ -4,9 +4,11 @@ import com.bonddesk.oms.compliance.ComplianceResult;
 import com.bonddesk.oms.compliance.ComplianceService;
 import com.bonddesk.oms.domain.Execution;
 import com.bonddesk.oms.domain.Order;
+import com.bonddesk.oms.domain.OrderSide;
 import com.bonddesk.oms.domain.OrderStatus;
 import com.bonddesk.oms.domain.OrderType;
 import com.bonddesk.oms.domain.Security;
+import com.bonddesk.oms.domain.TimeInForce;
 import com.bonddesk.oms.dto.CreateOrderRequest;
 import com.bonddesk.oms.event.OrderEvent;
 import com.bonddesk.oms.event.OrderEventPublisher;
@@ -167,6 +169,49 @@ public class OrderService {
         Order cancelled = finish(order, OrderEvent.Type.ORDER_CANCELLED);
         matching.cancel(cancelled); // pull any resting remainder from the book
         return cancelled;
+    }
+
+    /**
+     * Book a fixed-income trade negotiated off-book via RFQ. Unlike a CLOB order, an RFQ
+     * is agreed bilaterally with a dealer at a price, so it goes straight from entry to a
+     * fill at that price (no matching engine) — but still runs full pre-trade compliance
+     * and books through the same execution/position path as every other trade, with the
+     * dealer recorded as the execution venue.
+     */
+    @Transactional
+    public Order executeRfqFill(String cusip, String portfolio, String trader, OrderSide side,
+                                BigDecimal quantity, BigDecimal price, String dealer) {
+        Security security = securities.findById(cusip)
+                .orElseThrow(() -> new NotFoundException("No security with cusip " + cusip));
+
+        Order order = new Order();
+        order.setOrderRef(UUID.randomUUID().toString());
+        order.setSecurity(security);
+        order.setPortfolio(portfolio);
+        order.setTrader(trader);
+        order.setSide(side);
+        order.setOrderType(OrderType.LIMIT);   // an RFQ prints at the agreed dealer price
+        order.setTimeInForce(TimeInForce.IOC);
+        order.setQuantity(quantity);
+        order.setLimitPrice(price);
+        order.setStatus(OrderStatus.NEW);
+        order.setCreatedAt(clock.instant());
+        order.setUpdatedAt(clock.instant());
+
+        ComplianceResult result = compliance.check(order);
+        if (!result.approved()) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setStatusReason(result.summary());
+            Order saved = orders.save(order);
+            log.info("RFQ order {} REJECTED at entry: {}", saved.getOrderRef(), result.summary());
+            publish(OrderEvent.Type.ORDER_REJECTED, saved);
+            throw new BadRequestException("RFQ blocked by compliance: " + result.summary());
+        }
+
+        // Go straight to a fill at the agreed price — the trade is already done with the dealer.
+        order.setStatus(OrderStatus.ROUTED);
+        Order saved = orders.save(order);
+        return recordFill(saved, quantity, price, dealer);
     }
 
     /**

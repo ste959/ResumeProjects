@@ -11,6 +11,8 @@ oms:
     recorder-enabled: false
   equities:
     enabled: false
+  fixedincome:
+    live-curve: false        # deterministic fallback curve in tests (no network)
 
 logging:
   level:

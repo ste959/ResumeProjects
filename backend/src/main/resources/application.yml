@@ -68,6 +68,10 @@ oms:
     key-id: ${ALPACA_KEY_ID:}
     secret-key: ${ALPACA_SECRET_KEY:}
     symbols: [AAPL, MSFT, NVDA, AMZN, JPM, TSLA]
+  fixedincome:
+    live-curve: true         # fetch the real daily US Treasury par-yield curve (keyless)
+    dealer-count: 5          # dealers responding to each RFQ
+    rfq-ttl-seconds: 30      # how long dealer quotes stay firm
   # Origin patterns allowed to call the API from a browser. "*" port covers the Vite
   # dev server (:5173) and the nginx-served UI (:8088). Set to your real domain in prod.
   cors:
