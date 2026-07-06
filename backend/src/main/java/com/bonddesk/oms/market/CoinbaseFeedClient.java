@@ -18,6 +18,7 @@ import java.net.http.WebSocket;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -39,6 +40,7 @@ public class CoinbaseFeedClient {
     private final CoinbaseProperties props;
     private final MarketDataService marketData;
     private final ObjectMapper json;
+    private final Optional<L2Recorder> recorder;
     private final HttpClient http = HttpClient.newHttpClient();
     private final ScheduledExecutorService reconnect = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "coinbase-feed");
@@ -49,10 +51,12 @@ public class CoinbaseFeedClient {
     private volatile boolean running = true;
     private volatile WebSocket webSocket;
 
-    public CoinbaseFeedClient(CoinbaseProperties props, MarketDataService marketData, ObjectMapper json) {
+    public CoinbaseFeedClient(CoinbaseProperties props, MarketDataService marketData, ObjectMapper json,
+                              Optional<L2Recorder> recorder) {
         this.props = props;
         this.marketData = marketData;
         this.json = json;
+        this.recorder = recorder;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -168,23 +172,26 @@ public class CoinbaseFeedClient {
                 }
             }
             book.resetTo(bids, asks);
+            recorder.ifPresent(r -> r.snapshot(product, bids, asks));
         } else {
             for (JsonNode u : event.path("updates")) {
-                book.apply("bid".equals(u.path("side").asText()),
-                        new BigDecimal(u.path("price_level").asText()),
-                        new BigDecimal(u.path("new_quantity").asText()));
+                boolean isBid = "bid".equals(u.path("side").asText());
+                BigDecimal price = new BigDecimal(u.path("price_level").asText());
+                BigDecimal size = new BigDecimal(u.path("new_quantity").asText());
+                book.apply(isBid, price, size);
+                recorder.ifPresent(r -> r.update(product, isBid, price, size));
             }
         }
     }
 
     private void applyTradeEvent(JsonNode event) {
         for (JsonNode t : event.path("trades")) {
-            marketData.recordTrade(
-                    t.path("product_id").asText(),
-                    new BigDecimal(t.path("price").asText()),
-                    new BigDecimal(t.path("size").asText()),
-                    t.path("side").asText(),
-                    parseTime(t.path("time").asText()));
+            String product = t.path("product_id").asText();
+            BigDecimal price = new BigDecimal(t.path("price").asText());
+            BigDecimal size = new BigDecimal(t.path("size").asText());
+            String side = t.path("side").asText();
+            marketData.recordTrade(product, price, size, side, parseTime(t.path("time").asText()));
+            recorder.ifPresent(r -> r.trade(product, price, size, side));
         }
     }
 

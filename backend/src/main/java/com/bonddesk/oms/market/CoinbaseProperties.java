@@ -28,6 +28,12 @@ public class CoinbaseProperties {
     /** Directory the recorder writes to (gitignored). */
     private String recorderDir = "market-data";
 
+    /** Capture the full-depth L2 event stream (book updates + trades) for backtest replay. */
+    private boolean l2CaptureEnabled = true;
+
+    /** Directory the L2 event recorder writes to (gitignored). */
+    private String l2CaptureDir = "market-data/l2";
+
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
@@ -45,5 +51,11 @@ public class CoinbaseProperties {
 
     public String getRecorderDir() { return recorderDir; }
     public void setRecorderDir(String recorderDir) { this.recorderDir = recorderDir; }
+
+    public boolean isL2CaptureEnabled() { return l2CaptureEnabled; }
+    public void setL2CaptureEnabled(boolean l2CaptureEnabled) { this.l2CaptureEnabled = l2CaptureEnabled; }
+
+    public String getL2CaptureDir() { return l2CaptureDir; }
+    public void setL2CaptureDir(String l2CaptureDir) { this.l2CaptureDir = l2CaptureDir; }
 }
 

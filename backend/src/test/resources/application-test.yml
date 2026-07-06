@@ -9,6 +9,7 @@ oms:
   crypto:
     enabled: false
     recorder-enabled: false
+    l2-capture-enabled: false
   equities:
     enabled: false
   fixedincome:
