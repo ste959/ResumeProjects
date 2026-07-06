@@ -7,6 +7,8 @@ import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.RobustnessPoint;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.RobustnessRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.SessionView;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.SyntheticRequest;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.SyntheticResult;
 import com.bonddesk.oms.market.CoinbaseProperties;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,10 +35,13 @@ import java.util.stream.Stream;
 public class BacktestController {
 
     private final BacktestService backtest;
+    private final SyntheticMarketGenerator synthetic;
     private final CoinbaseProperties props;
 
-    public BacktestController(BacktestService backtest, CoinbaseProperties props) {
+    public BacktestController(BacktestService backtest, SyntheticMarketGenerator synthetic,
+                              CoinbaseProperties props) {
         this.backtest = backtest;
+        this.synthetic = synthetic;
         this.props = props;
     }
 
@@ -56,6 +61,12 @@ public class BacktestController {
     @Operation(summary = "Replay a strategy across market-condition scenarios — robustness vs. overfitting")
     public List<RobustnessPoint> robustness(@RequestBody RobustnessRequest req) {
         return backtest.robustness(req);
+    }
+
+    @PostMapping("/synthetic")
+    @Operation(summary = "Generate a synthetic market with a known signal — a replayable session for ML validation")
+    public SyntheticResult synthetic(@RequestBody SyntheticRequest req) {
+        return synthetic.generate(req);
     }
 
     @GetMapping("/sessions")

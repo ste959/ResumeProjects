@@ -176,4 +176,36 @@ public final class BacktestDtos {
 
     public record SessionView(String date, String file, long rows, long sizeBytes) {
     }
+
+    /**
+     * Parameters for a synthetic market. {@code imbalanceAlpha} injects a <em>known</em> signal:
+     * the book imbalance is skewed toward the next mid move with this strength, so a model can be
+     * validated against ground truth (alpha &gt; 0 → recoverable signal; alpha = 0 → pure noise,
+     * a false-positive check). Written as a replayable session named {@code label}.
+     */
+    public record SyntheticRequest(
+            String label,
+            Integer durationSeconds,
+            Long tickMs,
+            Double midStart,
+            Double volBps,          // per-tick price volatility, in bps
+            Double driftBpsPerMin,
+            Double spreadBps,
+            Integer depthLevels,
+            Double levelSize,
+            Integer tradesPerTick,
+            Double imbalanceAlpha,  // strength of the planted imbalance→return signal
+            Long seed
+    ) {
+    }
+
+    public record SyntheticResult(
+            String label,
+            String product,
+            String file,
+            long events,
+            int ticks,
+            double injectedAlpha
+    ) {
+    }
 }

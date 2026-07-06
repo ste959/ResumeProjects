@@ -237,10 +237,24 @@ but a sustained **trend wipes it out ~70×** — it is implicitly **short moment
 over on one side and accumulating a losing inventory against the move. No single backtest would
 surface that; the scenario sweep makes it explicit. That is the overfitting defense, quantified.
 
-*Next (same phase):* a synthetic market generator — produce L2 from a model with a **known** injected
-signal, so a model/strategy can be validated against ground truth. On real data you cannot tell luck
-from skill; on simulated data with a planted signal, you can. This is the substrate the ML phase
-trains on.
+## Synthetic market generation (known-signal ground truth)
+
+**Naive:** validate a model on real data and trust the backtest number.
+**Reality:** on real data you cannot separate a genuine edge from a lucky fit — the ground truth is
+unknown. **Simulated data with a *planted* signal has known ground truth**, so you can measure whether
+a model actually recovers it, and — just as important — whether it hallucinates one where there is none.
+**What we do:** a generator produces a replayable L2 session from a model whose book imbalance is skewed
+toward the next mid move with a configurable strength (`imbalanceAlpha`), plus idiosyncratic noise.
+Output uses the exact capture format, so a synthetic market is a first-class session. Verified by
+recovering the imbalance→forward-return information coefficient from the raw generated book:
+
+| session | injected alpha | recovered IC |
+|---|---|---|
+| signal | 2.5 | **+0.86** (recoverable) |
+| noise | 0 | **−0.02** (varies but predicts nothing — the false-positive check) |
+
+This is precisely how JS validates ML on simulated data, and it is the substrate the ML phase trains
+on: fit where the answer is known, *then* turn the model loose on the real feed.
 
 ---
 
