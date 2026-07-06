@@ -154,4 +154,32 @@ That curve — where the cost of size eats the edge — is the institutional cap
 
 ---
 
-*Phases 3.5–6 extend this log as each realism layer lands.*
+## Taxes (Phase 3.5 — the most-overlooked cost of all)
+
+**Naive:** subtract a flat rate from profits — or, as almost every backtest does, ignore taxes
+entirely.
+**Reality:** the tax bill depends on *how* you traded, not just how much you made, and it can
+dominate net returns. The nuances that actually matter:
+- **Lot selection.** Average cost is wrong for tax; which lots you sell (FIFO / LIFO / **HIFO**)
+  changes the realized gain. On a laddered book, HIFO vs. FIFO produced a **10× difference in the
+  tax bill** on the same economic position ($7.40 vs. $81.40).
+- **Holding period.** Short-term gains (≤ 1 yr) are taxed at the ordinary rate, long-term at a
+  lower one — on a $100k gain, **$37k vs. $20k**. Since quant/HFT strategies are almost entirely
+  short-term, **turnover carries a direct tax cost.**
+- **Wash sales (§1091) vs. crypto.** Sell a *security* at a loss and rebuy within 30 days and the
+  loss is **disallowed**; **crypto is property**, so the rule does not apply. Same loss-and-rebuy:
+  the equity's $100 loss is disallowed (tax benefit $0) while crypto keeps it (tax benefit $37) —
+  a real asymmetry between the asset classes.
+- **§475(f) mark-to-market** — the regime a prop firm actually elects: the open book is marked at
+  period end, everything is ordinary, and wash sales / long-term treatment don't apply.
+**What we do:** a lot-level tax engine (`POST /api/tax`) that ingests a trade sequence and returns
+after-tax P&L under a chosen lot method, regime, and rates — so a backtest's fills can be run
+through it to reveal the tax drag almost no backtest models.
+
+*Simplifications (documented):* the disallowed wash-sale loss is taken as a current-period hit
+rather than carried into the replacement lot's basis; short sales are not lot-matched; capital-loss
+netting and carryforward caps are not applied.
+
+---
+
+*Phases 4–6 extend this log as each realism layer lands.*
