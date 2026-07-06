@@ -6,6 +6,7 @@ import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityPoint;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.Costs;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.FillView;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.RiskLimits;
 import com.bonddesk.oms.exception.BadRequestException;
 import com.bonddesk.oms.exception.NotFoundException;
 import com.bonddesk.oms.market.CoinbaseProperties;
@@ -13,6 +14,7 @@ import com.bonddesk.oms.market.LiveOrderBook;
 import com.bonddesk.oms.market.LiveOrderBook.Level;
 import com.bonddesk.oms.strategy.AlmgrenChrissExecution;
 import com.bonddesk.oms.strategy.AvellanedaStoikovMaker;
+import com.bonddesk.oms.strategy.ExecutionModel;
 import com.bonddesk.oms.strategy.Fill;
 import com.bonddesk.oms.strategy.MarketState;
 import com.bonddesk.oms.strategy.PnlBook;
@@ -118,6 +120,14 @@ public class BacktestService {
         long moCnt1s = 0;
         long moCnt10s = 0;
         int lastFillCount = 0;
+
+        // Runtime risk: track the mark-to-market high-water mark and drawdown; a breach trips
+        // the kill-switch, flattens the position, and stops trading.
+        RiskLimits limits = req.riskLimits();
+        double peakPnl = 0;
+        double maxDrawdown = 0;
+        boolean halted = false;
+        String haltReason = null;
 
         // Snapshot rows for one snapshot event share a sequence and are contiguous.
         List<Level> snapBids = new ArrayList<>();
@@ -287,6 +297,39 @@ public class BacktestService {
                     mk10s.addLast(new double[]{ft + 10000, f.price(), sign});
                 }
                 lastFillCount = soFar.size();
+
+                // Kill-switch: track drawdown; on a breach, flatten and stop.
+                if (curMid > 0) {
+                    double pnlNow = run.book().totalPnl(curMid);
+                    peakPnl = Math.max(peakPnl, pnlNow);
+                    maxDrawdown = Math.max(maxDrawdown, peakPnl - pnlNow);
+                    if (!halted && limits != null) {
+                        String breach = null;
+                        if (limits.maxDrawdownUsd() != null && peakPnl - pnlNow > limits.maxDrawdownUsd()) {
+                            breach = "MAX_DRAWDOWN";
+                        } else if (limits.maxLossUsd() != null && pnlNow < -limits.maxLossUsd()) {
+                            breach = "MAX_LOSS";
+                        } else if (limits.maxPositionSize() != null
+                                && Math.abs(run.book().position()) > limits.maxPositionSize()) {
+                            breach = "MAX_POSITION";
+                        }
+                        if (breach != null) {
+                            double pos = run.book().position();
+                            if (Math.abs(pos) > 1e-9 && book.isReady()) {
+                                ExecutionModel.Sweep sw = ExecutionModel.sweep(book, pos < 0, Math.abs(pos));
+                                if (sw.filledSize() > 1e-9) {
+                                    run.book().apply(Fill.taker(e.ts(), pos < 0, sw.vwap(), sw.filledSize()));
+                                }
+                            }
+                            halted = true;
+                            haltReason = breach;
+                            tradingDone = true;
+                            qSzBid = 0;
+                            qSzAsk = 0;
+                            log.info("Backtest kill-switch fired: {} — flattened at {}", breach, e.ts());
+                        }
+                    }
+                }
             }
             if (inSnap) {
                 book.resetTo(snapBids, snapAsks);
@@ -301,12 +344,13 @@ public class BacktestService {
         double avgMk1s = moCnt1s > 0 ? round(moSum1s / moCnt1s, 3) : 0;
         double avgMk10s = moCnt10s > 0 ? round(moSum10s / moCnt10s, 3) : 0;
         return buildResult(req, product, buy, book, run, events, ticks, firstTs, lastTs,
-                avgMk1s, avgMk10s, sessionVolume);
+                avgMk1s, avgMk10s, sessionVolume, maxDrawdown, halted, haltReason);
     }
 
     private BacktestResult buildResult(BacktestRequest req, String product, boolean buy, LiveOrderBook book,
                                        StrategyRun run, long events, long ticks, Instant start, Instant end,
-                                       double avgMk1s, double avgMk10s, double sessionVolume) {
+                                       double avgMk1s, double avgMk10s, double sessionVolume,
+                                       double maxDrawdown, boolean halted, String haltReason) {
         double execSize = run.executedSize();
         double execNotional = run.executedNotional();
         double avgExec = execSize > 0 ? execNotional / execSize : 0;
@@ -378,6 +422,9 @@ public class BacktestService {
                 : (execSize + 1e-9 < (req.size() == null ? 0 : req.size())
                         ? "Partial: the recorded session ended before the schedule completed."
                         : "Taker fills sweep real recorded depth; all-in cost adds fees + square-root market impact on top of that slippage.");
+        if (halted) {
+            note = "Risk kill-switch fired (" + haltReason + "): position flattened and trading halted. " + note;
+        }
 
         return new BacktestResult(product, run.type(), buy ? "BUY" : "SELL",
                 req.size() == null ? 0 : req.size(), execSize, round(avgExec, 8), round(arrival, 8),
@@ -385,6 +432,7 @@ public class BacktestService {
                 round(pnl.realized(), 2), round(pnl.unrealized(finalMark), 2), round(gross, 2),
                 round(feeCost, 2), round(impactCost, 2), round(financingCost, 2), round(netPnl, 2),
                 round(feeBps, 2), round(impactBps, 2), round(allInCostBps, 2),
+                round(maxDrawdown, 2), halted, haltReason,
                 fills.size(), makerFills, takerFills, avgMk1s, avgMk10s,
                 events, ticks, start, end, note, fills);
     }
@@ -397,7 +445,8 @@ public class BacktestService {
         List<CapacityPoint> points = new ArrayList<>();
         for (double size : cap.sizes()) {
             BacktestResult r = run(new BacktestRequest(cap.product(), cap.strategyType(), cap.side(), size,
-                    cap.slices(), null, null, null, null, null, cap.tickMs(), cap.latencyMs(), cap.date(), cap.costs()));
+                    cap.slices(), null, null, null, null, null, cap.tickMs(), cap.latencyMs(), cap.date(),
+                    cap.costs(), null));
             points.add(new CapacityPoint(size, r.executedSize(), r.implementationShortfallBps(),
                     r.feeBps(), r.impactBps(), r.allInCostBps(), r.netPnl()));
         }

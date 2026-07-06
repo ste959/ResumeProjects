@@ -24,6 +24,14 @@ public final class BacktestDtos {
     ) {
     }
 
+    /** Runtime risk limits; a breach halts trading and flattens the position (kill-switch). */
+    public record RiskLimits(
+            Double maxDrawdownUsd,
+            Double maxLossUsd,
+            Double maxPositionSize
+    ) {
+    }
+
     /**
      * A backtest request: which recorded session (product + optional date, else latest),
      * which strategy to replay, its parameters, decision latency, and cost assumptions.
@@ -42,7 +50,8 @@ public final class BacktestDtos {
             Long tickMs,           // strategy tick cadence in virtual time
             Long latencyMs,        // decision-to-market latency (order + cancel); 0 = none
             String date,           // capture date (yyyy-MM-dd); null = latest file
-            Costs costs            // trading costs; null = defaults
+            Costs costs,           // trading costs; null = defaults
+            RiskLimits riskLimits  // runtime kill-switches; null = none
     ) {
     }
 
@@ -75,6 +84,9 @@ public final class BacktestDtos {
             double feeBps,
             double impactBps,
             double allInCostBps,      // fees + impact + financing, per notional
+            double maxDrawdownUsd,    // observed peak-to-trough of mark-to-market P&L
+            boolean halted,           // did a risk kill-switch fire?
+            String haltReason,
             int numFills,
             int makerFills,
             int takerFills,

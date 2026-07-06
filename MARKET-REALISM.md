@@ -182,4 +182,34 @@ netting and carryforward caps are not applied.
 
 ---
 
-*Phases 4–6 extend this log as each realism layer lands.*
+## Risk management (Phase 4)
+
+Risk is not a number you read off afterwards — it's limits enforced *before and during* trading,
+plus an aggregate, factor-level view of what you're actually exposed to.
+
+**Runtime kill-switches.** Naive backtests let a strategy run to the end no matter what. Real
+desks have hard limits — a max drawdown, a daily loss stop, an inventory cap — and a breach
+**flattens the position and halts.** The backtester enforces them live: an Avellaneda–Stoikov
+maker that drifted to a **−$212 loss** (short 1.2 BTC) was, under an $8 max-drawdown limit,
+stopped at −$8.5 — flattened to flat and halted — turning the loss into **+$13.** Pre-trade
+compliance (which the OMS already had) is only half of risk; runtime risk-off is the other half.
+
+**Aggregate, factor-level risk.** Naive: risk is a list of line items. Reality: it is aggregate
+and by factor. The risk engine sums **DV01** across the bond book (reusing the bond math),
+separates **rate** risk from **credit/spread** risk, and stresses the book:
+- a long-Treasury / long-corporate / short-long-Treasury book showed net **rate DV01 $1,998/bp**
+  but **credit DV01 $3,225/bp** — the short Treasury hedges duration but not spread, so credit
+  risk exceeds net rate risk. That's exposure you'd miss reading positions one at a time.
+- parametric 1-day 95% VaR, **diversified ($28k) vs. undiversified ($39k)** — the diversification
+  benefit made explicit.
+- scenario stress including a correlated **RISK_OFF** shock (rates rally, equities fall, credit
+  widens) — the flight-to-quality tail where the corporate longs bleed straight through the
+  Treasury rally.
+
+*Deferred:* per-name key-rate durations and a true covariance matrix (this VaR assumes factor
+independence); the de-cointegration / pairs-blowout scenario is represented by the correlated
+RISK_OFF shock rather than a strategy-specific spread model.
+
+---
+
+*Phases 5–6 extend this log as each realism layer lands.*
