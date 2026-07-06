@@ -291,6 +291,7 @@ kubectl -n bonddesk get pods
 | `GET` | `/api/market/products` | Live Coinbase quotes (best bid/ask, spread, last) |
 | `GET` | `/api/market/{product}/book` | Live depth ladder (real order book) |
 | `GET` | `/api/market/{product}/trades` | Real trade tape |
+| `GET` | `/api/market/{product}/microstructure` | Rolling signals: imbalance, microprice premium, spread |
 | `POST` | `/api/market/{product}/orders` | Paper-trade against the live book (VWAP + slippage) |
 | `GET` | `/api/market/positions` | Crypto positions with live mark-to-market |
 | `POST` | `/api/strategies` | Launch a strategy (TWAP/POV/Almgren–Chriss or Avellaneda–Stoikov) |

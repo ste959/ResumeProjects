@@ -5,19 +5,42 @@ import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { Blotter } from './components/Blotter';
 import { LiveMarket } from './components/LiveMarket';
 import { OrderTicket } from './components/OrderTicket';
+import { Overview } from './components/Overview';
 import { Positions } from './components/Positions';
 import { RiskDashboard } from './components/RiskDashboard';
+import { Signals } from './components/Signals';
 import { Strategies } from './components/Strategies';
 import { usePolling } from './hooks/usePolling';
 
 const PORTFOLIO = 'PORT-DEMO';
 
-type Tab = 'trading' | 'risk' | 'analytics' | 'market' | 'strategies';
+type Tab = 'overview' | 'trading' | 'risk' | 'analytics' | 'market' | 'strategies' | 'signals';
+
+// Grouped navigation — the structure that tells the "multi-desk platform" story.
+const NAV: { group: string | null; items: { key: Tab; label: string }[] }[] = [
+  { group: null, items: [{ key: 'overview', label: 'Overview' }] },
+  {
+    group: 'Fixed Income',
+    items: [
+      { key: 'trading', label: 'Desk' },
+      { key: 'risk', label: 'Risk' },
+      { key: 'analytics', label: 'Analytics' },
+    ],
+  },
+  {
+    group: 'Live Markets',
+    items: [
+      { key: 'market', label: 'Market' },
+      { key: 'strategies', label: 'Strategies' },
+      { key: 'signals', label: 'Signals' },
+    ],
+  },
+];
 
 export default function App() {
   const [securities, setSecurities] = useState<Security[]>([]);
   const [secError, setSecError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('trading');
+  const [tab, setTab] = useState<Tab>('overview');
 
   const orders = usePolling(api.orders, 2000);
   const positions = usePolling(useCallback(() => api.positions(PORTFOLIO), []), 2000);
@@ -43,26 +66,21 @@ export default function App() {
         <div className="brand">
           <span className="logo">◆</span>
           <div>
-            <h1>BondDesk OMS</h1>
-            <p>Fixed Income Order &amp; Execution Management</p>
+            <h1>BondDesk</h1>
+            <p>Multi-Asset Trading &amp; Research Platform</p>
           </div>
         </div>
-        <nav className="tabs">
-          <button className={tab === 'trading' ? 'active' : ''} onClick={() => setTab('trading')}>
-            Trading Desk
-          </button>
-          <button className={tab === 'risk' ? 'active' : ''} onClick={() => setTab('risk')}>
-            Risk
-          </button>
-          <button className={tab === 'analytics' ? 'active' : ''} onClick={() => setTab('analytics')}>
-            Analytics
-          </button>
-          <button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}>
-            Live Market
-          </button>
-          <button className={tab === 'strategies' ? 'active' : ''} onClick={() => setTab('strategies')}>
-            Strategies
-          </button>
+        <nav className="nav">
+          {NAV.map((section, i) => (
+            <div className="nav-group" key={i}>
+              {section.group && <span className="nav-group-label">{section.group}</span>}
+              {section.items.map((it) => (
+                <button key={it.key} className={tab === it.key ? 'active' : ''} onClick={() => setTab(it.key)}>
+                  {it.label}
+                </button>
+              ))}
+            </div>
+          ))}
         </nav>
         <div className="status-strip">
           <span className={`dot ${connected ? 'live' : 'down'}`} />
@@ -76,6 +94,12 @@ export default function App() {
         <div className="banner err global">
           Cannot reach the API at <code>/api</code>. Is the backend running on :8080?
         </div>
+      )}
+
+      {tab === 'overview' && (
+        <main className="risk-main">
+          <Overview onNavigate={(t) => setTab(t as Tab)} />
+        </main>
       )}
 
       {tab === 'trading' && (
@@ -136,11 +160,22 @@ export default function App() {
           <Strategies />
         </main>
       )}
+
+      {tab === 'signals' && (
+        <main className="risk-main">
+          <div className="risk-intro">
+            <span className="dot live" />
+            Live <b>microstructure signals</b> from the Coinbase book — order-book imbalance, microprice
+            premium, spread, and an imbalance information coefficient
+          </div>
+          <Signals />
+        </main>
+      )}
     </div>
   );
 }
 
-/** Live ticking clock for the terminal header. */
+/** Live ticking clock for the header. */
 function Clock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {

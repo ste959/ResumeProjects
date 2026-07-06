@@ -6,6 +6,7 @@ import type {
   DeskRiskSummary,
   DeskSummary,
   ExecutionQuality,
+  MicroSnapshot,
   Order,
   PaperOrder,
   PaperOrderRequest,
@@ -87,6 +88,8 @@ export const api = {
     request<BookView>(`/market/${encodeURIComponent(product)}/book?depth=${depth}`),
   marketTrades: (product: string) =>
     request<TradePrint[]>(`/market/${encodeURIComponent(product)}/trades`),
+  marketMicrostructure: (product: string) =>
+    request<MicroSnapshot[]>(`/market/${encodeURIComponent(product)}/microstructure`),
   submitPaperOrder: (product: string, req: PaperOrderRequest) =>
     request<PaperOrder>(`/market/${encodeURIComponent(product)}/orders`, {
       method: 'POST',

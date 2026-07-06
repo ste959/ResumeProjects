@@ -183,6 +183,15 @@ export interface PaperOrder {
   fills: PaperFill[];
 }
 
+export interface MicroSnapshot {
+  epochMillis: number;
+  mid: number;
+  microprice: number;
+  imbalance: number;
+  spreadBps: number;
+  microPremiumBps: number;
+}
+
 export interface CryptoPosition {
   product: string;
   netSize: number;

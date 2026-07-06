@@ -32,10 +32,13 @@ public class MarketController {
 
     private final MarketDataService marketData;
     private final PaperTradingService paper;
+    private final MicrostructureService microstructure;
 
-    public MarketController(MarketDataService marketData, PaperTradingService paper) {
+    public MarketController(MarketDataService marketData, PaperTradingService paper,
+                           MicrostructureService microstructure) {
         this.marketData = marketData;
         this.paper = paper;
+        this.microstructure = microstructure;
     }
 
     @GetMapping("/products")
@@ -56,6 +59,12 @@ public class MarketController {
     @Operation(summary = "Recent real trades (the tape)")
     public List<TradePrint> trades(@PathVariable String product) {
         return marketData.recentTrades(product);
+    }
+
+    @GetMapping("/{product}/microstructure")
+    @Operation(summary = "Rolling microstructure signals (imbalance, microprice premium, spread)")
+    public List<MicroSnapshot> microstructure(@PathVariable String product) {
+        return microstructure.series(product);
     }
 
     @PostMapping("/{product}/orders")
