@@ -17,3 +17,14 @@ dist/
 .idea/
 .vscode/
 *.log
+
+# Captured market data (research dataset)
+market-data/
+backend/market-data/
+
+# Python research artifacts
+research/data/
+research/output/
+__pycache__/
+.pytest_cache/
+*.pyc

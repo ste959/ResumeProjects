@@ -85,6 +85,7 @@ the same numbers).
 | **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
 | **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
 | **Real-time data / WebSockets** | Live **Coinbase** order-book feed (JDK WebSocket) → depth ladder + **paper trading against real liquidity** with genuine slippage |
+| **Quant research / Python** | `research/` — **Parquet + DuckDB** warehouse, hand-rolled econometrics (**cointegration, OU half-life**), cost-aware **backtester**, BTC/ETH **stat-arb** study with an honest (overfit-flagging) verdict |
 
 ---
 
@@ -185,6 +186,26 @@ The same order-book machinery is asset-agnostic, so a **"Live Market" module** s
 This grounds the platform in **real liquidity levels and price action** — the matching
 mechanics (sweep best-first, partial fills, slippage) are identical whether the book is a
 bond CLOB or a crypto exchange. Disabled by config (`oms.crypto.enabled`) in tests/offline.
+
+---
+
+## Quant research & backtesting (Python — `research/`)
+
+On top of the live feed sits a **Python research layer** — mirroring how quant desks
+actually split things: the Java/Spring system does low-latency trading; **Python does
+research** over a columnar data warehouse. (Polyglot *for the right reason*.)
+
+- **Data architecture**: raw capture is an append-only log; the analytical store is
+  **columnar Parquet (zstd, partitioned) queried with DuckDB** — candles cached as Parquet
+  so studies don't re-hit the API. (Not CSV-as-a-database.)
+- **Hand-rolled econometrics** (no statsmodels): OLS, ADF unit-root, **Engle–Granger
+  cointegration**, **Ornstein–Uhlenbeck half-life**.
+- **Honest backtester**: transaction costs + a **one-period execution lag (no look-ahead)**,
+  reporting Sharpe / drawdown / turnover / hit-rate.
+- **BTC/ETH stat-arb study** that is built to *catch itself out*: on real data the pair is
+  **not cointegrated**, so the study flags its shiny in-sample Sharpe as **likely spurious/
+  overfit** rather than reporting it as alpha. Rigor and intellectual honesty over pretty
+  equity curves. 9 tests on synthetic data. See [`research/README.md`](research/README.md).
 
 ---
 

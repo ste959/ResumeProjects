@@ -8,6 +8,7 @@ oms:
     enabled: false
   crypto:
     enabled: false
+    recorder-enabled: false
 
 logging:
   level:

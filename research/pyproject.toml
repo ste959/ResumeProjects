@@ -1,0 +1,10 @@
+[project]
+name = "bonddesk-research"
+version = "0.1.0"
+description = "Quant research / backtesting over the BondDesk live market feed"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pandas", "pyarrow", "duckdb", "requests"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

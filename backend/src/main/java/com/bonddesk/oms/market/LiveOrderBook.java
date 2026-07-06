@@ -60,6 +60,30 @@ public final class LiveOrderBook {
         return e == null ? null : e.getKey();
     }
 
+    public BigDecimal bestBidSize() {
+        Map.Entry<BigDecimal, BigDecimal> e = bids.firstEntry();
+        return e == null ? null : e.getValue();
+    }
+
+    public BigDecimal bestAskSize() {
+        Map.Entry<BigDecimal, BigDecimal> e = asks.firstEntry();
+        return e == null ? null : e.getValue();
+    }
+
+    /** Size-weighted fair value: leans toward the side with more size behind it. */
+    public BigDecimal microprice() {
+        BigDecimal bid = bestBid(), ask = bestAsk(), bs = bestBidSize(), as = bestAskSize();
+        if (bid == null || ask == null || bs == null || as == null) {
+            return null;
+        }
+        BigDecimal denom = bs.add(as);
+        if (denom.signum() == 0) {
+            return mid();
+        }
+        // microprice = (bid*askSize + ask*bidSize) / (bidSize + askSize)
+        return bid.multiply(as).add(ask.multiply(bs)).divide(denom, 8, java.math.RoundingMode.HALF_UP);
+    }
+
     public BigDecimal mid() {
         BigDecimal b = bestBid();
         BigDecimal a = bestAsk();

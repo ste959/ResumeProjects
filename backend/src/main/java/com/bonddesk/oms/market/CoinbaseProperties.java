@@ -22,6 +22,12 @@ public class CoinbaseProperties {
     /** How many recent trade prints to retain per product for the tape. */
     private int tradeTapeSize = 50;
 
+    /** Capture a per-second microstructure snapshot to CSV for offline research. */
+    private boolean recorderEnabled = true;
+
+    /** Directory the recorder writes to (gitignored). */
+    private String recorderDir = "market-data";
+
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
@@ -33,4 +39,11 @@ public class CoinbaseProperties {
 
     public int getTradeTapeSize() { return tradeTapeSize; }
     public void setTradeTapeSize(int tradeTapeSize) { this.tradeTapeSize = tradeTapeSize; }
+
+    public boolean isRecorderEnabled() { return recorderEnabled; }
+    public void setRecorderEnabled(boolean recorderEnabled) { this.recorderEnabled = recorderEnabled; }
+
+    public String getRecorderDir() { return recorderDir; }
+    public void setRecorderDir(String recorderDir) { this.recorderDir = recorderDir; }
 }
+
