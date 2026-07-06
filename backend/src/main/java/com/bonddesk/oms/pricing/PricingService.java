@@ -1,5 +1,6 @@
 package com.bonddesk.oms.pricing;
 
+import com.bonddesk.oms.domain.AssetClass;
 import com.bonddesk.oms.domain.Security;
 import com.bonddesk.oms.exception.BadRequestException;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,11 @@ public class PricingService {
     }
 
     public BondAnalyticsResponse report(Security security) {
+        if (security.getAssetClass() != AssetClass.FIXED_INCOME) {
+            throw new BadRequestException(
+                    "Bond analytics are only available for fixed-income securities, not "
+                            + security.getCusip() + " (" + security.getAssetClass() + ")");
+        }
         LocalDate settlement = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
         if (!security.getMaturityDate().isAfter(settlement)) {
             throw new BadRequestException("Security " + security.getCusip() + " has matured");

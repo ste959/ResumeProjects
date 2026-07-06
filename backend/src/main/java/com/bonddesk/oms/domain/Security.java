@@ -14,11 +14,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * Reference (static) data for a tradable fixed-income instrument — a bond.
+ * Reference (static) data for a tradable security — a bond or a listed equity.
  *
  * <p>The CUSIP is used as the natural primary key: it is the industry-standard
- * 9-character identifier for a North American security, so there is no benefit to a
- * synthetic surrogate key here.
+ * 9-character identifier for a North American security (equities have CUSIPs too, e.g.
+ * Apple is 037833100), so there is no benefit to a synthetic surrogate key here.
+ *
+ * <p>The {@link #assetClass} discriminates bonds from equities. Bond-specific fields
+ * (coupon, maturity, rating) are null for equities; the equity {@link #ticker} is null
+ * for bonds. This keeps one security master, one order model and one position model
+ * across asset classes rather than parallel silos.
  */
 @Entity
 @Table(name = "security")
@@ -32,6 +37,15 @@ public class Security {
     @Column(length = 9, nullable = false)
     private String cusip;
 
+    /** Asset class — determines how the security is priced and executed. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private AssetClass assetClass = AssetClass.FIXED_INCOME;
+
+    /** Exchange ticker, e.g. "AAPL" — equities only (null for bonds). */
+    @Column(length = 12)
+    private String ticker;
+
     /** 12-character ISIN, e.g. "US912828YK08". */
     @Column(length = 12)
     private String isin;
@@ -44,15 +58,15 @@ public class Security {
     @Column(nullable = false)
     private String issuer;
 
-    /** Annual coupon rate as a percentage, e.g. 1.5 means 1.50%. */
-    @Column(nullable = false, precision = 7, scale = 4)
+    /** Annual coupon rate as a percentage, e.g. 1.5 means 1.50% — fixed income only. */
+    @Column(precision = 7, scale = 4)
     private BigDecimal couponRate;
 
-    @Column(nullable = false)
+    /** Maturity date — fixed income only (null for equities). */
     private LocalDate maturityDate;
 
-    /** Par/face value of a single bond, typically 1000. */
-    @Column(nullable = false, precision = 19, scale = 2)
+    /** Par/face value of a single bond, typically 1000 — fixed income only. */
+    @Column(precision = 19, scale = 2)
     private BigDecimal faceValue;
 
     @Column(length = 3, nullable = false)
@@ -62,13 +76,14 @@ public class Security {
     @Column(nullable = false)
     private String sector;
 
+    /** Credit rating — fixed income only (null for equities). */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private CreditRating rating;
 
     /**
-     * Latest indicative clean price as a percentage of par (e.g. 99.75 = 99.75% of
-     * face). Used by the execution simulator as a reference for fills.
+     * Latest indicative reference price. For bonds this is the clean price as a
+     * percentage of par (e.g. 99.75 = 99.75% of face); for equities it is the price in
+     * currency per share. Used as a fallback fill reference before a live quote arrives.
      */
     @Column(nullable = false, precision = 9, scale = 4)
     private BigDecimal cleanPrice;

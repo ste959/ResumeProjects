@@ -1,5 +1,6 @@
 package com.bonddesk.oms.dto;
 
+import com.bonddesk.oms.domain.AssetClass;
 import com.bonddesk.oms.domain.CreditRating;
 import com.bonddesk.oms.domain.Security;
 
@@ -8,6 +9,8 @@ import java.time.LocalDate;
 
 public record SecurityResponse(
         String cusip,
+        AssetClass assetClass,
+        String ticker,
         String isin,
         String description,
         String issuer,
@@ -25,6 +28,8 @@ public record SecurityResponse(
     public static SecurityResponse from(Security s) {
         return new SecurityResponse(
                 s.getCusip(),
+                s.getAssetClass(),
+                s.getTicker(),
                 s.getIsin(),
                 s.getDescription(),
                 s.getIssuer(),
@@ -34,7 +39,7 @@ public record SecurityResponse(
                 s.getCurrency(),
                 s.getSector(),
                 s.getRating(),
-                s.getRating().isInvestmentGrade(),
+                s.getRating() != null && s.getRating().isInvestmentGrade(),
                 s.getCleanPrice(),
                 s.isRestricted()
         );

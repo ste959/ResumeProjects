@@ -48,7 +48,8 @@ public class ConcentrationLimitRule implements ComplianceRule {
                 : order.getQuantity().negate();
 
         BigDecimal projectedNet = currentNet.add(signedOrderQty).abs();
-        BigDecimal projectedNotional = Pricing.notional(projectedNet, Pricing.referencePrice(order));
+        BigDecimal projectedNotional =
+                Pricing.notional(order.getSecurity(), projectedNet, Pricing.referencePrice(order));
 
         if (projectedNotional.compareTo(props.getMaxSecurityNotionalPerPortfolio()) > 0) {
             return Optional.of("Post-trade exposure %s in %s for %s exceeds the concentration limit of %s"

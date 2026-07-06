@@ -1,5 +1,6 @@
 package com.bonddesk.oms.config;
 
+import com.bonddesk.oms.domain.AssetClass;
 import com.bonddesk.oms.domain.CreditRating;
 import com.bonddesk.oms.domain.Security;
 import com.bonddesk.oms.repository.SecurityRepository;
@@ -60,16 +61,30 @@ public class DataSeeder implements CommandLineRunner {
                         "6.2500", "2036-04-15", "CORPORATE", CreditRating.B_PLUS, "84.5000", false),
                 // Restricted: all trading blocked by RestrictedSecurityRule.
                 bond("999999XX9", "US999999XX90", "PROJECT MERIDIAN 5.0% 2032 (RESTRICTED)", "MERIDIAN SPV",
-                        "5.0000", "2032-09-30", "CORPORATE", CreditRating.BBB_MINUS, "100.0000", true)
+                        "5.0000", "2032-09-30", "CORPORATE", CreditRating.BBB_MINUS, "100.0000", true),
+
+                // Listed equities — routed to the lit order book (Alpaca) rather than RFQ.
+                // The clean_price here is only an indicative fallback; the live feed overrides it.
+                // Tickers match the equity market-data / execution symbols.
+                equity("037833100", "AAPL", "US0378331005", "APPLE INC", "TECHNOLOGY", "232.50"),
+                equity("594918104", "MSFT", "US5949181045", "MICROSOFT CORP", "TECHNOLOGY", "430.00"),
+                equity("67066G104", "NVDA", "US67066G1040", "NVIDIA CORP", "SEMICONDUCTORS", "128.00"),
+                equity("023135106", "AMZN", "US0231351067", "AMAZON.COM INC", "CONSUMER DISCRETIONARY", "205.00"),
+                equity("46625H100", "JPM", "US46625H1005", "JPMORGAN CHASE & CO", "FINANCIALS", "265.00"),
+                equity("88160R101", "TSLA", "US88160R1014", "TESLA INC", "CONSUMER DISCRETIONARY", "340.00")
         );
         securities.saveAll(seed);
-        log.info("Seeded {} securities into the security master", seed.size());
+        long bonds = seed.stream().filter(s -> s.getAssetClass() == AssetClass.FIXED_INCOME).count();
+        long equities = seed.size() - bonds;
+        log.info("Seeded {} securities into the security master ({} bonds, {} equities)",
+                seed.size(), bonds, equities);
     }
 
     private static Security bond(String cusip, String isin, String description, String issuer,
                                  String coupon, String maturity, String sector,
                                  CreditRating rating, String cleanPrice, boolean restricted) {
         Security s = new Security();
+        s.setAssetClass(AssetClass.FIXED_INCOME);
         s.setCusip(cusip);
         s.setIsin(isin);
         s.setDescription(description);
@@ -82,6 +97,26 @@ public class DataSeeder implements CommandLineRunner {
         s.setRating(rating);
         s.setCleanPrice(new BigDecimal(cleanPrice));
         s.setRestricted(restricted);
+        return s;
+    }
+
+    /**
+     * A listed equity: no coupon/maturity/rating (those are fixed-income concepts), a
+     * ticker for the market-data feed, and a price quoted in dollars per share.
+     */
+    private static Security equity(String cusip, String ticker, String isin, String issuer,
+                                   String sector, String price) {
+        Security s = new Security();
+        s.setAssetClass(AssetClass.EQUITY);
+        s.setCusip(cusip);
+        s.setTicker(ticker);
+        s.setIsin(isin);
+        s.setDescription(issuer + " COMMON STOCK");
+        s.setIssuer(issuer);
+        s.setCurrency("USD");
+        s.setSector(sector);
+        s.setCleanPrice(new BigDecimal(price));
+        s.setRestricted(false);
         return s;
     }
 }

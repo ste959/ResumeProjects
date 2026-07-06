@@ -29,7 +29,7 @@ public class MaxOrderNotionalRule implements ComplianceRule {
 
     @Override
     public Optional<String> evaluate(Order order) {
-        BigDecimal notional = Pricing.notional(order.getQuantity(), Pricing.referencePrice(order));
+        BigDecimal notional = Pricing.notional(order);
         if (notional.compareTo(props.getMaxOrderNotional()) > 0) {
             return Optional.of("Order notional %s exceeds the per-order limit of %s"
                     .formatted(MONEY.format(notional), MONEY.format(props.getMaxOrderNotional())));

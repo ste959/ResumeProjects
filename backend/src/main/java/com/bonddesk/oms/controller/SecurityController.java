@@ -1,5 +1,6 @@
 package com.bonddesk.oms.controller;
 
+import com.bonddesk.oms.domain.AssetClass;
 import com.bonddesk.oms.dto.SecurityResponse;
 import com.bonddesk.oms.pricing.BondAnalyticsResponse;
 import com.bonddesk.oms.pricing.PricingService;
@@ -17,7 +18,7 @@ import java.util.List;
 /** Bond reference data — what the order-ticket security picker reads. */
 @RestController
 @RequestMapping("/api/securities")
-@Tag(name = "Securities", description = "Bond reference data (security master)")
+@Tag(name = "Securities", description = "Multi-asset reference data (security master)")
 public class SecurityController {
 
     private final SecurityService securities;
@@ -29,13 +30,14 @@ public class SecurityController {
     }
 
     @GetMapping
-    @Operation(summary = "List bonds, optionally filtered by sector")
-    public List<SecurityResponse> list(@RequestParam(required = false) String sector) {
-        return securities.list(sector).stream().map(SecurityResponse::from).toList();
+    @Operation(summary = "List securities, optionally filtered by asset class and/or sector")
+    public List<SecurityResponse> list(@RequestParam(required = false) AssetClass assetClass,
+                                       @RequestParam(required = false) String sector) {
+        return securities.list(sector, assetClass).stream().map(SecurityResponse::from).toList();
     }
 
     @GetMapping("/{cusip}")
-    @Operation(summary = "Fetch a single bond by CUSIP")
+    @Operation(summary = "Fetch a single security by CUSIP")
     public SecurityResponse get(@PathVariable String cusip) {
         return SecurityResponse.from(securities.get(cusip));
     }
