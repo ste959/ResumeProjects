@@ -13,6 +13,9 @@ dist/
 # Env / editor
 .env
 .env.local
+# Alpaca API keys (paste real keys here; committed template is alpaca-local.yml.example)
+alpaca-local.yml
+backend/alpaca-local.yml
 .DS_Store
 .idea/
 .vscode/

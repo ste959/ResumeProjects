@@ -2,6 +2,11 @@ spring:
   application:
     name: bonddesk-oms
 
+  # Optional, git-ignored file holding Alpaca API keys for the equities module. "optional:"
+  # means the app still boots if it is absent (the equities feed just stays idle).
+  config:
+    import: optional:file:./alpaca-local.yml
+
   # Default profile runs entirely in-memory (H2) so the OMS starts with nothing but a
   # JDK. Hibernate builds the schema here; the PostgreSQL profile uses Flyway instead.
   datasource:
@@ -56,6 +61,13 @@ oms:
     enabled: true          # live Coinbase market-data feed (public, no API key)
     ws-url: wss://advanced-trade-ws.coinbase.com
     products: [BTC-USD, ETH-USD, SOL-USD]
+  equities:
+    enabled: true          # live Alpaca IEX feed + paper-broker execution
+    # Credentials come from the environment or the git-ignored alpaca-local.yml; blank
+    # here means the module boots idle until keys are supplied.
+    key-id: ${ALPACA_KEY_ID:}
+    secret-key: ${ALPACA_SECRET_KEY:}
+    symbols: [AAPL, MSFT, NVDA, AMZN, JPM, TSLA]
   # Origin patterns allowed to call the API from a browser. "*" port covers the Vite
   # dev server (:5173) and the nginx-served UI (:8088). Set to your real domain in prod.
   cors:

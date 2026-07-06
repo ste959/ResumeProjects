@@ -10,9 +10,12 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 /**
- * Payload for staging a new bond order. Structural validation (required fields,
- * positive quantity) is enforced here via bean validation; business rules
+ * Payload for staging a new order (bond or equity). Structural validation (required
+ * fields, positive quantity) is enforced here via bean validation; business rules
  * (LIMIT needs a price, compliance) are enforced in the service layer.
+ *
+ * <p>Quantity is in the instrument's natural unit: par face for bonds (traded in large
+ * blocks), number of shares for equities.
  */
 public record CreateOrderRequest(
 
@@ -35,7 +38,7 @@ public record CreateOrderRequest(
         TimeInForce timeInForce,
 
         @NotNull(message = "quantity is required")
-        @DecimalMin(value = "1000", message = "minimum order size is 1,000 face")
+        @DecimalMin(value = "1", message = "quantity must be at least 1")
         BigDecimal quantity,
 
         /** Required for LIMIT orders; ignored for MARKET orders. */

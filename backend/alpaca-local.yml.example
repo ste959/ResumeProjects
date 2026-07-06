@@ -1,0 +1,15 @@
+# Alpaca paper-trading credentials for the equities module.
+#
+# HOW TO USE:
+#   1. Copy this file to `alpaca-local.yml` (same directory). That file is git-ignored.
+#   2. Paste your PAPER keys from the Alpaca dashboard (Home -> your Paper account ->
+#      "Generate / View API Keys"). Use the paper keys, not live keys.
+#   3. Restart the backend. On boot it logs "Alpaca authenticated; subscribing ...".
+#
+# Alternatively, set the ALPACA_KEY_ID / ALPACA_SECRET_KEY environment variables instead
+# of using this file. Either way, no keys are ever committed.
+
+oms:
+  equities:
+    key-id: "PKXXXXXXXXXXXXXXXXXX"
+    secret-key: "your-secret-key-here"

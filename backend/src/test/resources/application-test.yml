@@ -9,6 +9,8 @@ oms:
   crypto:
     enabled: false
     recorder-enabled: false
+  equities:
+    enabled: false
 
 logging:
   level:
