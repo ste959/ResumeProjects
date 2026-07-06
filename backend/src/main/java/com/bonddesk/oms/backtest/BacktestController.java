@@ -4,6 +4,8 @@ import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestResult;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityPoint;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityRequest;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.RobustnessPoint;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.RobustnessRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.SessionView;
 import com.bonddesk.oms.market.CoinbaseProperties;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,6 +50,12 @@ public class BacktestController {
     @Operation(summary = "Sweep a strategy across order sizes — the capacity curve (cost grows with size)")
     public List<CapacityPoint> capacity(@RequestBody CapacityRequest req) {
         return backtest.capacity(req);
+    }
+
+    @PostMapping("/robustness")
+    @Operation(summary = "Replay a strategy across market-condition scenarios — robustness vs. overfitting")
+    public List<RobustnessPoint> robustness(@RequestBody RobustnessRequest req) {
+        return backtest.robustness(req);
     }
 
     @GetMapping("/sessions")

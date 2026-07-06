@@ -212,4 +212,36 @@ RISK_OFF shock rather than a strategy-specific spread model.
 
 ---
 
-*Phases 5–6 extend this log as each realism layer lands.*
+## Market scenario engine — counterfactual replay (overfitting defense)
+
+**Naive:** a backtest on one recorded path proves the strategy works.
+**Reality:** it proves the strategy worked *once*, on that exact path. Markets are non-stationary
+and the world adapts — the only question that matters is whether an edge survives when conditions
+are slightly different.
+**What we do:** a counterfactual transform perturbs the recorded L2 stream into a different regime
+— scaling volatility, spread and liquidity, imposing a trend, or injecting a shock — while
+preserving book structure (the transform is monotonic in price, so bids stay below the mid and
+asks above it). The *same* strategy re-runs against the harder/easier world, and a robustness
+sweep runs a grid of regimes and reports how it holds up.
+
+The result on the Avellaneda–Stoikov maker is exactly the hidden fragility a single backtest hides:
+
+| regime | net P&L | markout +1s | max drawdown |
+|---|---|---|---|
+| base (as recorded) | −178 | +0.01 | 321 |
+| high vol 2.5× | +106 | −4.5 | 45 |
+| **trend +20 bps/min** | **−12,355** | **−62** | **12,397** |
+
+The maker looks marginal at baseline and even *profits* in higher vol (wider quotes capture more),
+but a sustained **trend wipes it out ~70×** — it is implicitly **short momentum**, repeatedly run
+over on one side and accumulating a losing inventory against the move. No single backtest would
+surface that; the scenario sweep makes it explicit. That is the overfitting defense, quantified.
+
+*Next (same phase):* a synthetic market generator — produce L2 from a model with a **known** injected
+signal, so a model/strategy can be validated against ground truth. On real data you cannot tell luck
+from skill; on simulated data with a planted signal, you can. This is the substrate the ML phase
+trains on.
+
+---
+
+*Phase 5 (ML on real + simulated data) and Phase 6 extend this log as each layer lands.*

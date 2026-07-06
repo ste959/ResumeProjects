@@ -33,6 +33,20 @@ public final class BacktestDtos {
     }
 
     /**
+     * A counterfactual market-condition transform applied to the recorded stream during replay,
+     * to test a strategy's robustness across regimes. All optional (default = no change).
+     */
+    public record Scenario(
+            Double volScale,        // scale price volatility (>1 = more volatile)
+            Double spreadScale,     // scale the bid/ask spread
+            Double liquidityScale,  // scale resting size (thin vs. thick book)
+            Double driftBpsPerMin,  // impose a trend
+            Double shockBps,        // one-off price jump
+            Long shockAtSecond      // when the shock hits (seconds into the session)
+    ) {
+    }
+
+    /**
      * A backtest request: which recorded session (product + optional date, else latest),
      * which strategy to replay, its parameters, decision latency, and cost assumptions.
      */
@@ -51,7 +65,8 @@ public final class BacktestDtos {
             Long latencyMs,        // decision-to-market latency (order + cancel); 0 = none
             String date,           // capture date (yyyy-MM-dd); null = latest file
             Costs costs,           // trading costs; null = defaults
-            RiskLimits riskLimits  // runtime kill-switches; null = none
+            RiskLimits riskLimits, // runtime kill-switches; null = none
+            Scenario scenario      // counterfactual market transform; null = replay as recorded
     ) {
     }
 
@@ -124,6 +139,38 @@ public final class BacktestDtos {
             double impactBps,
             double allInCostBps,
             double netPnl
+    ) {
+    }
+
+    public record NamedScenario(String label, Scenario scenario) {
+    }
+
+    /** Sweep a strategy across market-condition scenarios to measure robustness. */
+    public record RobustnessRequest(
+            String product,
+            String strategyType,
+            String side,
+            Double size,
+            Integer slices,
+            Double quoteSize,
+            Long tickMs,
+            Long latencyMs,
+            String date,
+            Costs costs,
+            List<NamedScenario> scenarios
+    ) {
+    }
+
+    /** One row of the robustness sweep: how the strategy fared under a named regime. */
+    public record RobustnessPoint(
+            String label,
+            double executedSize,
+            double shortfallBps,
+            double allInCostBps,
+            double netPnl,
+            double avgMarkoutBps1s,
+            double maxDrawdownUsd,
+            boolean halted
     ) {
     }
 

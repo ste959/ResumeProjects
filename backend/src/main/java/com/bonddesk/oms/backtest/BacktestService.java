@@ -6,7 +6,11 @@ import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityPoint;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.Costs;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.FillView;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.NamedScenario;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.RiskLimits;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.RobustnessPoint;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.RobustnessRequest;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.Scenario;
 import com.bonddesk.oms.exception.BadRequestException;
 import com.bonddesk.oms.exception.NotFoundException;
 import com.bonddesk.oms.market.CoinbaseProperties;
@@ -73,6 +77,7 @@ public class BacktestService {
         String product = req.product();
         long tickMs = req.tickMs() != null ? req.tickMs() : 500L;
         Path file = resolveFile(req.date());
+        ScenarioTransform transform = buildTransform(req.scenario());
 
         LiveOrderBook book = new LiveOrderBook(product);
         StrategyRun run = null;
@@ -144,6 +149,12 @@ public class BacktestService {
                     continue;
                 }
                 events++;
+                if (transform != null) {
+                    if (firstTs == null) {
+                        transform.start(e.ts());
+                    }
+                    e = transform.apply(e); // counterfactual regime
+                }
                 if (firstTs == null) {
                     firstTs = e.ts();
                 }
@@ -446,11 +457,40 @@ public class BacktestService {
         for (double size : cap.sizes()) {
             BacktestResult r = run(new BacktestRequest(cap.product(), cap.strategyType(), cap.side(), size,
                     cap.slices(), null, null, null, null, null, cap.tickMs(), cap.latencyMs(), cap.date(),
-                    cap.costs(), null));
+                    cap.costs(), null, null));
             points.add(new CapacityPoint(size, r.executedSize(), r.implementationShortfallBps(),
                     r.feeBps(), r.impactBps(), r.allInCostBps(), r.netPnl()));
         }
         return points;
+    }
+
+    /** Replay a strategy across market-condition scenarios — a robustness sweep for overfitting. */
+    public List<RobustnessPoint> robustness(RobustnessRequest req) {
+        if (req.scenarios() == null || req.scenarios().isEmpty()) {
+            throw new BadRequestException("scenarios are required for a robustness sweep");
+        }
+        List<RobustnessPoint> out = new ArrayList<>();
+        for (NamedScenario ns : req.scenarios()) {
+            BacktestResult r = run(new BacktestRequest(req.product(), req.strategyType(), req.side(), req.size(),
+                    req.slices(), null, null, null, null, req.quoteSize(), req.tickMs(), req.latencyMs(),
+                    req.date(), req.costs(), null, ns.scenario()));
+            out.add(new RobustnessPoint(ns.label(), r.executedSize(), r.implementationShortfallBps(),
+                    r.allInCostBps(), r.netPnl(), r.avgMarkoutBps1s(), r.maxDrawdownUsd(), r.halted()));
+        }
+        return out;
+    }
+
+    private static ScenarioTransform buildTransform(Scenario s) {
+        if (s == null) {
+            return null;
+        }
+        return new ScenarioTransform(
+                s.volScale() == null ? 1.0 : s.volScale(),
+                s.spreadScale() == null ? 1.0 : s.spreadScale(),
+                s.liquidityScale() == null ? 1.0 : s.liquidityScale(),
+                s.driftBpsPerMin() == null ? 0.0 : s.driftBpsPerMin(),
+                s.shockBps() == null ? 0.0 : s.shockBps(),
+                s.shockAtSecond() == null ? 0L : s.shockAtSecond());
     }
 
     private static double cfg(Double v, double def) {

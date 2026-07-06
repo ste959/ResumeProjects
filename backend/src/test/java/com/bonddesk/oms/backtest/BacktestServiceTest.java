@@ -41,7 +41,7 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", null, null));
+                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", null, null, null));
 
         assertThat(r.executedSize()).isEqualTo(2.0);
         assertThat(r.numFills()).isEqualTo(2);
@@ -57,7 +57,7 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "TWAP", "SELL", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", null, null));
+                "BTC-USD", "TWAP", "SELL", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", null, null, null));
 
         assertThat(r.executedSize()).isEqualTo(2.0);
         assertThat(r.avgExecPrice()).isEqualTo(100.0); // hits the bid
@@ -69,7 +69,7 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "AVELLANEDA_STOIKOV", null, 0.5, null, null, null, null, null, null, null, null, "2026-01-01", null, null));
+                "BTC-USD", "AVELLANEDA_STOIKOV", null, 0.5, null, null, null, null, null, null, null, null, "2026-01-01", null, null, null));
 
         assertThat(r.strategyType()).isEqualTo("AVELLANEDA_STOIKOV");
         assertThat(r.note().toLowerCase()).contains("market making");
@@ -83,7 +83,7 @@ class BacktestServiceTest {
         Costs costs = new Costs(50.0, 0.0, 0.0, 0.0, 0.0, 50.0); // 50 bps taker fee + impact
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", costs, null));
+                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", costs, null, null));
 
         assertThat(r.feeCostUsd()).isGreaterThan(0.0);
         assertThat(r.impactCostUsd()).isGreaterThan(0.0);
