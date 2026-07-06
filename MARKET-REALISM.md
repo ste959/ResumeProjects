@@ -92,11 +92,27 @@ later mid is recorded. The signatures come out exactly right on recorded data: a
 shows *positive* markouts (spread capture) yet still loses on **inventory risk** — the two
 sides of market making, separated and measured.
 
+## Latency (Phase 2b — order + cancel)
+
+**Naive:** your order reaches the market instantly and you can pull a stale quote at will.
+**Reality:** there is a delay between deciding and your order arriving, and you cannot cancel
+instantly — so your old quote lingers and gets run over in fast moves. This is *the* market-
+maker risk.
+**What we do:** the fill model acts on the quote as it was `latencyMs` ago — one parameter
+capturing both order latency (the new quote posts late) and cancel latency (the old one
+lingers until it does). The capture's receipt-time stamps make this well-defined. On recorded
+data the effect is the textbook latency signature: as latency rises 0 → 500 ms the maker takes
+*more* fills (stale quotes sit longer and get hit) but its short-horizon **+1s markout degrades
+monotonically** (+0.31 → −0.33 → −0.56 bps) — it is increasingly **adversely selected**, picked
+off right before the price moves. The degradation is short-horizon (the +10s markout washes out
+with mean reversion), which is precisely where adverse selection lives.
+
 ### Deliberately deferred (with reason)
 
-- **Latency** (order + cancel) — the book moves between your decision and your order's
-  arrival, and you cannot pull a stale quote instantly (you get run over in fast moves).
-  The capture is already receipt-time stamped for this; the model is the next increment.
+- **Per-order taker arrival latency.** The current model is a single decision-to-market lag,
+  which bites the maker (stale quotes) and state-dependent takers. Modelling arrival latency
+  for state-*independent* schedules (e.g. a fixed TWAP that ignores the book) needs deferred
+  execution and is a further step.
 
 ---
 

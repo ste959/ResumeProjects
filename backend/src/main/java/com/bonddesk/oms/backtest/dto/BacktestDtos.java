@@ -25,6 +25,7 @@ public final class BacktestDtos {
             Double tau,            // Avellaneda–Stoikov horizon
             Double quoteSize,      // Avellaneda–Stoikov quote size
             Long tickMs,           // strategy tick cadence in virtual time
+            Long latencyMs,        // decision-to-market latency (order + cancel); 0 = none
             String date            // capture date (yyyy-MM-dd); null = latest file
     ) {
     }

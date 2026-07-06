@@ -40,7 +40,7 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, "2026-01-01"));
+                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01"));
 
         assertThat(r.executedSize()).isEqualTo(2.0);
         assertThat(r.numFills()).isEqualTo(2);
@@ -56,7 +56,7 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "TWAP", "SELL", 2.0, 2, null, null, null, null, null, null, "2026-01-01"));
+                "BTC-USD", "TWAP", "SELL", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01"));
 
         assertThat(r.executedSize()).isEqualTo(2.0);
         assertThat(r.avgExecPrice()).isEqualTo(100.0); // hits the bid
@@ -68,7 +68,7 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "AVELLANEDA_STOIKOV", null, 0.5, null, null, null, null, null, null, null, "2026-01-01"));
+                "BTC-USD", "AVELLANEDA_STOIKOV", null, 0.5, null, null, null, null, null, null, null, null, "2026-01-01"));
 
         assertThat(r.strategyType()).isEqualTo("AVELLANEDA_STOIKOV");
         assertThat(r.note().toLowerCase()).contains("market making");

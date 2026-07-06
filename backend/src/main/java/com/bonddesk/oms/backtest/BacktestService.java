@@ -82,11 +82,18 @@ public class BacktestService {
         long events = 0;
         long ticks = 0;
 
-        // Passive (maker) queue-position state, per side: how much size is ahead of our
-        // quote, how much reaching volume has traded, and how much of our quote has filled.
-        double lastQBid = -1;
-        double lastQAsk = -1;
-        double lastQSz = -1;
+        // Decision-to-market latency: the fill model acts on the quote as it was
+        // `latencyMs` ago. This captures order latency (a new quote posts late) and cancel
+        // latency (the old quote lingers until it does) — how makers get run over in fast
+        // moves. quoteHist holds {tsMillis, bid, ask, size} snapshots at each tick.
+        long latencyMs = req.latencyMs() != null ? Math.max(0, req.latencyMs()) : 0;
+        Deque<double[]> quoteHist = new ArrayDeque<>();
+
+        // Passive (maker) queue-position state, per side: the currently-active (latency-lagged)
+        // quote, how much size is ahead of us, reaching volume traded, and how much has filled.
+        double lastActiveBid = -1;
+        double lastActiveAsk = -1;
+        double lastActiveSz = -1;
         double qBidPx = 0;
         double qAskPx = 0;
         double qSzBid = 0;
@@ -129,6 +136,39 @@ public class BacktestService {
                 lastTs = e.ts();
                 if (run == null) {
                     run = new StrategyRun(strategy.type(), product, strategy, e.ts());
+                }
+
+                // Latency: the active quote the fill model uses is the one in force
+                // `latencyMs` ago. When it changes, reset queue position at the new prices.
+                if (!quoteHist.isEmpty()) {
+                    long laggedMs = e.ts().toEpochMilli() - latencyMs;
+                    double[] active = null;
+                    for (double[] q : quoteHist) {
+                        if (q[0] <= laggedMs) {
+                            active = q;
+                        } else {
+                            break;
+                        }
+                    }
+                    if (active != null && (active[1] != lastActiveBid || active[2] != lastActiveAsk
+                            || active[3] != lastActiveSz)) {
+                        qBidPx = active[1];
+                        qAskPx = active[2];
+                        qSzBid = active[3];
+                        qSzAsk = active[3];
+                        queueAheadBid = book.sizeAtOrBetter(true, BigDecimal.valueOf(qBidPx)).doubleValue();
+                        queueAheadAsk = book.sizeAtOrBetter(false, BigDecimal.valueOf(qAskPx)).doubleValue();
+                        cumReachBid = 0;
+                        cumReachAsk = 0;
+                        filledBid = 0;
+                        filledAsk = 0;
+                        lastActiveBid = active[1];
+                        lastActiveAsk = active[2];
+                        lastActiveSz = active[3];
+                    }
+                    while (quoteHist.size() > 2 && quoteHist.peekFirst()[0] < laggedMs - 5000) {
+                        quoteHist.pollFirst();
+                    }
                 }
 
                 if (e.isSnapshot()) {
@@ -195,25 +235,12 @@ public class BacktestService {
                     MarketState state = new MarketState(product, d(book.bestBid()), d(book.bestAsk()),
                             mid, d(book.microprice()), perTickSigma(mids), volSinceTick);
                     strategy.step(new StrategyContext(state, book, run, e.ts()));
-                    // If the maker re-quoted, it cancelled and re-posted — reset our queue
-                    // position at the new prices (a fresh order joins at the back).
-                    double nb = run.quoteBid();
-                    double na = run.quoteAsk();
-                    double ns = run.quoteSize();
-                    if (ns > 0 && (nb != lastQBid || na != lastQAsk || ns != lastQSz)) {
-                        qBidPx = nb;
-                        qAskPx = na;
-                        qSzBid = ns;
-                        qSzAsk = ns;
-                        queueAheadBid = book.sizeAtOrBetter(true, BigDecimal.valueOf(nb)).doubleValue();
-                        queueAheadAsk = book.sizeAtOrBetter(false, BigDecimal.valueOf(na)).doubleValue();
-                        cumReachBid = 0;
-                        cumReachAsk = 0;
-                        filledBid = 0;
-                        filledAsk = 0;
-                        lastQBid = nb;
-                        lastQAsk = na;
-                        lastQSz = ns;
+                    // Record the maker's intended quote with a timestamp. The fill model
+                    // picks it up `latencyMs` later (see the lag-resolve above) — a fresh
+                    // order joins the back of the queue when it actually reaches the market.
+                    if (run.quoteSize() > 0) {
+                        quoteHist.addLast(new double[]{
+                                e.ts().toEpochMilli(), run.quoteBid(), run.quoteAsk(), run.quoteSize()});
                     }
                     run.touch(e.ts());
                     ticks++;
