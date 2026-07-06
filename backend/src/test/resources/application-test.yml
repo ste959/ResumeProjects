@@ -6,6 +6,8 @@ oms:
     enabled: false
   kafka:
     enabled: false
+  crypto:
+    enabled: false
 
 logging:
   level:

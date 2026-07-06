@@ -706,3 +706,135 @@ code {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--dim);
 }
+
+/* ---------- Live crypto market ---------- */
+.market-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.product-tabs {
+  display: flex;
+  gap: 4px;
+}
+.product-tabs button {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  color: var(--dim);
+  padding: 5px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+.product-tabs button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.quote-strip {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--dim);
+}
+.quote-strip .q.active {
+  color: var(--ink);
+}
+.quote-strip b {
+  color: var(--accent);
+  margin-right: 4px;
+}
+
+.market-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 360px;
+  gap: 12px;
+}
+.market-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ladder {
+  padding: 6px 0;
+}
+.lvl {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.depthbar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 0;
+}
+.depthbar.ask {
+  background: rgba(220, 38, 38, 0.1);
+}
+.depthbar.bid {
+  background: rgba(5, 150, 105, 0.1);
+}
+.lp,
+.lsz {
+  position: relative;
+  z-index: 1;
+}
+.lsz {
+  color: var(--dim);
+}
+.ladder-mid {
+  text-align: center;
+  padding: 6px;
+  margin: 4px 0;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 14px;
+  background: var(--head);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+}
+.ladder-mid .dim {
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.tape .tape-body {
+  padding: 6px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.tprint {
+  display: grid;
+  grid-template-columns: 46px 1fr 1fr 62px;
+  gap: 8px;
+  padding: 2px 12px;
+  font-size: 11.5px;
+  align-items: center;
+}
+.tprint span:first-child {
+  font-weight: 700;
+}
+.tprint.buy span:first-child {
+  color: var(--buy);
+}
+.tprint.sell span:first-child {
+  color: var(--sell);
+}
+
+@media (max-width: 900px) {
+  .market-grid {
+    grid-template-columns: 1fr;
+  }
+}

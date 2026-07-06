@@ -1,6 +1,7 @@
 package com.bonddesk.oms.config;
 
 import com.bonddesk.oms.compliance.ComplianceProperties;
+import com.bonddesk.oms.market.CoinbaseProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,7 +14,7 @@ import java.time.Clock;
  * timestamps deterministically.
  */
 @Configuration
-@EnableConfigurationProperties(ComplianceProperties.class)
+@EnableConfigurationProperties({ComplianceProperties.class, CoinbaseProperties.class})
 public class AppConfig {
 
     @Bean

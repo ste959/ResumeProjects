@@ -84,6 +84,7 @@ the same numbers).
 | **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
 | **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
 | **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
+| **Real-time data / WebSockets** | Live **Coinbase** order-book feed (JDK WebSocket) → depth ladder + **paper trading against real liquidity** with genuine slippage |
 
 ---
 
@@ -162,6 +163,26 @@ par/discount/premium yield relationships, accrued interest, and price round-trip
 
 ---
 
+## Live market data — real Coinbase feed (multi-asset)
+
+The same order-book machinery is asset-agnostic, so a **"Live Market" module** streams the
+**real Coinbase order book** and lets the desk **paper-trade against genuine liquidity**:
+
+- A **WebSocket client** (JDK built-in — no dependency) subscribes to Coinbase Advanced
+  Trade's public `level2` (full depth) and `market_trades` channels — **no API key required**.
+- `LiveOrderBook` reconstructs each product's book from the snapshot + incremental updates;
+  a live **depth ladder**, **spread/quote**, and **trade tape** are exposed over REST.
+- **Paper trading against the live book**: a market/limit order sweeps the real resting
+  liquidity level-by-level, paying **genuine multi-level slippage** vs. the arrival mid
+  (e.g. a 1.5 BTC market order filling across ~20+ real price levels), and updates a
+  crypto position with **live mark-to-market**.
+
+This grounds the platform in **real liquidity levels and price action** — the matching
+mechanics (sweep best-first, partial fills, slippage) are identical whether the book is a
+bond CLOB or a crypto exchange. Disabled by config (`oms.crypto.enabled`) in tests/offline.
+
+---
+
 ## Running it
 
 ### Option A — Local dev (needs only a JDK 21 and Node 20)
@@ -217,6 +238,11 @@ kubectl -n bonddesk get pods
 | `GET` | `/api/analytics/execution-quality` | TCA: avg fill vs. benchmark, slippage (bps) by security/side |
 | `GET` | `/api/analytics/top-securities?limit=` | Highest-volume securities |
 | `GET` | `/api/analytics/daily-volume` | Daily volume + running total (window function) |
+| `GET` | `/api/market/products` | Live Coinbase quotes (best bid/ask, spread, last) |
+| `GET` | `/api/market/{product}/book` | Live depth ladder (real order book) |
+| `GET` | `/api/market/{product}/trades` | Real trade tape |
+| `POST` | `/api/market/{product}/orders` | Paper-trade against the live book (VWAP + slippage) |
+| `GET` | `/api/market/positions` | Crypto positions with live mark-to-market |
 | `GET` | `/api/risk/summary` | *(risk-service :8081)* Desk risk aggregated from events |
 
 ---

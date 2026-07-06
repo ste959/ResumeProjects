@@ -3,6 +3,7 @@ import { api } from './api/client';
 import type { Security } from './api/types';
 import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { Blotter } from './components/Blotter';
+import { LiveMarket } from './components/LiveMarket';
 import { OrderTicket } from './components/OrderTicket';
 import { Positions } from './components/Positions';
 import { RiskDashboard } from './components/RiskDashboard';
@@ -10,7 +11,7 @@ import { usePolling } from './hooks/usePolling';
 
 const PORTFOLIO = 'PORT-DEMO';
 
-type Tab = 'trading' | 'risk' | 'analytics';
+type Tab = 'trading' | 'risk' | 'analytics' | 'market';
 
 export default function App() {
   const [securities, setSecurities] = useState<Security[]>([]);
@@ -54,6 +55,9 @@ export default function App() {
           </button>
           <button className={tab === 'analytics' ? 'active' : ''} onClick={() => setTab('analytics')}>
             Analytics
+          </button>
+          <button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}>
+            Live Market
           </button>
         </nav>
         <div className="status-strip">
@@ -104,6 +108,17 @@ export default function App() {
             execQuality={execQuality.data ?? []}
             topSecurities={topSecurities.data ?? []}
           />
+        </main>
+      )}
+
+      {tab === 'market' && (
+        <main className="risk-main">
+          <div className="risk-intro">
+            <span className="dot live" />
+            Live <b>Coinbase</b> order book (real depth &amp; price action) — paper-trade against genuine
+            liquidity with real slippage
+          </div>
+          <LiveMarket />
         </main>
       )}
     </div>

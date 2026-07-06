@@ -52,6 +52,10 @@ oms:
     enabled: true          # route orders to the CLOB matching engine
     liquidity:
       interval-ms: 1500     # market-maker quote-refresh cadence
+  crypto:
+    enabled: true          # live Coinbase market-data feed (public, no API key)
+    ws-url: wss://advanced-trade-ws.coinbase.com
+    products: [BTC-USD, ETH-USD, SOL-USD]
   # Origin patterns allowed to call the API from a browser. "*" port covers the Vite
   # dev server (:5173) and the nginx-served UI (:8088). Set to your real domain in prod.
   cors:

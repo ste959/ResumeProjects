@@ -122,6 +122,76 @@ export interface DeskRiskSummary {
   portfolios: PortfolioRisk[];
 }
 
+// ---- Live crypto market (real Coinbase feed) ----
+
+export interface ProductQuote {
+  product: string;
+  bestBid: number | null;
+  bestAsk: number | null;
+  mid: number | null;
+  spread: number | null;
+  spreadBps: number | null;
+  lastPrice: number | null;
+}
+
+export interface DepthLevel {
+  price: number;
+  size: number;
+  cumulative: number;
+}
+
+export interface BookView {
+  product: string;
+  quote: ProductQuote;
+  bids: DepthLevel[];
+  asks: DepthLevel[];
+}
+
+export interface TradePrint {
+  product: string;
+  price: number;
+  size: number;
+  side: string;
+  time: string;
+}
+
+export interface PaperOrderRequest {
+  side: 'BUY' | 'SELL';
+  type: 'MARKET' | 'LIMIT';
+  size: number;
+  limitPrice?: number | null;
+}
+
+export interface PaperFill {
+  price: number;
+  size: number;
+}
+
+export interface PaperOrder {
+  id: string;
+  product: string;
+  side: 'BUY' | 'SELL';
+  type: 'MARKET' | 'LIMIT';
+  requestedSize: number;
+  limitPrice: number | null;
+  status: string;
+  filledSize: number;
+  avgPrice: number | null;
+  notional: number;
+  slippageBps: number;
+  createdAt: string;
+  fills: PaperFill[];
+}
+
+export interface CryptoPosition {
+  product: string;
+  netSize: number;
+  avgCost: number;
+  markPrice: number | null;
+  marketValue: number | null;
+  unrealizedPnl: number | null;
+}
+
 export interface ApiError {
   timestamp: string;
   status: number;

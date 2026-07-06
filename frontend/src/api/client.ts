@@ -1,12 +1,18 @@
 import type {
+  BookView,
   CreateOrderRequest,
+  CryptoPosition,
   DeskRiskSummary,
   DeskSummary,
   ExecutionQuality,
   Order,
+  PaperOrder,
+  PaperOrderRequest,
   Position,
+  ProductQuote,
   Security,
   SecurityVolume,
+  TradePrint,
   ApiError,
 } from './types';
 
@@ -72,4 +78,18 @@ export const api = {
   deskSummary: () => request<DeskSummary>('/analytics/desk-summary'),
   executionQuality: () => request<ExecutionQuality[]>('/analytics/execution-quality'),
   topSecurities: (limit = 6) => request<SecurityVolume[]>(`/analytics/top-securities?limit=${limit}`),
+
+  // Live crypto market (real Coinbase feed + paper trading).
+  marketProducts: () => request<ProductQuote[]>('/market/products'),
+  marketBook: (product: string, depth = 12) =>
+    request<BookView>(`/market/${encodeURIComponent(product)}/book?depth=${depth}`),
+  marketTrades: (product: string) =>
+    request<TradePrint[]>(`/market/${encodeURIComponent(product)}/trades`),
+  submitPaperOrder: (product: string, req: PaperOrderRequest) =>
+    request<PaperOrder>(`/market/${encodeURIComponent(product)}/orders`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  cryptoPositions: () => request<CryptoPosition[]>('/market/positions'),
+  cryptoOrders: () => request<PaperOrder[]>('/market/orders'),
 };
