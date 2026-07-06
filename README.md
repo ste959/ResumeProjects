@@ -163,7 +163,12 @@ par/discount/premium yield relationships, accrued interest, and price round-trip
 
 ---
 
-## Live market data — real Coinbase feed (multi-asset)
+## Live market data — real Coinbase feed (capability showcase)
+
+> This platform is **fixed-income-first** (above). This module is a self-contained
+> demonstration that the order-book engine is **asset-agnostic** and can integrate a
+> **real-time exchange feed** — not a change of focus. It lives in its own `market/`
+> package and "Live Market" tab, gated by `oms.crypto.enabled`.
 
 The same order-book machinery is asset-agnostic, so a **"Live Market" module** streams the
 **real Coinbase order book** and lets the desk **paper-trade against genuine liquidity**:
