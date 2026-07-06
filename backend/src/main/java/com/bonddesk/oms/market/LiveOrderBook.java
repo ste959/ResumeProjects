@@ -101,6 +101,24 @@ public final class LiveOrderBook {
         return rows;
     }
 
+    /**
+     * Total resting size at prices at least as good as {@code price} on the given side —
+     * i.e. the size that sits <em>ahead</em> of a new order joining at {@code price} in
+     * price-time priority. Used by the backtester to estimate queue position.
+     */
+    public BigDecimal sizeAtOrBetter(boolean bid, BigDecimal price) {
+        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? bids : asks;
+        BigDecimal total = BigDecimal.ZERO;
+        for (Map.Entry<BigDecimal, BigDecimal> e : side.entrySet()) {
+            boolean atOrBetter = bid ? e.getKey().compareTo(price) >= 0 : e.getKey().compareTo(price) <= 0;
+            if (!atOrBetter) {
+                break; // levels are best-first, so once worse than price we can stop
+            }
+            total = total.add(e.getValue());
+        }
+        return total;
+    }
+
     /** A point-in-time copy of one side (best first) for matching a paper order. */
     public List<Level> snapshot(boolean bid) {
         ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? bids : asks;

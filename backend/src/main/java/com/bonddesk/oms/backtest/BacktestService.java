@@ -9,6 +9,8 @@ import com.bonddesk.oms.market.CoinbaseProperties;
 import com.bonddesk.oms.market.LiveOrderBook;
 import com.bonddesk.oms.market.LiveOrderBook.Level;
 import com.bonddesk.oms.strategy.AlmgrenChrissExecution;
+import com.bonddesk.oms.strategy.AvellanedaStoikovMaker;
+import com.bonddesk.oms.strategy.Fill;
 import com.bonddesk.oms.strategy.MarketState;
 import com.bonddesk.oms.strategy.PnlBook;
 import com.bonddesk.oms.strategy.PovExecution;
@@ -80,6 +82,32 @@ public class BacktestService {
         long events = 0;
         long ticks = 0;
 
+        // Passive (maker) queue-position state, per side: how much size is ahead of our
+        // quote, how much reaching volume has traded, and how much of our quote has filled.
+        double lastQBid = -1;
+        double lastQAsk = -1;
+        double lastQSz = -1;
+        double qBidPx = 0;
+        double qAskPx = 0;
+        double qSzBid = 0;
+        double qSzAsk = 0;
+        double queueAheadBid = 0;
+        double queueAheadAsk = 0;
+        double cumReachBid = 0;
+        double cumReachAsk = 0;
+        double filledBid = 0;
+        double filledAsk = 0;
+
+        // Markout (adverse-selection) state: for each fill, revisit the mid +1s and +10s
+        // later. Each entry is {dueEpochMillis, fillPrice, sideSign(+1 buy / -1 sell)}.
+        Deque<double[]> mk1s = new ArrayDeque<>();
+        Deque<double[]> mk10s = new ArrayDeque<>();
+        double moSum1s = 0;
+        double moSum10s = 0;
+        long moCnt1s = 0;
+        long moCnt10s = 0;
+        int lastFillCount = 0;
+
         // Snapshot rows for one snapshot event share a sequence and are contiguous.
         List<Level> snapBids = new ArrayList<>();
         List<Level> snapAsks = new ArrayList<>();
@@ -124,7 +152,31 @@ public class BacktestService {
                 if (e.isUpdate()) {
                     book.apply(e.isBid(), e.price(), e.size());
                 } else if (e.isTrade()) {
-                    volSinceTick += e.size().doubleValue();
+                    double v = e.size().doubleValue();
+                    double px = e.price().doubleValue();
+                    volSinceTick += v;
+                    // Queue-position maker fill: a resting quote fills only after enough
+                    // reaching volume (trades on the far side, at prices that touch our
+                    // quote) has cleared the size ahead of us in the queue. e.isBid()==true
+                    // marks a buy-aggressor trade (lifts asks → fills our ask); false marks
+                    // a sell-aggressor trade (hits bids → fills our bid).
+                    if (run != null) {
+                        if (e.isBid() && qAskPx > 0 && px >= qAskPx && qSzAsk - filledAsk > 1e-12) {
+                            cumReachAsk += v;
+                            double fill = Math.min(Math.max(0, cumReachAsk - queueAheadAsk), qSzAsk) - filledAsk;
+                            if (fill > 1e-9) {
+                                run.book().apply(Fill.maker(e.ts(), false, qAskPx, fill));
+                                filledAsk += fill;
+                            }
+                        } else if (!e.isBid() && qBidPx > 0 && px <= qBidPx && qSzBid - filledBid > 1e-12) {
+                            cumReachBid += v;
+                            double fill = Math.min(Math.max(0, cumReachBid - queueAheadBid), qSzBid) - filledBid;
+                            if (fill > 1e-9) {
+                                run.book().apply(Fill.maker(e.ts(), true, qBidPx, fill));
+                                filledBid += fill;
+                            }
+                        }
+                    }
                 }
 
                 // Advance the strategy on the tick cadence, in virtual (event) time.
@@ -143,6 +195,26 @@ public class BacktestService {
                     MarketState state = new MarketState(product, d(book.bestBid()), d(book.bestAsk()),
                             mid, d(book.microprice()), perTickSigma(mids), volSinceTick);
                     strategy.step(new StrategyContext(state, book, run, e.ts()));
+                    // If the maker re-quoted, it cancelled and re-posted — reset our queue
+                    // position at the new prices (a fresh order joins at the back).
+                    double nb = run.quoteBid();
+                    double na = run.quoteAsk();
+                    double ns = run.quoteSize();
+                    if (ns > 0 && (nb != lastQBid || na != lastQAsk || ns != lastQSz)) {
+                        qBidPx = nb;
+                        qAskPx = na;
+                        qSzBid = ns;
+                        qSzAsk = ns;
+                        queueAheadBid = book.sizeAtOrBetter(true, BigDecimal.valueOf(nb)).doubleValue();
+                        queueAheadAsk = book.sizeAtOrBetter(false, BigDecimal.valueOf(na)).doubleValue();
+                        cumReachBid = 0;
+                        cumReachAsk = 0;
+                        filledBid = 0;
+                        filledAsk = 0;
+                        lastQBid = nb;
+                        lastQAsk = na;
+                        lastQSz = ns;
+                    }
                     run.touch(e.ts());
                     ticks++;
                     if (mid > 0) {
@@ -157,6 +229,32 @@ public class BacktestService {
                         tradingDone = true;
                     }
                 }
+
+                // Resolve markouts now due against the current mid, then schedule markouts
+                // for fills created this event (taker fills in the tick, maker fills above).
+                double curMid = d(book.mid());
+                long nowMs = e.ts().toEpochMilli();
+                if (curMid > 0) {
+                    while (!mk1s.isEmpty() && mk1s.peekFirst()[0] <= nowMs) {
+                        double[] m = mk1s.pollFirst();
+                        moSum1s += m[2] * (curMid - m[1]) / m[1] * 10_000.0;
+                        moCnt1s++;
+                    }
+                    while (!mk10s.isEmpty() && mk10s.peekFirst()[0] <= nowMs) {
+                        double[] m = mk10s.pollFirst();
+                        moSum10s += m[2] * (curMid - m[1]) / m[1] * 10_000.0;
+                        moCnt10s++;
+                    }
+                }
+                List<Fill> soFar = run.book().fills();
+                for (int i = lastFillCount; i < soFar.size(); i++) {
+                    Fill f = soFar.get(i);
+                    double sign = f.isBuy() ? 1 : -1;
+                    long ft = f.time().toEpochMilli();
+                    mk1s.addLast(new double[]{ft + 1000, f.price(), sign});
+                    mk10s.addLast(new double[]{ft + 10000, f.price(), sign});
+                }
+                lastFillCount = soFar.size();
             }
             if (inSnap) {
                 book.resetTo(snapBids, snapAsks);
@@ -168,11 +266,14 @@ public class BacktestService {
         if (run == null) {
             throw new BadRequestException("No events for product " + product + " in " + file.getFileName());
         }
-        return buildResult(req, product, buy, book, run, events, ticks, firstTs, lastTs);
+        double avgMk1s = moCnt1s > 0 ? round(moSum1s / moCnt1s, 3) : 0;
+        double avgMk10s = moCnt10s > 0 ? round(moSum10s / moCnt10s, 3) : 0;
+        return buildResult(req, product, buy, book, run, events, ticks, firstTs, lastTs, avgMk1s, avgMk10s);
     }
 
     private BacktestResult buildResult(BacktestRequest req, String product, boolean buy, LiveOrderBook book,
-                                       StrategyRun run, long events, long ticks, Instant start, Instant end) {
+                                       StrategyRun run, long events, long ticks, Instant start, Instant end,
+                                       double avgMk1s, double avgMk10s) {
         double execSize = run.executedSize();
         double execNotional = run.executedNotional();
         double avgExec = execSize > 0 ? execNotional / execSize : 0;
@@ -185,15 +286,22 @@ public class BacktestService {
         List<FillView> fills = pnl.fills().stream()
                 .map(f -> new FillView(f.time(), f.side(), f.price(), f.size(), f.liquidity()))
                 .toList();
-        String note = execSize + 1e-9 < (req.size() == null ? 0 : req.size())
-                ? "Partial: the recorded session ended before the schedule completed."
-                : "Fills sweep real recorded depth (multi-level slippage); own-order market impact arrives in a later phase.";
+        int makerFills = (int) pnl.fills().stream().filter(f -> "MAKER".equals(f.liquidity())).count();
+        int takerFills = fills.size() - makerFills;
+
+        boolean mm = "AVELLANEDA_STOIKOV".equals(run.type());
+        String note = mm
+                ? "Two-sided market making: fills are queue-position aware (a quote fills only after reaching volume clears the size ahead). Markouts reveal adverse selection."
+                : (execSize + 1e-9 < (req.size() == null ? 0 : req.size())
+                        ? "Partial: the recorded session ended before the schedule completed."
+                        : "Taker fills sweep real recorded depth (multi-level slippage); own-order market impact arrives in a later phase.");
 
         return new BacktestResult(product, run.type(), buy ? "BUY" : "SELL",
                 req.size() == null ? 0 : req.size(), execSize, round(avgExec, 8), round(arrival, 8),
                 round(isBps, 2), round(finalMark, 8), pnl.position(),
                 round(pnl.realized(), 2), round(pnl.unrealized(finalMark), 2), round(pnl.totalPnl(finalMark), 2),
-                fills.size(), events, ticks, start, end, note, fills);
+                fills.size(), makerFills, takerFills, avgMk1s, avgMk10s,
+                events, ticks, start, end, note, fills);
     }
 
     private Strategy build(BacktestRequest req, boolean buy) {
@@ -205,8 +313,11 @@ public class BacktestService {
             case "POV" -> new PovExecution(buy, size, slices, req.participation() == null ? 0.1 : req.participation());
             case "ALMGREN_CHRISS" ->
                     new AlmgrenChrissExecution(buy, size, slices, req.kappa() == null ? 0.3 : req.kappa());
-            case "AVELLANEDA_STOIKOV" -> throw new BadRequestException(
-                    "Market-making backtest needs the maker fill model (Phase 2); execution algos (TWAP/POV/ALMGREN_CHRISS) work now");
+            case "AVELLANEDA_STOIKOV" -> new AvellanedaStoikovMaker(
+                    req.gamma() == null ? 0.3 : req.gamma(),
+                    req.kappa() == null ? 1.5 : req.kappa(),
+                    req.tau() == null ? 60.0 : req.tau(),
+                    req.quoteSize() == null ? (req.size() == null ? 0.05 : req.size()) : req.quoteSize());
             default -> throw new BadRequestException("Unknown strategyType: " + type);
         };
     }

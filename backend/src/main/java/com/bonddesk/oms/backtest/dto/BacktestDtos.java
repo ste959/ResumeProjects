@@ -15,12 +15,15 @@ public final class BacktestDtos {
      */
     public record BacktestRequest(
             String product,
-            String strategyType,   // TWAP | POV | ALMGREN_CHRISS
-            String side,           // BUY | SELL
+            String strategyType,   // TWAP | POV | ALMGREN_CHRISS | AVELLANEDA_STOIKOV
+            String side,           // BUY | SELL (execution algos)
             Double size,
             Integer slices,
             Double participation,  // POV
-            Double kappa,          // Almgren–Chriss
+            Double kappa,          // Almgren–Chriss / Avellaneda–Stoikov
+            Double gamma,          // Avellaneda–Stoikov risk aversion
+            Double tau,            // Avellaneda–Stoikov horizon
+            Double quoteSize,      // Avellaneda–Stoikov quote size
             Long tickMs,           // strategy tick cadence in virtual time
             String date            // capture date (yyyy-MM-dd); null = latest file
     ) {
@@ -48,6 +51,10 @@ public final class BacktestDtos {
             double unrealizedPnl,
             double totalPnl,
             int numFills,
+            int makerFills,
+            int takerFills,
+            double avgMarkoutBps1s,   // adverse selection: fill P&L 1s later (negative = picked off)
+            double avgMarkoutBps10s,
             long eventsProcessed,
             long ticks,
             Instant sessionStart,

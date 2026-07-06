@@ -63,4 +63,41 @@ state reconstructed from events **up to that instant**. Events are replayed in r
 
 ---
 
-*Phases 2–6 extend this log as each realism layer lands.*
+## Realistic fills (Phase 2 — passive fills, queue position, adverse selection)
+
+**Naive:** a resting quote fills the instant a trade prints through its price. (This is
+literally what the live engine's maker fill does — it's labelled "optimistic queue.")
+**Reality:** you are in a **price-time (FIFO) queue**. When you post a bid, there is already
+size resting ahead of you; a sell only reaches *you* after it has cleared everyone in front.
+Fill probability depends on queue position, not just price.
+**What we do:** on posting, queue-ahead = total size at prices at least as good as ours
+(`LiveOrderBook.sizeAtOrBetter`). Reaching trade volume first depletes the queue; only the
+overflow fills us, up to our size. Re-quoting cancels and re-posts, so it **resets the queue**
+(a fresh order joins at the back). Result on real data: an Avellaneda–Stoikov maker quoted
+91 times but filled only 6 — the queue gates fills, exactly as it should.
+
+**Naive:** deplete the queue whenever the book size at your level drops.
+**Reality:** size drops from both trades *and* cancels; some cancels are ahead of you (you
+advance), some behind (you don't). It's genuinely hard to know.
+**What we do (conservative):** advance the queue on **reaching trades only**, not on cancels.
+This is the pessimistic choice — you fill later and are more exposed — consistent with the
+"assume the worse fill" rule. Cancel-based advancement is a later refinement.
+
+**Naive:** a passive fill is free spread capture.
+**Reality:** **adverse selection** — your bid tends to fill right before the price drops. The
+fill itself is information; you get picked off by someone who knows more.
+**What we do:** **markouts** — every fill is revisited at +1s and +10s and its P&L versus the
+later mid is recorded. The signatures come out exactly right on recorded data: an aggressive
+**taker** shows *negative* markouts (it moves the price and it reverts), while the **maker**
+shows *positive* markouts (spread capture) yet still loses on **inventory risk** — the two
+sides of market making, separated and measured.
+
+### Deliberately deferred (with reason)
+
+- **Latency** (order + cancel) — the book moves between your decision and your order's
+  arrival, and you cannot pull a stale quote instantly (you get run over in fast moves).
+  The capture is already receipt-time stamped for this; the model is the next increment.
+
+---
+
+*Phases 3–6 extend this log as each realism layer lands.*
