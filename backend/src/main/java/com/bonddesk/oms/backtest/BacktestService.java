@@ -2,6 +2,9 @@ package com.bonddesk.oms.backtest;
 
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestResult;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityPoint;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityRequest;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.Costs;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.FillView;
 import com.bonddesk.oms.exception.BadRequestException;
 import com.bonddesk.oms.exception.NotFoundException;
@@ -79,6 +82,7 @@ public class BacktestService {
         boolean arrivalSet = false;
         Deque<Double> mids = new ArrayDeque<>();
         double volSinceTick = 0;
+        double sessionVolume = 0;   // total traded volume — the ADV proxy for market impact
         long events = 0;
         long ticks = 0;
 
@@ -195,6 +199,7 @@ public class BacktestService {
                     double v = e.size().doubleValue();
                     double px = e.price().doubleValue();
                     volSinceTick += v;
+                    sessionVolume += v;
                     // Queue-position maker fill: a resting quote fills only after enough
                     // reaching volume (trades on the far side, at prices that touch our
                     // quote) has cleared the size ahead of us in the queue. e.isBid()==true
@@ -295,12 +300,13 @@ public class BacktestService {
         }
         double avgMk1s = moCnt1s > 0 ? round(moSum1s / moCnt1s, 3) : 0;
         double avgMk10s = moCnt10s > 0 ? round(moSum10s / moCnt10s, 3) : 0;
-        return buildResult(req, product, buy, book, run, events, ticks, firstTs, lastTs, avgMk1s, avgMk10s);
+        return buildResult(req, product, buy, book, run, events, ticks, firstTs, lastTs,
+                avgMk1s, avgMk10s, sessionVolume);
     }
 
     private BacktestResult buildResult(BacktestRequest req, String product, boolean buy, LiveOrderBook book,
                                        StrategyRun run, long events, long ticks, Instant start, Instant end,
-                                       double avgMk1s, double avgMk10s) {
+                                       double avgMk1s, double avgMk10s, double sessionVolume) {
         double execSize = run.executedSize();
         double execNotional = run.executedNotional();
         double avgExec = execSize > 0 ? execNotional / execSize : 0;
@@ -313,22 +319,93 @@ public class BacktestService {
         List<FillView> fills = pnl.fills().stream()
                 .map(f -> new FillView(f.time(), f.side(), f.price(), f.size(), f.liquidity()))
                 .toList();
+
+        // --- Costs. Takers pay fees + market impact; makers provide liquidity (fee/rebate,
+        // no impact). Impact follows the square-root law: cost grows with participation.
+        Costs c = req.costs();
+        double takerFeeBps = cfg(c == null ? null : c.takerFeeBps(), 5.0);
+        double makerFeeBps = cfg(c == null ? null : c.makerFeeBps(), 0.0);
+        double commissionBps = cfg(c == null ? null : c.commissionBps(), 0.0);
+        double regFeeBps = cfg(c == null ? null : c.regFeeBps(), 0.0);
+        double borrowBpsYr = cfg(c == null ? null : c.borrowBpsPerYear(), 0.0);
+        double impactCoef = cfg(c == null ? null : c.impactCoef(), 50.0);
+
+        double takerNotional = 0;
+        double makerNotional = 0;
+        double sellNotional = 0;
+        double takerSize = 0;
+        for (Fill f : pnl.fills()) {
+            double notional = f.price() * f.size();
+            if ("MAKER".equals(f.liquidity())) {
+                makerNotional += notional;
+            } else {
+                takerNotional += notional;
+                takerSize += f.size();
+            }
+            if (!f.isBuy()) {
+                sellNotional += notional;
+            }
+        }
+        double totalNotional = takerNotional + makerNotional;
+
+        double participation = sessionVolume > 1e-9 ? takerSize / sessionVolume : 0;
+        double impactBps = impactCoef * Math.sqrt(participation);
+        double impactCost = takerNotional * impactBps / 10_000.0;
+
+        double feeCost = takerNotional * takerFeeBps / 10_000.0
+                + makerNotional * makerFeeBps / 10_000.0
+                + totalNotional * commissionBps / 10_000.0
+                + sellNotional * regFeeBps / 10_000.0;
+
+        double financingCost = 0;
+        if (pnl.position() < 0 && finalMark > 0) {
+            double years = Math.max(0, (end.toEpochMilli() - start.toEpochMilli()) / 1000.0) / 31_557_600.0;
+            financingCost = -pnl.position() * finalMark * borrowBpsYr / 10_000.0 * years;
+        }
+
+        double gross = pnl.totalPnl(finalMark);
+        double netPnl = gross - feeCost - impactCost - financingCost;
+        double feeBps = totalNotional > 0 ? feeCost / totalNotional * 10_000.0 : 0;
+        double allInCostBps = totalNotional > 0
+                ? (feeCost + impactCost + financingCost) / totalNotional * 10_000.0 : 0;
+
         int makerFills = (int) pnl.fills().stream().filter(f -> "MAKER".equals(f.liquidity())).count();
         int takerFills = fills.size() - makerFills;
 
         boolean mm = "AVELLANEDA_STOIKOV".equals(run.type());
         String note = mm
-                ? "Two-sided market making: fills are queue-position aware (a quote fills only after reaching volume clears the size ahead). Markouts reveal adverse selection."
+                ? "Two-sided market making: queue-position-aware maker fills, adverse selection in the markouts, and after-cost P&L (makers earn the maker fee/rebate, pay no impact)."
                 : (execSize + 1e-9 < (req.size() == null ? 0 : req.size())
                         ? "Partial: the recorded session ended before the schedule completed."
-                        : "Taker fills sweep real recorded depth (multi-level slippage); own-order market impact arrives in a later phase.");
+                        : "Taker fills sweep real recorded depth; all-in cost adds fees + square-root market impact on top of that slippage.");
 
         return new BacktestResult(product, run.type(), buy ? "BUY" : "SELL",
                 req.size() == null ? 0 : req.size(), execSize, round(avgExec, 8), round(arrival, 8),
                 round(isBps, 2), round(finalMark, 8), pnl.position(),
-                round(pnl.realized(), 2), round(pnl.unrealized(finalMark), 2), round(pnl.totalPnl(finalMark), 2),
+                round(pnl.realized(), 2), round(pnl.unrealized(finalMark), 2), round(gross, 2),
+                round(feeCost, 2), round(impactCost, 2), round(financingCost, 2), round(netPnl, 2),
+                round(feeBps, 2), round(impactBps, 2), round(allInCostBps, 2),
                 fills.size(), makerFills, takerFills, avgMk1s, avgMk10s,
                 events, ticks, start, end, note, fills);
+    }
+
+    /** Sweep a strategy across order sizes to build a capacity curve (cost vs. size). */
+    public List<CapacityPoint> capacity(CapacityRequest cap) {
+        if (cap.sizes() == null || cap.sizes().isEmpty()) {
+            throw new BadRequestException("sizes are required for a capacity sweep");
+        }
+        List<CapacityPoint> points = new ArrayList<>();
+        for (double size : cap.sizes()) {
+            BacktestResult r = run(new BacktestRequest(cap.product(), cap.strategyType(), cap.side(), size,
+                    cap.slices(), null, null, null, null, null, cap.tickMs(), cap.latencyMs(), cap.date(), cap.costs()));
+            points.add(new CapacityPoint(size, r.executedSize(), r.implementationShortfallBps(),
+                    r.feeBps(), r.impactBps(), r.allInCostBps(), r.netPnl()));
+        }
+        return points;
+    }
+
+    private static double cfg(Double v, double def) {
+        return v == null ? def : v;
     }
 
     private Strategy build(BacktestRequest req, boolean buy) {

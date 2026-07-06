@@ -2,6 +2,7 @@ package com.bonddesk.oms.backtest;
 
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestResult;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.Costs;
 import com.bonddesk.oms.market.CoinbaseProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,7 +41,7 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01"));
+                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", null));
 
         assertThat(r.executedSize()).isEqualTo(2.0);
         assertThat(r.numFills()).isEqualTo(2);
@@ -56,7 +57,7 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "TWAP", "SELL", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01"));
+                "BTC-USD", "TWAP", "SELL", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", null));
 
         assertThat(r.executedSize()).isEqualTo(2.0);
         assertThat(r.avgExecPrice()).isEqualTo(100.0); // hits the bid
@@ -68,11 +69,25 @@ class BacktestServiceTest {
         BacktestService service = serviceOver(dir);
 
         BacktestResult r = service.run(new BacktestRequest(
-                "BTC-USD", "AVELLANEDA_STOIKOV", null, 0.5, null, null, null, null, null, null, null, null, "2026-01-01"));
+                "BTC-USD", "AVELLANEDA_STOIKOV", null, 0.5, null, null, null, null, null, null, null, null, "2026-01-01", null));
 
         assertThat(r.strategyType()).isEqualTo("AVELLANEDA_STOIKOV");
         assertThat(r.note().toLowerCase()).contains("market making");
         assertThat(r.makerFills()).isGreaterThanOrEqualTo(0);
         assertThat(r.takerFills()).isEqualTo(0); // a maker never takes
+    }
+
+    @Test
+    void feesAndImpactReduceNetBelowGross(@TempDir Path dir) throws IOException {
+        BacktestService service = serviceOver(dir);
+        Costs costs = new Costs(50.0, 0.0, 0.0, 0.0, 0.0, 50.0); // 50 bps taker fee + impact
+
+        BacktestResult r = service.run(new BacktestRequest(
+                "BTC-USD", "TWAP", "BUY", 2.0, 2, null, null, null, null, null, null, null, "2026-01-01", costs));
+
+        assertThat(r.feeCostUsd()).isGreaterThan(0.0);
+        assertThat(r.impactCostUsd()).isGreaterThan(0.0);
+        assertThat(r.allInCostBps()).isGreaterThan(0.0);
+        assertThat(r.netPnl()).isLessThan(r.totalPnl()); // costs eat into gross P&L
     }
 }

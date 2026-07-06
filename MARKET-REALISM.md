@@ -116,4 +116,42 @@ with mean reversion), which is precisely where adverse selection lives.
 
 ---
 
-*Phases 3–6 extend this log as each realism layer lands.*
+## Costs & market impact (Phase 3)
+
+**Naive:** fill at the touch; maybe subtract a flat fee.
+**Reality:** you pay to trade, and — crucially — **your own size moves the market.** At small
+size, cost is dominated by fees and the spread; at large size, **market impact dominates and
+grows super-linearly**, which is what caps how much capital a strategy can deploy.
+**What we do:**
+- **Fees.** Takers pay a taker fee; makers pay the maker fee or earn a **rebate** (a maker can
+  be net-positive on rebates even when gross-flat) and pay **no impact** — they are the ones
+  being impacted against. Commissions and regulatory fees (SEC/FINRA on equity sells) are
+  modelled as configurable per-notional costs.
+- **Market impact** follows the **square-root law**: `cost(bps) = coef · √(participation)`,
+  participation = taker size ÷ traded volume, applied on top of the mechanical book-sweep
+  slippage the replay already captures.
+- **Financing.** Short inventory accrues a borrow rate over the holding period.
+
+This layer answers the honest question raised back in Phase 1 — *"is ~0 bps real?"* — with a
+**capacity curve**. Sweeping a TWAP across sizes on ~70 min of recorded BTC:
+
+| order size | raw slippage | fee | impact | **all-in** |
+|---|---|---|---|---|
+| 1   | −0.6 bps | 5 | 4.9  | **9.9 bps**  |
+| 10  | −0.3 bps | 5 | 15.4 | **20.4 bps** |
+| 100 | +1.6 bps | 5 | 48.4 | **53.4 bps** |
+
+The raw slippage stays near zero (it conflates spread with drift — the number that *looked*
+free). The **all-in cost rises from ~10 to ~53 bps as size scales 100×**, driven by impact.
+That curve — where the cost of size eats the edge — is the institutional capacity question.
+
+### Deliberately deferred (with reason)
+
+- **Permanent vs. temporary impact.** A lasting mid shift (information leakage) is folded into
+  the single impact coefficient for now; splitting the two is a refinement.
+- **Taxes** — the most-overlooked cost of all — get their own layer (lot accounting, wash
+  sales, §475(f) MTM vs. retail) so after-tax returns are honest. See Phase 3.5.
+
+---
+
+*Phases 3.5–6 extend this log as each realism layer lands.*

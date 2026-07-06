@@ -10,8 +10,23 @@ public final class BacktestDtos {
     }
 
     /**
+     * Trading costs, all optional (sensible defaults applied). Maker fee can be negative
+     * (a rebate). Regulatory fees and borrow matter mostly for equities; impactCoef scales
+     * the square-root market-impact law.
+     */
+    public record Costs(
+            Double takerFeeBps,
+            Double makerFeeBps,        // negative = rebate
+            Double commissionBps,
+            Double regFeeBps,          // e.g. SEC/FINRA on equity sells
+            Double borrowBpsPerYear,   // financing on short inventory
+            Double impactCoef          // bps of impact at 100% participation (sqrt law)
+    ) {
+    }
+
+    /**
      * A backtest request: which recorded session (product + optional date, else latest),
-     * which strategy to replay, and its parameters.
+     * which strategy to replay, its parameters, decision latency, and cost assumptions.
      */
     public record BacktestRequest(
             String product,
@@ -26,7 +41,8 @@ public final class BacktestDtos {
             Double quoteSize,      // Avellaneda–Stoikov quote size
             Long tickMs,           // strategy tick cadence in virtual time
             Long latencyMs,        // decision-to-market latency (order + cancel); 0 = none
-            String date            // capture date (yyyy-MM-dd); null = latest file
+            String date,           // capture date (yyyy-MM-dd); null = latest file
+            Costs costs            // trading costs; null = defaults
     ) {
     }
 
@@ -35,7 +51,8 @@ public final class BacktestDtos {
 
     /**
      * The result of replaying a strategy against recorded L2: execution quality
-     * (implementation shortfall vs. arrival mid) and P&L, plus replay metadata.
+     * (implementation shortfall), microstructure diagnostics (markouts), gross and
+     * after-cost P&L, and the cost breakdown, plus replay metadata.
      */
     public record BacktestResult(
             String product,
@@ -50,11 +67,18 @@ public final class BacktestDtos {
             double finalPosition,
             double realizedPnl,
             double unrealizedPnl,
-            double totalPnl,
+            double totalPnl,          // gross, before costs
+            double feeCostUsd,
+            double impactCostUsd,
+            double financingCostUsd,
+            double netPnl,            // after fees + impact + financing
+            double feeBps,
+            double impactBps,
+            double allInCostBps,      // fees + impact + financing, per notional
             int numFills,
             int makerFills,
             int takerFills,
-            double avgMarkoutBps1s,   // adverse selection: fill P&L 1s later (negative = picked off)
+            double avgMarkoutBps1s,
             double avgMarkoutBps10s,
             long eventsProcessed,
             long ticks,
@@ -62,6 +86,32 @@ public final class BacktestDtos {
             Instant sessionEnd,
             String note,
             List<FillView> fills
+    ) {
+    }
+
+    /** Request to sweep a strategy across order sizes and build a capacity curve. */
+    public record CapacityRequest(
+            String product,
+            String strategyType,
+            String side,
+            Integer slices,
+            List<Double> sizes,
+            Long tickMs,
+            Long latencyMs,
+            String date,
+            Costs costs
+    ) {
+    }
+
+    /** One point on the capacity curve: how the all-in cost of trading grows with size. */
+    public record CapacityPoint(
+            double size,
+            double executedSize,
+            double grossShortfallBps,
+            double feeBps,
+            double impactBps,
+            double allInCostBps,
+            double netPnl
     ) {
     }
 

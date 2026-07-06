@@ -2,6 +2,8 @@ package com.bonddesk.oms.backtest;
 
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestResult;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityPoint;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.CapacityRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.SessionView;
 import com.bonddesk.oms.market.CoinbaseProperties;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,6 +42,12 @@ public class BacktestController {
     @Operation(summary = "Replay a strategy against a recorded L2 session")
     public BacktestResult run(@RequestBody BacktestRequest req) {
         return backtest.run(req);
+    }
+
+    @PostMapping("/capacity")
+    @Operation(summary = "Sweep a strategy across order sizes — the capacity curve (cost grows with size)")
+    public List<CapacityPoint> capacity(@RequestBody CapacityRequest req) {
+        return backtest.capacity(req);
     }
 
     @GetMapping("/sessions")
