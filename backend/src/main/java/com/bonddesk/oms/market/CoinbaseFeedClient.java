@@ -179,12 +179,12 @@ public class CoinbaseFeedClient {
 
     private void applyTradeEvent(JsonNode event) {
         for (JsonNode t : event.path("trades")) {
-            marketData.recordTrade(new TradePrint(
+            marketData.recordTrade(
                     t.path("product_id").asText(),
                     new BigDecimal(t.path("price").asText()),
                     new BigDecimal(t.path("size").asText()),
                     t.path("side").asText(),
-                    parseTime(t.path("time").asText())));
+                    parseTime(t.path("time").asText()));
         }
     }
 
