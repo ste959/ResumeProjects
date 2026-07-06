@@ -120,10 +120,12 @@ public class BacktestService {
         // later. Each entry is {dueEpochMillis, fillPrice, sideSign(+1 buy / -1 sell)}.
         Deque<double[]> mk1s = new ArrayDeque<>();
         Deque<double[]> mk10s = new ArrayDeque<>();
+        // Markouts are SIZE-WEIGHTED (a 100-unit fill must count 100x a 1-unit fill), so
+        // moSum accumulates size*markout and moWt accumulates size; the average is the ratio.
         double moSum1s = 0;
         double moSum10s = 0;
-        long moCnt1s = 0;
-        long moCnt10s = 0;
+        double moWt1s = 0;
+        double moWt10s = 0;
         int lastFillCount = 0;
 
         // Runtime risk: track the mark-to-market high-water mark and drawdown; a breach trips
@@ -165,7 +167,9 @@ public class BacktestService {
 
                 // Latency: the active quote the fill model uses is the one in force
                 // `latencyMs` ago. When it changes, reset queue position at the new prices.
-                if (!quoteHist.isEmpty()) {
+                // Skip entirely once halted — a stale quote must not re-activate and re-open
+                // the position the kill-switch just flattened.
+                if (!halted && !quoteHist.isEmpty()) {
                     long laggedMs = e.ts().toEpochMilli() - latencyMs;
                     double[] active = null;
                     for (double[] q : quoteHist) {
@@ -181,8 +185,11 @@ public class BacktestService {
                         qAskPx = active[2];
                         qSzBid = active[3];
                         qSzAsk = active[3];
-                        queueAheadBid = book.sizeAtOrBetter(true, BigDecimal.valueOf(qBidPx)).doubleValue();
-                        queueAheadAsk = book.sizeAtOrBetter(false, BigDecimal.valueOf(qAskPx)).doubleValue();
+                        // Queue-ahead is the size at OUR EXACT level (time priority). Better
+                        // levels are consumed by any trade that reaches us, so counting them
+                        // (sizeAtOrBetter) over-states the queue and starves the fill.
+                        queueAheadBid = book.sizeAt(true, BigDecimal.valueOf(qBidPx)).doubleValue();
+                        queueAheadAsk = book.sizeAt(false, BigDecimal.valueOf(qAskPx)).doubleValue();
                         cumReachBid = 0;
                         cumReachAsk = 0;
                         filledBid = 0;
@@ -221,20 +228,21 @@ public class BacktestService {
                     double px = e.price().doubleValue();
                     volSinceTick += v;
                     sessionVolume += v;
-                    // Queue-position maker fill: a resting quote fills only after enough
-                    // reaching volume (trades on the far side, at prices that touch our
-                    // quote) has cleared the size ahead of us in the queue. e.isBid()==true
-                    // marks a buy-aggressor trade (lifts asks → fills our ask); false marks
-                    // a sell-aggressor trade (hits bids → fills our bid).
-                    if (run != null) {
-                        if (e.isBid() && qAskPx > 0 && px >= qAskPx && qSzAsk - filledAsk > 1e-12) {
+                    // Queue-position maker fill, gated by PRICE not by the trade's labelled
+                    // side. A trade printing at/above our ask reached our ask (consuming ask
+                    // liquidity); a print at/below our bid reached our bid. This matches the
+                    // live engine and is agnostic to the feed's aggressor-vs-maker "side"
+                    // convention — Coinbase documents market_trades "side" as the MAKER side,
+                    // the opposite of aggressor, so relying on it would invert the mapping.
+                    if (run != null && !halted) {
+                        if (qAskPx > 0 && px >= qAskPx && qSzAsk - filledAsk > 1e-12) {
                             cumReachAsk += v;
                             double fill = Math.min(Math.max(0, cumReachAsk - queueAheadAsk), qSzAsk) - filledAsk;
                             if (fill > 1e-9) {
                                 run.book().apply(Fill.maker(e.ts(), false, qAskPx, fill));
                                 filledAsk += fill;
                             }
-                        } else if (!e.isBid() && qBidPx > 0 && px <= qBidPx && qSzBid - filledBid > 1e-12) {
+                        } else if (qBidPx > 0 && px <= qBidPx && qSzBid - filledBid > 1e-12) {
                             cumReachBid += v;
                             double fill = Math.min(Math.max(0, cumReachBid - queueAheadBid), qSzBid) - filledBid;
                             if (fill > 1e-9) {
@@ -288,15 +296,16 @@ public class BacktestService {
                 double curMid = d(book.mid());
                 long nowMs = e.ts().toEpochMilli();
                 if (curMid > 0) {
+                    // entry = {dueMs, fillPrice, sideSign, fillSize}; weight the markout by size.
                     while (!mk1s.isEmpty() && mk1s.peekFirst()[0] <= nowMs) {
                         double[] m = mk1s.pollFirst();
-                        moSum1s += m[2] * (curMid - m[1]) / m[1] * 10_000.0;
-                        moCnt1s++;
+                        moSum1s += m[3] * m[2] * (curMid - m[1]) / m[1] * 10_000.0;
+                        moWt1s += m[3];
                     }
                     while (!mk10s.isEmpty() && mk10s.peekFirst()[0] <= nowMs) {
                         double[] m = mk10s.pollFirst();
-                        moSum10s += m[2] * (curMid - m[1]) / m[1] * 10_000.0;
-                        moCnt10s++;
+                        moSum10s += m[3] * m[2] * (curMid - m[1]) / m[1] * 10_000.0;
+                        moWt10s += m[3];
                     }
                 }
                 List<Fill> soFar = run.book().fills();
@@ -304,8 +313,8 @@ public class BacktestService {
                     Fill f = soFar.get(i);
                     double sign = f.isBuy() ? 1 : -1;
                     long ft = f.time().toEpochMilli();
-                    mk1s.addLast(new double[]{ft + 1000, f.price(), sign});
-                    mk10s.addLast(new double[]{ft + 10000, f.price(), sign});
+                    mk1s.addLast(new double[]{ft + 1000, f.price(), sign, f.size()});
+                    mk10s.addLast(new double[]{ft + 10000, f.price(), sign, f.size()});
                 }
                 lastFillCount = soFar.size();
 
@@ -352,8 +361,8 @@ public class BacktestService {
         if (run == null) {
             throw new BadRequestException("No events for product " + product + " in " + file.getFileName());
         }
-        double avgMk1s = moCnt1s > 0 ? round(moSum1s / moCnt1s, 3) : 0;
-        double avgMk10s = moCnt10s > 0 ? round(moSum10s / moCnt10s, 3) : 0;
+        double avgMk1s = moWt1s > 1e-12 ? round(moSum1s / moWt1s, 3) : 0;
+        double avgMk10s = moWt10s > 1e-12 ? round(moSum10s / moWt10s, 3) : 0;
         return buildResult(req, product, buy, book, run, events, ticks, firstTs, lastTs,
                 avgMk1s, avgMk10s, sessionVolume, maxDrawdown, halted, haltReason);
     }

@@ -258,4 +258,43 @@ on: fit where the answer is known, *then* turn the model loose on the real feed.
 
 ---
 
+## Bias register — every known simplification and which way it cuts
+
+Naming the *direction* of a bias is the actual skill — a simplification that flatters the
+strategy is far more dangerous than one that penalises it. Each item below is an accepted
+approximation (not a bug — the bugs were fixed); several are pinned by `biasCallout_*` tests so
+they can't drift silently.
+
+| Simplification | Direction of the bias | Where |
+|---|---|---|
+| Market impact scaled to **whole-session** volume | Not conservative — the same order shows *less* impact on a longer session; the cost floats with session length rather than a real ADV | `BacktestService` impact |
+| Kill-switch flatten is **frictionless** | Flatters the kill-switch — real forced liquidation into a drawdown is costly, so realised losses are *understated* exactly when it matters | `BacktestService` flatten |
+| Parametric VaR assumes **factor independence** | **Understates** the correlated risk-off tail (rates/equity/credit co-move); overstates the diversification benefit | `RiskEngine`; `biasCallout_varAssumesFactorIndependence` |
+| Replay assumes **your orders don't move the market** | Maker P&L assumes the recorded flow is unchanged by your presence — inherent to all historical replay; adverse selection *is* captured via markouts | `BacktestService` maker fills |
+| Impact is a **cost overlay**, no permanent accumulation across slices | Understates the cost of large, slow execution | `BacktestService` impact |
+| Wash-sale loss taken **in-period**, not carried to the replacement's basis | **Overstates** the wash-sale tax hit (the loss is deferred, not destroyed) | `TaxEngine` |
+| Short-term and long-term **not netted** | Can create an artificial tax benefit at different rates | `TaxEngine`; `biasCallout_shortAndLongTermAreNotNetted` |
+| §475(f) MTM allowed on **crypto** | Legally contested (crypto is property, not a security) — modelled, not endorsed | `TaxEngine` |
+| Oversell (short beyond holdings) drops the excess | Under-reports proceeds; shorts aren't lot-matched | `TaxEngine` |
+| Bond pricing: **par yield as discount yield**, 30/360 for Treasuries (should be ACT/ACT) | Small indicative-pricing inaccuracy that grows with curve steepness | `DealerQuoteEngine`, `BondMath` |
+| Synthetic imbalance IC ≈ **+0.86** | Idealised — real order-book imbalance predicts with IC ~0.01–0.05; a model getting 0.03 on real data is a *win*, not a failure | `SyntheticMarketGenerator` |
+| Markout horizon drifts long on **sparse** tapes | Biases the adverse-selection metric (not P&L) on thin/synthetic sessions | `BacktestService` markouts |
+
+### Bugs found by adversarial review and fixed (with regression tests)
+
+An adversarial code review found six real defects that the earlier tests missed — most instructively,
+two that *passing* tests were hiding. All fixed, each with a test that would now catch it:
+kill-switch re-arming under latency; wash-sale counting the sold lot as its own replacement (and
+double-counting replacements); queue-position over-counting via better levels; equal-weighted
+markouts; the risk engine reclassifying un-priceable bonds as equity; and a leap-day holding-period
+off-by-one.
+
+The review also flagged a convention risk: our fill model assumed a trade's `side` was the
+**aggressor**, but Coinbase documents `market_trades` `side` as the **maker** side (the opposite).
+Verified against the docs, then made moot — maker fills are now gated purely by **price** (a print
+at/above our ask filled our ask), matching the live engine and independent of the feed's side
+convention. The lesson: verify the assumption, then design so the answer doesn't matter.
+
+---
+
 *Phase 5 (ML on real + simulated data) and Phase 6 extend this log as each layer lands.*

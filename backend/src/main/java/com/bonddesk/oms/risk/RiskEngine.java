@@ -8,6 +8,8 @@ import com.bonddesk.oms.risk.dto.RiskDtos.PortfolioRiskReport;
 import com.bonddesk.oms.risk.dto.RiskDtos.ScenarioPnl;
 import com.bonddesk.oms.service.PositionService;
 import com.bonddesk.oms.util.Pricing;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -28,6 +30,8 @@ import java.util.TreeMap;
  */
 @Service
 public class RiskEngine {
+
+    private static final Logger log = LoggerFactory.getLogger(RiskEngine.class);
 
     // Representative daily factor volatilities and the 95% one-tailed z-score.
     private static final double RATE_VOL_BP = 7.0;      // bp/day
@@ -66,19 +70,27 @@ public class RiskEngine {
             gross += Math.abs(notional);
             sector.merge(s.getSector() == null ? "UNKNOWN" : s.getSector(), notional, Double::sum);
 
-            boolean pricableBond = s.getAssetClass() == AssetClass.FIXED_INCOME
-                    && s.getMaturityDate() != null && s.getMaturityDate().isAfter(settle)
-                    && s.getCouponRate() != null;
-            if (pricableBond) {
-                double coupon = s.getCouponRate().doubleValue() / 100.0;
-                double dv01Per100 = BondMath.analyze(settle, s.getMaturityDate(), coupon,
-                        s.getCleanPrice().doubleValue()).dv01();
-                double posDv01 = dv01Per100 * netQty.doubleValue() / 100.0; // signed by position
-                aggDv01 += posDv01;
-                if (!isSovereign(s)) {
-                    corpDv01 += posDv01;
-                }
+            // Classify by asset class FIRST. An un-priceable bond (null coupon/maturity,
+            // matured, e.g. a floater or bad data) must stay in fixed income — never fall
+            // through to the equity bucket where it would take the equity shock and vol.
+            if (s.getAssetClass() == AssetClass.FIXED_INCOME) {
                 fiNet += notional;
+                boolean priceable = s.getMaturityDate() != null && s.getMaturityDate().isAfter(settle)
+                        && s.getCouponRate() != null;
+                if (priceable) {
+                    double coupon = s.getCouponRate().doubleValue() / 100.0;
+                    double dv01Per100 = BondMath.analyze(settle, s.getMaturityDate(), coupon,
+                            s.getCleanPrice().doubleValue()).dv01();
+                    double posDv01 = dv01Per100 * netQty.doubleValue() / 100.0; // signed by position
+                    aggDv01 += posDv01;
+                    if (!isSovereign(s)) {
+                        corpDv01 += posDv01;
+                    }
+                } else {
+                    // Counted in FI notional, but its rate risk (DV01) can't be computed — flag it.
+                    log.warn("Bond {} is unpriceable (no coupon/maturity or matured) — "
+                            + "its rate risk is NOT in the aggregate DV01", s.getCusip());
+                }
             } else {
                 eqNet += notional;
             }

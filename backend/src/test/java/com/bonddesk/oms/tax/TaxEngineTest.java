@@ -81,4 +81,70 @@ class TaxEngineTest {
         assertThat(r.longTermGain()).isEqualTo(0.0);           // no long-term under MTM
         assertThat(r.taxOwed()).isCloseTo(7.4, within(1e-6));  // 20 * ordinary 37%
     }
+
+    // --- Regression tests for bugs the earlier suite missed ---
+
+    @Test
+    void plainLossRoundTripIsNotAWashSale() {
+        // Buy, then sell at a loss within 30 days, with NO replacement purchase. The sold
+        // lot's own originating buy must NOT count as its replacement. (Regression: the old
+        // code disallowed the loss on every closed losing trade.)
+        List<TaxTrade> trades = List.of(
+                trade("2026-01-01T00:00:00Z", "BUY", 100, 10),
+                trade("2026-01-10T00:00:00Z", "SELL", 100, 8)); // -200 loss, nothing rebought
+
+        TaxReport r = engine.compute(new TaxRequest("EQUITY", "FIFO", "RETAIL", null, null, null, trades));
+
+        assertThat(r.washSaleDisallowed()).isEqualTo(0.0);
+        assertThat(r.taxableGain()).isEqualTo(-200.0); // the loss stands
+    }
+
+    @Test
+    void oneReplacementCannotWashTwoSeparateLosses() {
+        // Two losing sales but only one 100-share replacement → at most $500 disallowed, not
+        // $1000 (replacement capacity is consumed). Buys are spaced >30 days from the sales so
+        // only the rebuy is a candidate.
+        List<TaxTrade> trades = List.of(
+                trade("2026-01-01T00:00:00Z", "BUY", 100, 10),
+                trade("2026-01-02T00:00:00Z", "BUY", 100, 10),
+                trade("2026-03-01T00:00:00Z", "SELL", 100, 5),   // -500 (lot 1)
+                trade("2026-03-02T00:00:00Z", "SELL", 100, 5),   // -500 (lot 2)
+                trade("2026-03-10T00:00:00Z", "BUY", 100, 5));    // one 100-share replacement
+
+        TaxReport r = engine.compute(new TaxRequest("EQUITY", "FIFO", "RETAIL", null, null, null, trades));
+
+        assertThat(r.washSaleDisallowed()).isEqualTo(500.0);
+    }
+
+    @Test
+    void exactlyOneYearHoldSpanningALeapDayIsShortTerm() {
+        // 2020 is a leap year → 366 days, but one calendar year is NOT "more than one year".
+        List<TaxTrade> trades = List.of(
+                trade("2020-01-01T00:00:00Z", "BUY", 1, 100),
+                trade("2021-01-01T00:00:00Z", "SELL", 1, 120));
+
+        TaxReport r = engine.compute(new TaxRequest("CRYPTO", "FIFO", "RETAIL", 0.37, 0.20, null, trades));
+
+        assertThat(r.shortTermGain()).isEqualTo(20.0);
+        assertThat(r.longTermGain()).isEqualTo(0.0);
+    }
+
+    @Test
+    void biasCallout_shortAndLongTermAreNotNetted() {
+        // KNOWN SIMPLIFICATION (documented): a short-term loss and an equal long-term gain net
+        // to zero economically, but taxing them at their own rates (37% vs 20%) yields an
+        // artificial benefit. Real IRS netting rules would cancel them. This test PINS the
+        // direction of the bias so it can't drift silently.
+        List<TaxTrade> trades = List.of(
+                trade("2020-01-01T00:00:00Z", "BUY", 1, 100),   // long-term lot
+                trade("2026-01-01T00:00:00Z", "BUY", 1, 100),   // short-term lot
+                trade("2026-01-05T00:00:00Z", "SELL", 1, 80),   // LIFO sells the ST lot: -20 ST loss
+                trade("2026-02-01T00:00:00Z", "SELL", 1, 120)); // then the LT lot: +20 LT gain
+
+        TaxReport r = engine.compute(new TaxRequest("CRYPTO", "LIFO", "RETAIL", 0.37, 0.20, null, trades));
+
+        assertThat(r.preTaxPnl()).isEqualTo(0.0);        // economically break-even
+        assertThat(r.taxOwed()).isLessThan(0.0);         // yet a net tax "benefit" — the bias
+        assertThat(r.afterTaxPnl()).isGreaterThan(0.0);
+    }
 }

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -166,7 +168,11 @@ public class TaxEngine {
             d.basis = q * lot.basis;
             d.gain = d.proceeds - d.basis;
             d.days = Duration.between(lot.acquired, t.time()).toDays();
-            d.longTerm = d.days > LONG_TERM_DAYS;
+            // Long-term is "held MORE THAN one year" — a calendar-anniversary test, not a
+            // 365-day count (which misclassifies a one-year hold spanning a leap day).
+            LocalDate acq = LocalDate.ofInstant(lot.acquired, ZoneOffset.UTC);
+            LocalDate sold = LocalDate.ofInstant(t.time(), ZoneOffset.UTC);
+            d.longTerm = sold.isAfter(acq.plusYears(1));
             disps.add(d);
             lot.qty -= q;
             remaining -= q;
@@ -177,20 +183,50 @@ public class TaxEngine {
         // remaining > 0 → sold more than held (a short); not lot-matched in this model.
     }
 
-    /** A realized loss is disallowed to the extent the same name was bought within ±30 days. */
+    /**
+     * A realized loss is disallowed to the extent it is matched by a <em>replacement</em>
+     * purchase within ±30 days of the sale. Two things the naive version got wrong:
+     * <ol>
+     *   <li>The originating purchase of the shares being sold is NOT a replacement (else a
+     *       plain buy→sell-at-a-loss within 30 days would be wrongly disallowed).</li>
+     *   <li>Each replacement share can wash only ONE loss — replacement capacity is consumed
+     *       across dispositions so a single rebuy can't disallow multiple losses.</li>
+     * </ol>
+     * Simplification retained: a replacement is not required to still be held at year-end,
+     * and the disallowed loss is not carried into the replacement lot's basis (see design log).
+     */
     private void applyWashSales(List<Disp> disps, List<TaxTrade> trades) {
+        // Pool of candidate replacement purchases with consumable capacity: {epochMillis, qty}.
+        List<double[]> replacements = new ArrayList<>();
+        for (TaxTrade t : trades) {
+            if ("BUY".equalsIgnoreCase(t.side())) {
+                replacements.add(new double[]{t.time().toEpochMilli(), t.quantity()});
+            }
+        }
+        long windowMs = WASH_WINDOW_DAYS * 86_400_000L;
         for (Disp d : disps) {
             if (d.gain >= 0) {
                 continue;
             }
-            double replacementQty = 0;
-            for (TaxTrade t : trades) {
-                if ("BUY".equalsIgnoreCase(t.side())
-                        && Math.abs(Duration.between(t.time(), d.sold).toDays()) <= WASH_WINDOW_DAYS) {
-                    replacementQty += t.quantity();
+            long soldMs = d.sold.toEpochMilli();
+            long acquiredMs = d.acquired.toEpochMilli();
+            double need = d.qty;
+            double disallowedQty = 0;
+            for (double[] r : replacements) {
+                if (need <= 1e-12) {
+                    break;
                 }
+                if (r[1] <= 1e-12 || Math.abs(soldMs - (long) r[0]) > windowMs) {
+                    continue;
+                }
+                if ((long) r[0] == acquiredMs) {
+                    continue; // the sold lot's own purchase is not a replacement for its loss
+                }
+                double use = Math.min(need, r[1]);
+                disallowedQty += use;
+                r[1] -= use;   // consume — this replacement can't wash another loss too
+                need -= use;
             }
-            double disallowedQty = Math.min(d.qty, replacementQty);
             if (d.qty > 1e-12 && disallowedQty > 0) {
                 d.wash = -d.gain * (disallowedQty / d.qty); // positive: the loss added back
             }

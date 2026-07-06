@@ -22,6 +22,14 @@ import java.util.Random;
  *
  * <p>This is the market structure fixed income actually has (OTC, dealer-quoted), rather
  * than the lit central order book used for equities and crypto.
+ *
+ * <p><b>Pricing approximation (deliberate):</b> the fair value discounts every cash flow at
+ * the single interpolated <em>par</em> yield at the bond's tenor (plus a credit spread). That
+ * treats the par yield as the bond's YTM, which is exact only on a flat curve; a purist would
+ * bootstrap zero/spot rates from the par curve and discount each cash flow at its own tenor.
+ * This is an honest <em>indicative, spread-to-benchmark</em> quote — how a dealer desk actually
+ * thinks in spread terms — not a zero-curve-accurate valuation. The error grows with curve
+ * steepness and with |coupon − par yield|.
  */
 @Component
 public class DealerQuoteEngine {

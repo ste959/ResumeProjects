@@ -74,7 +74,10 @@ public final class ScenarioTransform {
             price *= 1 + shockBps / 10_000.0;
         }
         if (price <= 0) {
-            price = rawPrice; // never invert a price
+            // A deep level pushed non-positive by an extreme scale: floor it just above zero
+            // rather than reverting to the raw price (which would break the price ordering the
+            // transform otherwise guarantees).
+            price = seeded && refMid > 0 ? refMid * 1e-6 : Math.max(rawPrice, 1e-9);
         }
 
         double size = Math.max(0, e.size().doubleValue() * liquidityScale);

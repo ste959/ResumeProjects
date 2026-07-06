@@ -3,6 +3,8 @@ package com.bonddesk.oms.backtest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestRequest;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.BacktestResult;
 import com.bonddesk.oms.backtest.dto.BacktestDtos.Costs;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.RiskLimits;
+import com.bonddesk.oms.backtest.dto.BacktestDtos.SyntheticRequest;
 import com.bonddesk.oms.market.CoinbaseProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -89,5 +91,27 @@ class BacktestServiceTest {
         assertThat(r.impactCostUsd()).isGreaterThan(0.0);
         assertThat(r.allInCostBps()).isGreaterThan(0.0);
         assertThat(r.netPnl()).isLessThan(r.totalPnl()); // costs eat into gross P&L
+    }
+
+    @Test
+    void killSwitchStaysFlatUnderLatency(@TempDir Path dir) {
+        // Regression for the kill-switch re-arm bug: with latency>0 a stale quote could
+        // re-activate AFTER a halt and re-open the flattened position. Drive a market maker
+        // into a strong trend so it breaches a tight drawdown limit, with latency on, and
+        // assert it ends flat (the flatten is not undone).
+        CoinbaseProperties props = new CoinbaseProperties();
+        props.setL2CaptureDir(dir.toString());
+        // Wide spread so the AS maker quotes INSIDE the book and actually fills; a trend with a
+        // signal-biased flow pushes it into a losing short.
+        new SyntheticMarketGenerator(props).generate(new SyntheticRequest(
+                "trend", 120, 250L, 100.0, 5.0, 200.0, 200.0, 5, 20.0, 4, 2.5, 3L));
+
+        // Tiny position cap → the kill-switch trips on the first fills; latency is on.
+        BacktestResult r = new BacktestService(props).run(new BacktestRequest(
+                "SYNTH-USD", "AVELLANEDA_STOIKOV", null, null, null, null, null, null, null, 0.1,
+                null, 300L, "trend", null, new RiskLimits(null, null, 0.02), null));
+
+        assertThat(r.halted()).isTrue();
+        assertThat(Math.abs(r.finalPosition())).isLessThan(1e-4); // flattened and NOT re-opened
     }
 }

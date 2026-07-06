@@ -102,9 +102,21 @@ public final class LiveOrderBook {
     }
 
     /**
+     * Resting size at exactly {@code price} on the given side, or zero if that level is
+     * empty. This is the size ahead of a new order joining at {@code price} in time
+     * priority — the correct queue-ahead measure, since any trade that reaches your price
+     * has already consumed the better-priced levels. (Contrast {@link #sizeAtOrBetter},
+     * which includes better levels and therefore over-counts the queue.)
+     */
+    public BigDecimal sizeAt(boolean bid, BigDecimal price) {
+        BigDecimal size = (bid ? bids : asks).get(price);
+        return size == null ? BigDecimal.ZERO : size;
+    }
+
+    /**
      * Total resting size at prices at least as good as {@code price} on the given side —
-     * i.e. the size that sits <em>ahead</em> of a new order joining at {@code price} in
-     * price-time priority. Used by the backtester to estimate queue position.
+     * i.e. all size that would fill before an order at {@code price}. Retained for depth
+     * queries; for queue position prefer {@link #sizeAt}.
      */
     public BigDecimal sizeAtOrBetter(boolean bid, BigDecimal price) {
         ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? bids : asks;
