@@ -833,6 +833,13 @@ code {
   color: var(--sell);
 }
 
+.strat-ticket .row {
+  flex-wrap: wrap;
+}
+.strat-ticket label {
+  min-width: 92px;
+}
+
 @media (max-width: 900px) {
   .market-grid {
     grid-template-columns: 1fr;

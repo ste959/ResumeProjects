@@ -7,11 +7,12 @@ import { LiveMarket } from './components/LiveMarket';
 import { OrderTicket } from './components/OrderTicket';
 import { Positions } from './components/Positions';
 import { RiskDashboard } from './components/RiskDashboard';
+import { Strategies } from './components/Strategies';
 import { usePolling } from './hooks/usePolling';
 
 const PORTFOLIO = 'PORT-DEMO';
 
-type Tab = 'trading' | 'risk' | 'analytics' | 'market';
+type Tab = 'trading' | 'risk' | 'analytics' | 'market' | 'strategies';
 
 export default function App() {
   const [securities, setSecurities] = useState<Security[]>([]);
@@ -58,6 +59,9 @@ export default function App() {
           </button>
           <button className={tab === 'market' ? 'active' : ''} onClick={() => setTab('market')}>
             Live Market
+          </button>
+          <button className={tab === 'strategies' ? 'active' : ''} onClick={() => setTab('strategies')}>
+            Strategies
           </button>
         </nav>
         <div className="status-strip">
@@ -119,6 +123,17 @@ export default function App() {
             liquidity with real slippage
           </div>
           <LiveMarket />
+        </main>
+      )}
+
+      {tab === 'strategies' && (
+        <main className="risk-main">
+          <div className="risk-intro">
+            <span className="dot live" />
+            Execution algos (TWAP / POV / Almgren–Chriss) &amp; an <b>Avellaneda–Stoikov market maker</b>
+            running live on the Coinbase feed, with transaction-cost analysis
+          </div>
+          <Strategies />
         </main>
       )}
     </div>

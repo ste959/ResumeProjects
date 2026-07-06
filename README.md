@@ -86,6 +86,7 @@ the same numbers).
 | **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
 | **Real-time data / WebSockets** | Live **Coinbase** order-book feed (JDK WebSocket) → depth ladder + **paper trading against real liquidity** with genuine slippage |
 | **Quant research / Python** | `research/` — **Parquet + DuckDB** warehouse, hand-rolled econometrics (**cointegration, OU half-life**), cost-aware **backtester**, BTC/ETH **stat-arb** study with an honest (overfit-flagging) verdict |
+| **Trading strategies / TCA** | `strategy/` — **execution algos** (TWAP/POV/**Almgren–Chriss**) with implementation-shortfall TCA, and an **Avellaneda–Stoikov market maker** — live on the feed |
 
 ---
 
@@ -209,6 +210,29 @@ research** over a columnar data warehouse. (Polyglot *for the right reason*.)
 
 ---
 
+## Strategy engine — execution algos + market making (live, with TCA)
+
+A unified **strategy engine** (`backend/.../strategy/`) runs trading strategies against the
+live Coinbase feed, covering **both sides of the market** with shared P&L / TCA plumbing:
+
+- **Execution algorithms (taker)** — **TWAP**, **POV** (percentage-of-volume), and
+  **Almgren–Chriss** optimal execution (risk-averse, front-loaded `sinh` trajectory). Each
+  works a parent order down over time, sweeping the real book with a one-tick lag, and
+  reports **implementation shortfall (bps) vs. the arrival mid** — the best-execution story.
+- **Market making (maker)** — an **Avellaneda–Stoikov** market maker: quotes are centred on
+  an **inventory-skewed reservation price** with an optimal spread, and get filled when a
+  **real trade prints through them**. Tracks inventory, spread capture and live P&L — the
+  sell-side story.
+- **Shared core** — `PnlBook` (average-cost, realized/unrealized, flip-through-zero),
+  `MarketState` (rolling volatility + recent volume), a 500 ms `StrategyRunner`, and a REST
+  API + a **"Strategies" UI tab** to launch runs and watch P&L / inventory / quotes /
+  shortfall live. 9 unit tests.
+
+Verified live: a TWAP buy filled across 14 real book levels (**−0.38 bps** shortfall); the
+Avellaneda–Stoikov maker took real fills on ETH and accrued inventory with live P&L.
+
+---
+
 ## Running it
 
 ### Option A — Local dev (needs only a JDK 21 and Node 20)
@@ -269,6 +293,9 @@ kubectl -n bonddesk get pods
 | `GET` | `/api/market/{product}/trades` | Real trade tape |
 | `POST` | `/api/market/{product}/orders` | Paper-trade against the live book (VWAP + slippage) |
 | `GET` | `/api/market/positions` | Crypto positions with live mark-to-market |
+| `POST` | `/api/strategies` | Launch a strategy (TWAP/POV/Almgren–Chriss or Avellaneda–Stoikov) |
+| `GET` | `/api/strategies` | Strategy runs with live P&L / inventory / TCA |
+| `POST` | `/api/strategies/{id}/stop` | Stop a running strategy |
 | `GET` | `/api/risk/summary` | *(risk-service :8081)* Desk risk aggregated from events |
 
 ---

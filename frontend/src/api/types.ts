@@ -192,6 +192,45 @@ export interface CryptoPosition {
   unrealizedPnl: number | null;
 }
 
+// ---- Strategy engine (execution algos + market making) ----
+
+export interface StrategyView {
+  id: string;
+  type: string;
+  product: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  position: number;
+  avgCost: number;
+  markPrice: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  totalPnl: number;
+  numFills: number;
+  parentSide: string | null;
+  parentSize: number | null;
+  executedSize: number | null;
+  avgExecPrice: number | null;
+  arrivalMid: number | null;
+  implementationShortfallBps: number | null;
+  quoteBid: number;
+  quoteAsk: number;
+}
+
+export interface CreateStrategyRequest {
+  type: string;
+  product: string;
+  side?: string;
+  size?: number | null;
+  slices?: number | null;
+  participation?: number | null;
+  kappa?: number | null;
+  gamma?: number | null;
+  tau?: number | null;
+  quoteSize?: number | null;
+}
+
 export interface ApiError {
   timestamp: string;
   status: number;

@@ -1,6 +1,7 @@
 import type {
   BookView,
   CreateOrderRequest,
+  CreateStrategyRequest,
   CryptoPosition,
   DeskRiskSummary,
   DeskSummary,
@@ -12,6 +13,7 @@ import type {
   ProductQuote,
   Security,
   SecurityVolume,
+  StrategyView,
   TradePrint,
   ApiError,
 } from './types';
@@ -92,4 +94,10 @@ export const api = {
     }),
   cryptoPositions: () => request<CryptoPosition[]>('/market/positions'),
   cryptoOrders: () => request<PaperOrder[]>('/market/orders'),
+
+  // Strategy engine (execution algos + market making).
+  strategies: () => request<StrategyView[]>('/strategies'),
+  createStrategy: (req: CreateStrategyRequest) =>
+    request<StrategyView>('/strategies', { method: 'POST', body: JSON.stringify(req) }),
+  stopStrategy: (id: string) => request<StrategyView>(`/strategies/${id}/stop`, { method: 'POST' }),
 };
