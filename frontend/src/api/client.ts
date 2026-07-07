@@ -36,10 +36,11 @@ import type {
 // In dev, requests go to /api and Vite proxies them to the backend. In a built
 // deployment, VITE_API_BASE can point at the API gateway.
 const BASE = (import.meta.env.VITE_API_BASE ?? '') + '/api';
-// The risk microservice is exposed under /risk by the dev proxy and nginx.
-const RISK_BASE = (import.meta.env.VITE_API_BASE ?? '') + '/risk';
-// The Python research service (FastAPI) is exposed under /research.
-const RESEARCH_BASE = (import.meta.env.VITE_API_BASE ?? '') + '/research';
+// The risk microservice is proxied under /risk-api (NOT /risk — that is the SPA route for the Risk
+// tab; a same-named proxy prefix would shadow it and 301 a browser refresh into the API).
+const RISK_BASE = (import.meta.env.VITE_API_BASE ?? '') + '/risk-api';
+// The Python research service (FastAPI) under /research-api (likewise distinct from the /research SPA route).
+const RESEARCH_BASE = (import.meta.env.VITE_API_BASE ?? '') + '/research-api';
 
 /** Error carrying the parsed {@link ApiError} body so callers can show field errors. */
 export class HttpError extends Error {

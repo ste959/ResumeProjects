@@ -12,19 +12,19 @@ export default defineConfig({
         target: process.env.VITE_API_TARGET ?? 'http://localhost:8080',
         changeOrigin: true,
       },
-      // Risk service lives on :8081; expose it under /risk so the browser stays
-      // single-origin. /risk/summary -> http://localhost:8081/api/risk/summary
-      '/risk': {
+      // Risk service on :8081 under /risk-api (distinct from the /risk SPA route).
+      // /risk-api/summary -> http://localhost:8081/api/risk/summary
+      '/risk-api': {
         target: process.env.VITE_RISK_TARGET ?? 'http://localhost:8081',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/risk/, '/api/risk'),
+        rewrite: (path) => path.replace(/^\/risk-api/, '/api/risk'),
       },
-      // Research service lives on :8082; expose under /research.
-      // /research/backtest -> http://localhost:8082/api/research/backtest
-      '/research': {
+      // Research service on :8082 under /research-api (distinct from the /research SPA route).
+      // /research-api/backtest -> http://localhost:8082/api/research/backtest
+      '/research-api': {
         target: process.env.VITE_RESEARCH_TARGET ?? 'http://localhost:8082',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/research/, '/api/research'),
+        rewrite: (path) => path.replace(/^\/research-api/, '/api/research'),
       },
       // Live market-data WebSocket → backend :8080 (ws: true upgrades the connection).
       '/ws': {
