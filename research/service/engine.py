@@ -135,7 +135,7 @@ def _trade_armed(real: dict, marks: dict) -> None:
             if (sid, sym) in pending:
                 continue  # a prior order is still working — wait for it to fill before sizing again
             try:
-                closes = alpaca.crypto_closes(sym, timeframe=BAR_TIMEFRAME, limit=BAR_LIMIT)
+                closes = alpaca.crypto_closes(sym, timeframe=defn.timeframe, limit=BAR_LIMIT)
                 if len(closes) < 5:
                     continue
                 target = S.target_qty(defn, closes)

@@ -9,10 +9,12 @@ a "connect Alpaca" state rather than an error.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query
 
 from . import alpaca
 from . import engine
+from . import lab
+from . import strategies as S
 
 router = APIRouter(prefix="/api/research", tags=["desk"])
 
@@ -155,3 +157,41 @@ def kill() -> dict:
 def resume() -> dict:
     engine.resume()
     return {"ok": True, **engine.snapshot()}
+
+
+# ── Backtest lab (research → backtest → promote to live) ─────────────────────────────────────────
+@router.get("/lab/templates")
+def lab_templates() -> dict:
+    """The strategy templates (with param schemas + code) and the testable universe."""
+    return {"templates": lab.TEMPLATES, "universe": lab.UNIVERSE,
+            "timeframes": list(lab.BARS_PER_YEAR.keys())}
+
+
+@router.get("/lab/backtest")
+def lab_backtest(kind: str = Query(...), symbol: str = Query(...), timeframe: str = Query("1Hour"),
+                 cost_bps: float = Query(10.0, ge=0.0, le=200.0),
+                 fast: int = Query(12), slow: int = Query(48), lookback: int = Query(24)) -> dict:
+    """Run one parameterized, cost-aware backtest over real Alpaca history."""
+    params = {"fast": fast, "slow": slow} if kind == "ma_crossover" else {"lookback": lookback}
+    try:
+        return lab.backtest(kind, symbol, timeframe, params, cost_bps=cost_bps)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown template: {kind}")
+    except alpaca.AlpacaError as e:
+        raise HTTPException(status_code=502, detail=f"market data error: {e}")
+
+
+@router.post("/lab/promote")
+def lab_promote(body: dict = Body(...)) -> dict:
+    """Register a backtested config as a live (disarmed) strategy on the engine."""
+    kind = body.get("kind")
+    symbol = body.get("symbol")
+    timeframe = body.get("timeframe", "1Hour")
+    params = body.get("params") or {}
+    notional = float(body.get("notional", 1500.0))
+    try:
+        defn = S.register(kind, symbol, timeframe, params, notional=notional)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    engine.refresh()  # pick the new strategy into the books immediately
+    return {"ok": True, "strategy_id": defn.id, "name": defn.name, **engine.snapshot()}

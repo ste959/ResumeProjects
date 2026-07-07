@@ -127,8 +127,10 @@ def stock_snapshots(symbols: list[str]) -> dict:
 
 
 def stock_bars(symbol: str, timeframe: str = "1Day", limit: int = 120) -> dict:
-    return _get(DATA_BASE, "/v2/stocks/bars",
-                {"symbols": symbol, "timeframe": timeframe, "limit": limit, "feed": "iex"})
+    span_h = _TF_HOURS.get(timeframe, 24.0) * (limit + 8)
+    start = (datetime.now(timezone.utc) - timedelta(hours=span_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    params = {"symbols": symbol, "timeframe": timeframe, "limit": 10000, "start": start, "feed": "iex"}
+    return _paginate_bars(DATA_BASE, "/v2/stocks/bars", [symbol], params, limit)
 
 
 def most_actives(top: int = 25) -> dict:
@@ -152,14 +154,31 @@ def news(symbols: list[str] | None = None, limit: int = 20) -> dict:
 _TF_HOURS = {"1Min": 1 / 60, "5Min": 5 / 60, "15Min": 0.25, "1Hour": 1.0, "4Hour": 4.0, "1Day": 24.0}
 
 
+def _paginate_bars(base: str, path: str, symbols: list[str], params: dict, limit: int) -> dict:
+    """Follow Alpaca's next_page_token until `limit` bars are gathered (pages cap out ~1k)."""
+    acc: dict[str, list] = {s: [] for s in symbols}
+    token: str | None = None
+    for _ in range(20):  # hard page cap — a backstop, not a real limit
+        page_params = dict(params)
+        if token:
+            page_params["page_token"] = token
+        data = _get(base, path, page_params)
+        page = data.get("bars") or {}
+        for s in symbols:
+            acc[s].extend(page.get(s) or [])
+        token = data.get("next_page_token")
+        if not token or (symbols and max(len(acc[s]) for s in symbols) >= limit):
+            break
+    return {"bars": {s: acc[s][:limit] for s in symbols}}
+
+
 def crypto_bars(symbols: list[str], timeframe: str = "1Hour", limit: int = 120,
                 start: str | None = None) -> dict:
-    params: dict = {"symbols": ",".join(symbols), "timeframe": timeframe, "limit": limit}
     if start is None:
         span_h = _TF_HOURS.get(timeframe, 1.0) * (limit + 8)
         start = (datetime.now(timezone.utc) - timedelta(hours=span_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    params["start"] = start
-    return _get(DATA_BASE, "/v1beta3/crypto/us/bars", params)
+    params = {"symbols": ",".join(symbols), "timeframe": timeframe, "limit": 10000, "start": start}
+    return _paginate_bars(DATA_BASE, "/v1beta3/crypto/us/bars", symbols, params, limit)
 
 
 def crypto_snapshots(symbols: list[str]) -> dict:

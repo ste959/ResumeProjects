@@ -398,6 +398,34 @@ export interface QpEngine {
   actions: QpAction[];
 }
 
+// ── Backtest lab ──
+export interface LabParamSchema { key: string; label: string; min: number; max: number; default: number; }
+export interface LabTemplate { kind: string; name: string; desc: string; params: LabParamSchema[]; code: string; }
+export interface LabUniverse { symbol: string; label: string; asset_class: string; promotable: boolean; }
+export interface LabTemplates { templates: LabTemplate[]; universe: LabUniverse[]; timeframes: string[]; }
+export interface LabCurvePoint { i: number; value: number; }
+export interface LabResult {
+  ok: boolean;
+  reason?: string;
+  kind: string;
+  symbol: string;
+  timeframe: string;
+  params: Record<string, number>;
+  cost_bps: number;
+  n_bars: number;
+  net_sharpe: number;
+  hac_t: number;
+  total_return: number;
+  ann_return: number;
+  max_drawdown: number;
+  avg_turnover: number;
+  hit_rate: number;
+  passes: boolean;
+  equity_curve: LabCurvePoint[];
+  verdict: string;
+}
+export interface LabPromoteResult { ok: boolean; strategy_id: string; name: string; }
+
 // ── Microstructure study (order-flow alpha on an event-driven backtester) ──
 export interface MicroDecayPoint {
   horizon: number;

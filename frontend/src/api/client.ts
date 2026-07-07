@@ -22,6 +22,9 @@ import type {
   QpOrder,
   QpHistory,
   QpEngine,
+  LabTemplates,
+  LabResult,
+  LabPromoteResult,
   Order,
   PaperOrder,
   PaperOrderRequest,
@@ -207,4 +210,16 @@ export const api = {
   qpFlatten: (id: string) => request<QpEngine>(`/strategies/${id}/flatten`, { method: 'POST' }, RESEARCH_BASE),
   qpKill: () => request<QpEngine>('/strategies/kill', { method: 'POST' }, RESEARCH_BASE),
   qpResume: () => request<QpEngine>('/strategies/resume', { method: 'POST' }, RESEARCH_BASE),
+
+  // Backtest lab.
+  labTemplates: () => request<LabTemplates>('/lab/templates', undefined, RESEARCH_BASE),
+  labBacktest: (q: { kind: string; symbol: string; timeframe: string; cost_bps: number; fast: number; slow: number; lookback: number }) =>
+    request<LabResult>(
+      `/lab/backtest?kind=${q.kind}&symbol=${encodeURIComponent(q.symbol)}&timeframe=${q.timeframe}` +
+        `&cost_bps=${q.cost_bps}&fast=${q.fast}&slow=${q.slow}&lookback=${q.lookback}`,
+      undefined,
+      RESEARCH_BASE,
+    ),
+  labPromote: (body: { kind: string; symbol: string; timeframe: string; params: Record<string, number>; notional: number }) =>
+    request<LabPromoteResult>('/lab/promote', { method: 'POST', body: JSON.stringify(body) }, RESEARCH_BASE),
 };

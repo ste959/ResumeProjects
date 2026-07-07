@@ -25,6 +25,8 @@ class StrategyDef:
     kind: str                 # 'ma_crossover' | 'momentum'
     params: dict = field(default_factory=dict)
     notional: float = 1000.0  # target gross $ per held symbol when in-position
+    timeframe: str = "1Hour"  # bar timeframe the live signal is computed on
+    promoted: bool = False    # created from a backtest (vs a seed strategy)
 
 
 # The initial book of strategies. Crypto first so the live demo trades around the clock.
@@ -40,6 +42,27 @@ REGISTRY: dict[str, StrategyDef] = {
         asset_class="crypto", symbols=("ETH/USD",), kind="momentum",
         params={"lookback": 24}, notional=1500.0),
 }
+
+
+def register(kind: str, symbol: str, timeframe: str, params: dict, notional: float = 1000.0) -> "StrategyDef":
+    """Promote a backtested config into the live registry (idempotent). Crypto only — the engine trades
+    24/7 crypto; equities would need market-hours + a separate order path."""
+    if kind not in {"ma_crossover", "momentum"}:
+        raise ValueError(f"unknown strategy kind: {kind}")
+    if "/" not in symbol:
+        raise ValueError("only crypto strategies can go live for now")
+    pslug = "-".join(str(params[k]) for k in sorted(params))
+    sid = f"{kind.split('_')[0]}-{symbol.split('/')[0].lower()}-{pslug}"
+    if sid in REGISTRY:
+        return REGISTRY[sid]
+    label = "MA-cross" if kind == "ma_crossover" else "Momentum"
+    defn = StrategyDef(
+        id=sid, name=f"{label} {symbol} ({pslug})",
+        desc=f"Promoted from the backtest lab: {kind.replace('_', ' ')} on {symbol} {timeframe} bars, params {params}.",
+        asset_class="crypto", symbols=(symbol,), kind=kind, params=dict(params),
+        notional=notional, timeframe=timeframe, promoted=True)
+    REGISTRY[sid] = defn
+    return defn
 
 
 def order_tag(strategy_id: str, seq: int) -> str:
@@ -171,6 +194,7 @@ def attribute(fills_by_strategy: dict[str, dict[str, list[dict]]],
         rows.append({
             "id": sid, "name": defn.name, "desc": defn.desc,
             "asset_class": defn.asset_class, "kind": defn.kind, "symbols": list(defn.symbols),
+            "promoted": defn.promoted,
             "realized": realized, "unrealized": unrealized, "total_pnl": realized + unrealized,
             "gross_exposure": gross, "positions": positions,
             "n_fills": sum(len(by_symbol.get(s, [])) for s in defn.symbols),
