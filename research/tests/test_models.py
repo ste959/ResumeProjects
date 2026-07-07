@@ -45,3 +45,17 @@ def test_walk_forward_predict_is_out_of_sample_and_learns():
     assert not mask[:10].any()                  # the first (pre-training) rows stay unpredicted
     # Out-of-sample predictions track the true relationship.
     assert np.corrcoef(pred[mask], df["fwd_ret"].to_numpy()[mask])[0, 1] > 0.5
+
+
+def test_net_backtest_horizon_avoids_overbooking_overlapping_returns():
+    # With a horizon-H label, consecutive samples overlap. A persistent position summed every
+    # step books each move ~H times; accounting on non-overlapping (every-H) samples counts each
+    # once. So the horizon-aware gross should be ~1/H of the naive every-step gross, not equal.
+    n, h = 120, 6
+    fwd = np.full(n, 0.001)          # constant H-step forward return
+    position = np.ones(n)            # always long
+    spread = np.zeros(n)
+    naive = models.net_backtest(fwd, position, spread, fee_bps=0.0, horizon=1)
+    aware = models.net_backtest(fwd, position, spread, fee_bps=0.0, horizon=h)
+    ratio = aware["gross_ret_bps"] / naive["gross_ret_bps"]
+    assert 1.0 / h * 0.8 < ratio < 1.0 / h * 1.3   # ~1/H, i.e. overlap no longer double-counts

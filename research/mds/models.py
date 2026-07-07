@@ -54,13 +54,24 @@ def _sharpe(x: np.ndarray) -> float:
     return float(x.mean() / s * np.sqrt(len(x))) if s > 0 and len(x) else 0.0
 
 
-def net_backtest(fwd_ret, position, spread_bps, fee_bps: float = 1.0) -> dict:
+def net_backtest(fwd_ret, position, spread_bps, fee_bps: float = 1.0, horizon: int = 1) -> dict:
     """Backtest a directional position against realised forward returns, charging the
     **half-spread + fees on every trade** — the cost of crossing to enter/exit a microstructure
-    signal. One-period lag (position at t earns the return realised after t)."""
+    signal. One-period lag (position at t earns the return realised after t).
+
+    The label is a horizon-H forward return, so consecutive samples OVERLAP by H−1 steps. Trading
+    every step would book each price move ~H times and treat autocorrelated samples as IID
+    (inflating the Sharpe by ~√H). We therefore account on NON-OVERLAPPING samples — take every
+    H-th observation — so each realised return is counted once and the samples don't overlap. At
+    H=1 this is a no-op."""
     fwd_ret = np.asarray(fwd_ret, dtype=float)
     position = np.nan_to_num(np.asarray(position, dtype=float))
     spread_bps = np.asarray(spread_bps, dtype=float)
+
+    if horizon > 1:
+        fwd_ret = fwd_ret[::horizon]
+        position = position[::horizon]
+        spread_bps = spread_bps[::horizon]
 
     held = np.roll(position, 1)
     held[0] = 0.0
@@ -80,8 +91,10 @@ def net_backtest(fwd_ret, position, spread_bps, fee_bps: float = 1.0) -> dict:
     }
 
 
-def evaluate(df, features=None, folds: int = 5, fee_bps: float = 1.0) -> dict:
-    """Run the whole zoo: for each model, out-of-sample IC and the cost-aware backtest."""
+def evaluate(df, features=None, folds: int = 5, fee_bps: float = 1.0, horizon: int = 1) -> dict:
+    """Run the whole zoo: for each model, out-of-sample IC (with an overlap-aware significance
+    error bar) and the cost-aware, non-overlapping backtest. `horizon` must match the label
+    horizon used to build `df` so the significance and P&L don't double-count overlapping samples."""
     features = features or lob.FEATURES
     fwd = df["fwd_ret"].to_numpy(dtype=float)
     spread = df["spread_bps"].to_numpy(dtype=float)
@@ -91,8 +104,13 @@ def evaluate(df, features=None, folds: int = 5, fee_bps: float = 1.0) -> dict:
         pred = walk_forward_predict(df, features, factory, folds=folds)
         mask = np.isfinite(pred) & np.isfinite(fwd)
         ic = lob.information_coefficient(pred[mask], fwd[mask])
+        # Effective sample size discounts the horizon overlap so the IC error bar isn't overstated.
+        n_eff = int(mask.sum()) // max(horizon, 1)
+        sig = lob.ic_significance(ic["spearman"], n_eff)
         position = np.sign(pred)  # long/short by predicted direction of the next move
-        bt = net_backtest(fwd[mask], position[mask], spread[mask], fee_bps=fee_bps)
+        bt = net_backtest(fwd[mask], position[mask], spread[mask], fee_bps=fee_bps, horizon=horizon)
         results[name] = {"ic_pearson": ic["pearson"], "ic_spearman": ic["spearman"],
-                         "oos_n": int(mask.sum()), **bt}
+                         "ic_t": sig["t_stat"], "ic_ci_low": sig["ci_low"],
+                         "ic_ci_high": sig["ci_high"], "oos_n": int(mask.sum()),
+                         "n_eff": sig["n_eff"], **bt}
     return results

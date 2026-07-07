@@ -180,6 +180,22 @@ def information_coefficient(feature: np.ndarray, fwd_ret: np.ndarray) -> dict:
     return {"n": n, "pearson": pearson, "spearman": spearman}
 
 
+def ic_significance(r: float, n_eff: int) -> dict:
+    """Significance of a correlation-style IC: two-sided t-stat and a 95% CI via the Fisher
+    z-transform. Pass the EFFECTIVE sample size, not the raw count — when the label is a
+    horizon-H forward return the samples overlap, so n_eff ≈ n / H (overlap inflates naive
+    significance). Assumes roughly IID effective samples; residual autocorrelation still widens
+    the true interval, so treat this as a floor on the error bar, not the last word."""
+    if not np.isfinite(r) or n_eff < 4 or abs(r) >= 1.0:
+        return {"t_stat": float("nan"), "ci_low": float("nan"), "ci_high": float("nan"),
+                "n_eff": int(max(n_eff, 0))}
+    z = np.arctanh(r)
+    se = 1.0 / np.sqrt(n_eff - 3)
+    t = r * np.sqrt((n_eff - 2) / (1.0 - r * r))
+    return {"t_stat": float(t), "ci_low": float(np.tanh(z - 1.96 * se)),
+            "ci_high": float(np.tanh(z + 1.96 * se)), "n_eff": int(n_eff)}
+
+
 def walk_forward_splits(n: int, folds: int = 4, min_train: float = 0.4):
     """Expanding-window walk-forward splits (train always precedes test in time).
 

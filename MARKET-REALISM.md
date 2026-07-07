@@ -276,18 +276,23 @@ cost-blindness (an edge smaller than the spread you must cross to capture it). T
 
 Validated on the ground truth above, the pipeline behaves correctly and the honest findings are:
 
-| study | best IC | net-of-cost verdict |
+| study | best IC (t-stat) | net-of-cost verdict |
 |---|---|---|
-| SYNTH noise (α=0) | +0.005 | finds nothing — the false-positive check passes |
-| SYNTH signal (α=2.5) | +0.922 | recovers the planted signal, but **dies after spread** at tick frequency |
-| REAL BTC-USD microstructure | +0.287 | real predictive signal, but **dies after spread** — bid-ask bounce, not tradable |
+| SYNTH noise (α=0) | +0.005 (t≈0.2) | finds nothing — the false-positive check passes, and the IC is *insignificant* as it should be |
+| SYNTH signal (α=2.5) | +0.922 (t≈90) | recovers the planted signal — hugely significant — but **dies after spread** at tick frequency |
+| REAL BTC-USD microstructure | +0.289 (t≈91) | a real, *strongly significant* predictive signal, yet still **dies after spread** — bid-ask bounce, not tradable |
 | REAL equity momentum (cross-sectional) | — | best raw performer, net +0.41 at low turnover (0.10) — but **t ≈ +0.76, 95% CI [−0.65, +1.47]: not significant** |
 | REAL equity risk-adjusted momentum | — | net +0.45, a cleaner momentum but 0.83-correlated to it — **t ≈ +0.84: also not significant** |
 | REAL equity reversal | — | net −1.07, **t ≈ −2.24: the ONLY statistically significant result — and it's a loser** |
 | REAL equity low-vol / betting-against-beta / idio-vol | — | all negative (net −0.20 to −0.39), none significant; the low-risk family, all 0.85+ correlated (one bet in three costumes) |
 
 Two lessons the whole layer is built to teach. First, **what survives is low turnover, not high IC** — a
-+0.29 IC that trades every tick is worthless; IC is not tradability. Second, and more important once we
++0.29 IC that trades every tick is worthless; IC is not tradability. Note the discipline in the IC column:
+each carries a **t-stat on an overlap-adjusted effective sample** (Fisher-z, `n_eff ≈ n / horizon`, so a
+horizon-H label can't fake significance by counting overlapping samples), and the P&L is booked on
+**non-overlapping** samples so a persistent position isn't credited the same move H times. The real BTC IC
+is *strongly* significant (t≈91) — and still dies after costs: significance confirms the signal is real, it
+says nothing about whether you can trade it. Second, and more important once we
 report **t-stats and confidence intervals** (see `run_crosssec.py`): **no signal clears statistical
 significance.** Momentum's +0.41 Sharpe sounds like an edge but its 95% CI straddles zero (t ≈ 0.76) on a
 survivorship-selected 40-name, 4.4-year sample; the *only* significant result is reversal, and it loses.

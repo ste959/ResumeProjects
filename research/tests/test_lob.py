@@ -57,3 +57,19 @@ def test_panel_is_leakage_free(tmp_path):
     assert set(lob.FEATURES).issubset(df.columns)
     # The mid rose monotonically, so every forward return is positive.
     assert (df["fwd_ret"] > 0).all()
+
+
+def test_ic_significance_scales_with_effective_sample():
+    # A fixed IC is more significant with more independent samples; discounting the sample for
+    # horizon overlap must REDUCE the t-stat and WIDEN the interval (never fabricate significance).
+    r = 0.05
+    big = lob.ic_significance(r, n_eff=40_000)
+    small = lob.ic_significance(r, n_eff=40_000 // 20)   # as if H=20 overlap
+    assert big["t_stat"] > small["t_stat"] > 0
+    assert (big["ci_high"] - big["ci_low"]) < (small["ci_high"] - small["ci_low"])
+    assert big["ci_low"] < r < big["ci_high"]            # the CI brackets the point estimate
+    # A weak IC on few effective samples is not distinguishable from zero.
+    weak = lob.ic_significance(0.02, n_eff=50)
+    assert weak["ci_low"] < 0 < weak["ci_high"]
+    # Degenerate inputs return NaNs, not a bogus number.
+    assert not np.isfinite(lob.ic_significance(0.3, n_eff=3)["t_stat"])
