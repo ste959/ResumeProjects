@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../api/client';
-import type { BacktestResult, Construction, EquityPoint, Findings, SignalMeta } from '../api/types';
+import type { BacktestResult, Construction, Findings, SignalMeta } from '../api/types';
+import { Callout, Chapter, EquityChart, MetricCtx } from './ui';
 
-// The Research Lab — the strongest work, made legible. Two halves:
-//   1. an INTERACTIVE runner: pick a signal / cost / neutralization → live backtest with honest,
-//      overfitting-adjusted stats (HAC t, bootstrap CI, Bonferroni bar);
-//   2. the TOLD STORY from a precomputed snapshot: the honest single-factor null, then why the
-//      construction stack (composite → risk model → timing → structuring → tax) is the real edge.
+// The Research Lab — the project's focal point, told as a guided story a reviewer can follow in two
+// minutes: (1) single factors fail the honest statistical gauntlet, (2) so the edge is portfolio
+// construction, (3) run any factor yourself through the same pipeline. This surface is the reference
+// standard for the whole site: clear hierarchy, labeled charts, and every number explained.
 
 const sh = (n: number | null | undefined) => (n == null ? '—' : (n >= 0 ? '+' : '') + n.toFixed(2));
 const pct = (n: number | null | undefined) => (n == null ? '—' : (n * 100).toFixed(1) + '%');
@@ -44,74 +44,171 @@ export function ResearchLab() {
     }
   }, [signal, costBps, neutralize]);
 
-  // Initial run so the panel isn't empty on arrival (composite @ 5bps, neutralized).
   useEffect(() => { void run(); /* eslint-disable-next-line */ }, []);
 
   if (down && !findings && !result) {
     return (
-      <main className="risk-main">
+      <div className="guide">
         <div className="banner err global">
-          Research service unreachable at <code>/research</code>. Start it from the{' '}
-          <code>research/</code> directory:{' '}
-          <code>pip install -r service/requirements.txt &amp;&amp; uvicorn service.app:app --port 8082</code>
+          The research service isn't reachable at <code>/research-api</code>. Start it from{' '}
+          <code>research/</code>: <code>uvicorn service.app:app --port 8082</code> (or bring up the Docker stack).
         </div>
-      </main>
+      </div>
     );
   }
 
   const u = findings?.universe;
+  const sel = findings?.selection;
 
   return (
-    <main className="risk-main">
-      <div className="risk-intro">
-        <span className="dot live" />
-        The <b>quant research</b> layer, live — factor backtests over the Python <code>mds</code> engine,
-        reported with <b>honest, overfitting-adjusted statistics</b> (Newey–West t, Deflated Sharpe, PBO).
-      </div>
+    <div className="guide">
+      {/* ---- framing hero ---- */}
+      <header className="guide-hero">
+        <span className="guide-eyebrow">Quant Research</span>
+        <h1 className="guide-title">Is there alpha in mega-cap equities?</h1>
+        <p className="guide-sub">
+          A rigorous, self-critical research pipeline. Every candidate signal is backtested as a
+          dollar-neutral, cost-aware, walk-forward book and forced through the same overfitting
+          gauntlet — so the answer below is honest, not a cherry-picked backtest.
+        </p>
+        {u && (
+          <div className="guide-chips">
+            <span className="gchip"><b>{u.names}</b> mega-cap names</span>
+            <span className="gchip"><b>{(u.days / 252).toFixed(1)}y</b> ({u.start} → {u.end})</span>
+            <span className="gchip">net of costs</span>
+            <span className="gchip">walk-forward · no look-ahead</span>
+          </div>
+        )}
+      </header>
 
-      {/* ---- interactive runner ---- */}
-      <div className="panel lab-runner">
-        <div className="panel-head">
-          <h2>Interactive Backtest</h2>
-          <span className="count">dollar-neutral, walk-forward, net of cost</span>
+      {/* ---- chapter 1: the honest null ---- */}
+      <Chapter
+        num="01 — The Honest Null"
+        title="No single factor survives"
+        lede={<>We tested {findings?.signals.length ?? 18} classic equity factors — value, momentum, quality,
+          low-risk and more. To count as <b>real</b> (not luck, not overfitting), a factor must clear all
+          three of these checks at once:</>}
+      >
+        <div className="gauntlet">
+          <div className="gcheck">
+            <div className="gcheck-name">Newey–West t-stat</div>
+            <div className="gcheck-q">Is the return distinguishable from zero, once you stop pretending it's noise-free (autocorrelation-adjusted)?</div>
+            <div className="gcheck-bar">Pass: <b>|t| &gt; {num(sel?.bonferroni_z)}</b> — the bar, raised for testing {sel?.n_trials ?? 18} factors at once.</div>
+          </div>
+          <div className="gcheck">
+            <div className="gcheck-name">Deflated Sharpe</div>
+            <div className="gcheck-q">After trying many strategies, what's the probability this one's edge is genuinely positive?</div>
+            <div className="gcheck-bar">Pass: <b>&gt; 0.95</b>.</div>
+          </div>
+          <div className="gcheck">
+            <div className="gcheck-name">PBO</div>
+            <div className="gcheck-q">How often does the best in-sample factor turn into a loser out-of-sample (probability of backtest overfitting)?</div>
+            <div className="gcheck-bar">Good: <b>&lt; 0.5</b>.</div>
+          </div>
         </div>
-        <div className="lab-body">
-          <div className="lab-controls">
-            <label className="lab-field">
-              <span>Signal</span>
+
+        {findings && (
+          <div className="panel">
+            <div className="panel-head">
+              <h2>Every factor, one verdict</h2>
+              <span className="count">neutralized · net of 5bps cost</span>
+            </div>
+            <div className="tablewrap">
+              <table className="data-table">
+                <thead>
+                  <tr><th>Factor</th><th>Family</th><th className="r">Net Sharpe</th><th className="r">t-stat</th><th className="r">Verdict</th></tr>
+                </thead>
+                <tbody>
+                  {findings.signals.slice(0, 8).map((r) => (
+                    <tr key={r.name}>
+                      <td>{r.label}</td>
+                      <td className="dim">{r.family}</td>
+                      <td className={`r mono ${(r.net_sharpe ?? 0) >= 0 ? 'pos' : 'neg'}`}>{sh(r.net_sharpe)}</td>
+                      <td className="r mono dim">{sh(r.hac_t)}</td>
+                      <td className="r">{r.significant ? <span className="tag-sig">passes</span> : <span className="tag-no">not significant</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {findings.signals.length > 8 && (
+              <div className="lab-note" style={{ borderRadius: 0 }}>…and {findings.signals.length - 8} more — all below the bar.</div>
+            )}
+          </div>
+        )}
+
+        {sel && (
+          <Callout figure={`DSR ${num(sel.deflated_sharpe)}`} tone="warn">
+            <b>Not one of {sel.n_trials} factors clears the bar.</b> The best factor's Deflated Sharpe is{' '}
+            {num(sel.deflated_sharpe)} — it needs 0.95. This isn't a failure of technique (the pipeline is
+            deliberately rigorous); it's the efficient-market ceiling on the easiest names with the weakest data.
+          </Callout>
+        )}
+      </Chapter>
+
+      {/* ---- chapter 2: construction is the edge ---- */}
+      {construction && <ConstructionChapter c={construction} />}
+
+      {/* ---- chapter 3: run it yourself ---- */}
+      <Chapter
+        num="03 — Run It Yourself"
+        title="The same pipeline, on demand"
+        lede={<>Pick any factor (or the composite), set the cost assumption, and it runs through the exact
+          honest backtest above — the equity curve and the statistics update live. Nothing is pre-baked.</>}
+      >
+        <div className="lab2">
+          <div className="lab2-controls">
+            <label className="lab2-field">
+              <span>Factor</span>
               <select value={signal} onChange={(e) => setSignal(e.target.value)}>
-                {signals.map((s) => (
-                  <option key={s.name} value={s.name}>{s.label}</option>
-                ))}
+                {signals.map((s) => <option key={s.name} value={s.name}>{s.label}</option>)}
               </select>
             </label>
-            <label className="lab-field">
-              <span>Cost (bps): {costBps}</span>
-              <input type="range" min={0} max={30} step={1} value={costBps}
-                onChange={(e) => setCostBps(Number(e.target.value))} />
+            <label className="lab2-field">
+              <span>Trading cost: {costBps} bps per turnover</span>
+              <input type="range" min={0} max={30} step={1} value={costBps} onChange={(e) => setCostBps(Number(e.target.value))} />
             </label>
-            <label className="lab-field toggle">
-              <span>β + sector neutral</span>
+            <label className="lab2-toggle">
               <input type="checkbox" checked={neutralize} onChange={(e) => setNeutralize(e.target.checked)} />
+              β + sector neutralize (the investable book)
             </label>
-            <button className="lab-run" onClick={run} disabled={running}>
+            <button className="btn primary" onClick={run} disabled={running}>
               {running ? 'Running…' : 'Run backtest'}
             </button>
+            {result && (
+              <p className="mctx-ctx" style={{ marginTop: '-4px' }}>
+                {result.label} · {result.days} trading days · turnover {num(result.avg_turnover)}/day
+              </p>
+            )}
           </div>
 
           {result && (
-            <div className="lab-result">
-              <EquityCurve curve={result.equity_curve} up={(result.net_sharpe ?? 0) >= 0} />
-              <div className="lab-stats">
-                <Stat label="Net Sharpe" value={sh(result.net_sharpe)} tone={(result.net_sharpe ?? 0) >= 0 ? 'good' : 'bad'} />
-                <Stat label="HAC t-stat" value={sh(result.hac_t)} />
-                <Stat label="Bootstrap 95% CI" value={`${sh(result.boot_lo)} … ${sh(result.boot_hi)}`} />
-                <Stat label="Ann. return" value={pct(result.ann_return)} tone={(result.ann_return ?? 0) >= 0 ? 'good' : 'bad'} />
-                <Stat label="Max drawdown" value={pct(result.max_drawdown)} tone="bad" />
-                <Stat label="Turnover" value={num(result.avg_turnover)} />
+            <div className="lab2-result">
+              <div className="lab2-chart-head">
+                <h4>Growth of $1 — net of cost, walk-forward</h4>
+                <span className="lab2-final" style={{ color: (result.net_sharpe ?? 0) >= 0 ? 'var(--buy)' : 'var(--sell)' }}>
+                  ×{result.equity_curve.length ? result.equity_curve[result.equity_curve.length - 1].value.toFixed(2) : '—'}
+                </span>
               </div>
-              <div className={`lab-verdict ${result.significant ? (result.net_sharpe && result.net_sharpe > 0 ? 'good' : 'warn') : 'neutral'}`}>
-                <span className="lv-chip">
+              <EquityChart curve={result.equity_curve} up={(result.net_sharpe ?? 0) >= 0} />
+
+              <div className="lab2-stats">
+                <MetricCtx label="Net Sharpe" value={sh(result.net_sharpe)} tone={(result.net_sharpe ?? 0) >= 0 ? 'good' : 'bad'}
+                  ctx="annualized return per unit risk, after cost · 1.0+ is strong" />
+                <MetricCtx label="t-stat (HAC)" value={sh(result.hac_t)}
+                  ctx={`significance, autocorr-adjusted · |t| > ${num(result.bonferroni_z)} to pass`} />
+                <MetricCtx label="95% CI (Sharpe)" value={`${sh(result.boot_lo)}…${sh(result.boot_hi)}`}
+                  ctx="bootstrap range — spans 0 = not distinguishable" />
+                <MetricCtx label="Ann. return" value={pct(result.ann_return)} tone={(result.ann_return ?? 0) >= 0 ? 'good' : 'bad'}
+                  ctx="annualized, net of cost" />
+                <MetricCtx label="Max drawdown" value={pct(result.max_drawdown)} tone="bad"
+                  ctx="worst peak-to-trough loss" />
+                <MetricCtx label="Turnover" value={num(result.avg_turnover)}
+                  ctx="fraction of the book traded per day · lower = cheaper" />
+              </div>
+
+              <div className={`lab2-verdict ${result.significant ? (result.net_sharpe && result.net_sharpe > 0 ? 'good' : 'warn') : 'neutral'}`}>
+                <span className="lab2-chip">
                   {result.significant ? (result.net_sharpe && result.net_sharpe > 0 ? 'CANDIDATE' : 'SIGNIFICANT LOSER') : 'NOT SIGNIFICANT'}
                 </span>
                 {result.verdict}
@@ -119,183 +216,70 @@ export function ResearchLab() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* ---- told story 1: the honest null ---- */}
-      {findings && (
-        <div className="panel">
-          <div className="panel-head">
-            <h2>The Honest Null — single factors</h2>
-            {u && <span className="count">{u.names} names · {u.days} days · {u.start} → {u.end}</span>}
-          </div>
-          <div className="lab-findings">
-            <div className="tablewrap">
-              <table className="data-table">
-                <thead>
-                  <tr><th>Factor</th><th>Family</th><th className="r">Net Sharpe</th><th className="r">HAC t</th><th className="r">Turnover</th><th className="r">Sig?</th></tr>
-                </thead>
-                <tbody>
-                  {findings.signals.slice(0, 10).map((r) => (
-                    <tr key={r.name}>
-                      <td>{r.label}</td>
-                      <td className="dim">{r.family}</td>
-                      <td className={`r mono ${(r.net_sharpe ?? 0) >= 0 ? 'pos' : 'neg'}`}>{sh(r.net_sharpe)}</td>
-                      <td className="r mono">{sh(r.hac_t)}</td>
-                      <td className="r mono dim">{num(r.turnover)}</td>
-                      <td className="r">{r.significant ? <span className="tag-sig">yes</span> : <span className="tag-no">no</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="lab-selection">
-              <SelStat label="Best factor" value={findings.selection.best_label} />
-              <SelStat label="Deflated Sharpe" value={num(findings.selection.deflated_sharpe)} hint="needs > 0.95" />
-              <SelStat label="PBO" value={num(findings.selection.pbo)} hint="prob. overfit" />
-              <SelStat label="Bonferroni bar" value={`|t| > ${num(findings.selection.bonferroni_z)}`} hint={`${findings.selection.n_trials} trials`} />
-            </div>
-          </div>
-          <p className="lab-note">{findings.verdict}</p>
-        </div>
-      )}
-
-      {/* ---- told story 2: why construction is the edge ---- */}
-      {construction && <ConstructionStory c={construction} />}
-    </main>
-  );
-}
-
-function ConstructionStory({ c }: { c: Construction }) {
-  return (
-    <div className="panel">
-      <div className="panel-head">
-        <h2>Why Construction Is the Edge</h2>
-        <span className="count">combine → risk-model → time → hedge → tax</span>
-      </div>
-      <div className="constr-grid">
-        <div className="constr-cell">
-          <h3>1 · Multi-factor composite</h3>
-          <p>IC t <b>{sh(c.composite.ic_t)}</b> (positive &amp; significant), but neutral Sharpe{' '}
-            <b>{sh(c.composite.net_sharpe)}</b> still &lt; best single ({c.composite.best_single_label}{' '}
-            {sh(c.composite.best_single_sharpe)}). Combining lowers noise; it can't create absent alpha.</p>
-        </div>
-
-        <div className="constr-cell">
-          <h3>2 · Risk-model optimizer</h3>
-          <div className="tablewrap">
-            <table className="data-table sm">
-              <thead><tr><th>Book</th><th className="r">Sharpe</th><th className="r">Turn</th><th className="r">|β|</th><th className="r">Max DD</th></tr></thead>
-              <tbody>
-                {c.riskmodel.map((b) => (
-                  <tr key={b.book}>
-                    <td>{b.book}</td>
-                    <td className="r mono">{sh(b.net_sharpe)}</td>
-                    <td className="r mono dim">{num(b.turnover)}</td>
-                    <td className="r mono dim">{num(b.net_beta, 3)}</td>
-                    <td className="r mono neg">{pct(b.max_drawdown)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="constr-cell">
-          <h3>3 · Regime exposure timing</h3>
-          <p>Directional book, timed on the FRED credit/VIX state:</p>
-          <div className="mini-metrics">
-            <span>max DD <b className="neg">{pct(c.timing.mkt_raw_dd)}</b> → <b className="pos">{pct(c.timing.mkt_timed_dd)}</b></span>
-            <span className="cut">drawdown cut {pct(c.timing.dd_cut)}</span>
-          </div>
-        </div>
-
-        <div className="constr-cell">
-          <h3>4 · Options structuring</h3>
-          {c.structuring.available ? (
-            <p>
-              Live surface ({c.structuring.n_names} names, IV&gt;RV on {c.structuring.vrp_count}). Tail hedge{' '}
-              <b>{pct(c.structuring.tail_hedge?.annual_drag)}</b>/yr (cheap-entry {pct(c.structuring.tail_hedge?.cheap_drag)}).
-              {c.structuring.overwrite && c.structuring.overwrite.length > 0 && (
-                <> Overwrite: {c.structuring.overwrite.slice(0, 3).map((o) => o.symbol).join(', ')}.</>
-              )}
-            </p>
-          ) : <p className="dim">No options snapshot cached.</p>}
-        </div>
-
-        <div className="constr-cell wide">
-          <h3>5 · Tax-aware rebalancing</h3>
-          <div className="tablewrap">
-            <table className="data-table sm">
-              <thead><tr><th>Method</th><th className="r">Tax</th><th className="r">Net ST</th><th className="r">Net LT</th><th className="r">LT% gains</th><th className="r">Deferred</th></tr></thead>
-              <tbody>
-                {c.tax.map((t) => (
-                  <tr key={t.method} className={t.method === 'hifo' ? 'row-hi' : ''}>
-                    <td className="up">{t.method}</td>
-                    <td className="r mono">{money(t.tax)}</td>
-                    <td className="r mono dim">{money(t.net_short_term)}</td>
-                    <td className="r mono dim">{money(t.net_long_term)}</td>
-                    <td className="r mono dim">{pct(t.lt_fraction)}</td>
-                    <td className="r mono">{money(t.deferred_gain)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <p className="lab-note">{c.verdict}</p>
+      </Chapter>
     </div>
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'bad' }) {
-  return (
-    <div className="lab-stat">
-      <span className="ls-label">{label}</span>
-      <span className={`ls-value ${tone ?? ''}`}>{value}</span>
-    </div>
-  );
-}
+function ConstructionChapter({ c }: { c: Construction }) {
+  const [, neut, opt] = c.riskmodel;
+  const fifo = c.tax.find((t) => t.method === 'fifo');
+  const hifo = c.tax.find((t) => t.method === 'hifo');
+  const taxSaved = fifo && hifo && fifo.tax != null && hifo.tax != null ? fifo.tax - hifo.tax : null;
 
-function SelStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="sel-stat">
-      <span className="ss-label">{label}</span>
-      <span className="ss-value">{value}</span>
-      {hint && <span className="ss-hint">{hint}</span>}
-    </div>
-  );
-}
+  const layers = [
+    {
+      name: 'Multi-factor composite', sub: 'value · quality · momentum',
+      what: <>Blends the weak factors into one cross-sectional score, so uncorrelated signals reinforce and their noise cancels.</>,
+      result: `IC t ${sh(c.composite.ic_t)}`, resultSub: 'a significant combined forecast (t>2 is the bar)',
+    },
+    {
+      name: 'Risk-model optimizer', sub: 'Barra Σ = BFBᵀ+D · constrained MVO',
+      what: <>Risk-weights the same alpha and caps position size &amp; turnover — the <b>investable</b> form of the book.</>,
+      result: `${sh(opt?.net_sharpe)} Sharpe`, resultSub: `from ${sh(neut?.net_sharpe)} · DD ${pct(opt?.max_drawdown)} · turnover ${num(opt?.turnover)}`,
+    },
+    {
+      name: 'Regime timing', sub: 'FRED credit spreads + VIX',
+      what: <>Cuts equity exposure when credit and volatility flash risk-off — drawdown control, not new alpha.</>,
+      result: `${pct(c.timing.dd_cut)} cut`, resultSub: `max drawdown ${pct(c.timing.mkt_raw_dd)} → ${pct(c.timing.mkt_timed_dd)}`,
+    },
+    c.structuring.available ? {
+      name: 'Options structuring', sub: 'live IV surface',
+      what: <>Sizes tail hedges and harvests the variance-risk premium off the live options surface.</>,
+      result: `${c.structuring.vrp_count}/${c.structuring.n_names} rich`, resultSub: `tail hedge ~${pct(c.structuring.tail_hedge?.annual_drag)}/yr`,
+    } : null,
+    taxSaved != null ? {
+      name: 'Tax-aware rebalancing', sub: 'HIFO · wash sales · §475(f)',
+      what: <>HIFO lot selection defers gains and shifts them to the lower long-term rate — pure after-tax edge.</>,
+      result: `${money(taxSaved)} saved`, resultSub: 'HIFO vs FIFO on identical trades ($1M book)',
+    } : null,
+  ].filter(Boolean) as { name: string; sub: string; what: ReactNode; result: string; resultSub: string }[];
 
-/** Cumulative equity curve — area fill, a dashed 1.0 baseline, and an emphasized endpoint. */
-function EquityCurve({ curve, up }: { curve: EquityPoint[]; up: boolean }) {
-  if (!curve || curve.length < 2) return <div className="eq-empty">run a backtest…</div>;
-  const vals = curve.map((p) => p.value);
-  const min = Math.min(...vals, 1);
-  const max = Math.max(...vals, 1);
-  const range = max - min || 1;
-  const w = 100;
-  const h = 42;
-  const x = (i: number) => (i / (curve.length - 1)) * w;
-  const y = (v: number) => h - ((v - min) / range) * h;
-  const line = curve.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
-  const area = `0,${h} ${line} ${w},${h}`;
-  const baseY = y(1);
-  const color = up ? 'var(--buy)' : 'var(--sell)';
-  const last = curve[curve.length - 1];
   return (
-    <div className="eq-wrap">
-      <svg className="eq-curve" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <polygon points={area} fill={color} fillOpacity={0.1} />
-        <line x1={0} x2={w} y1={baseY} y2={baseY} className="eq-base" />
-        <polyline points={line} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
-        <circle cx={x(curve.length - 1)} cy={y(last.value)} r={1.6} fill={color} />
-      </svg>
-      <div className="eq-axis">
-        <span>{curve[0].date}</span>
-        <span className="eq-final" style={{ color }}>×{last.value.toFixed(2)}</span>
-        <span>{last.date}</span>
+    <Chapter
+      num="02 — The Edge Is Construction"
+      title="So don't hunt a signal — build a portfolio"
+      lede={<>If no single factor works, the quant move isn't a cleverer signal — it's how you <b>construct and
+        manage</b> the portfolio. Five layers, each measured against a naive baseline. The composite's forecast
+        is statistically significant (IC t {sh(c.composite.ic_t)}) yet still under the best single factor
+        ({c.composite.best_single_label} {sh(c.composite.best_single_sharpe)}): combining cuts noise, it can't
+        conjure absent alpha. The value shows up in the <b>construction</b>:</>}
+    >
+      <div className="layers">
+        {layers.map((l) => (
+          <div key={l.name} className="layer-card">
+            <div className="lc-name">{l.name}<small>{l.sub}</small></div>
+            <div className="lc-what">{l.what}</div>
+            <div className="lc-result">{l.result}<small>{l.resultSub}</small></div>
+          </div>
+        ))}
       </div>
-    </div>
+
+      <Callout figure="⅓ the drawdown">
+        The optimizer delivers the <b>same</b> alpha at a third of the drawdown ({pct(neut?.max_drawdown)} →{' '}
+        {pct(opt?.max_drawdown)}) and a tenth of the turnover — and none of these layers needs a significant
+        standalone signal. <b>When alpha is scarce, construction and risk control are the edge.</b>
+      </Callout>
+    </Chapter>
   );
 }

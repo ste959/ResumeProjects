@@ -25,6 +25,8 @@
 
   --text: var(--ink);
   --mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  /* Sans for headings + prose (data stays mono) — gives readable hierarchy vs. a wall of monospace. */
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
@@ -1434,4 +1436,110 @@ code {
 @media (max-width: 1000px) {
   .cockpit-runs { grid-template-columns: 1fr; }
   .eo-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ============================================================================
+   DESIGN SYSTEM — reference pass (hierarchy · explanation · narrative)
+   Reusable primitives: action buttons, chapters, prose, callouts, contextual
+   metrics, and labeled charts. Applied first to the Research Lab.
+   ============================================================================ */
+
+/* Action buttons — visually distinct from the nav (fixes "Run looks like a tab") */
+.btn {
+  font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; border-radius: 4px; cursor: pointer; padding: 10px 22px;
+  border: 1px solid transparent; display: inline-flex; align-items: center; gap: 8px; transition: filter 0.12s;
+}
+.btn.primary { background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(29, 78, 216, 0.28); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.primary:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+.btn.ghost { background: var(--panel); color: var(--accent); border-color: var(--border-strong); }
+.btn.ghost:hover { border-color: var(--accent); }
+
+/* A guided page: framing hero + numbered chapters with a one-line thesis each */
+.guide { display: flex; flex-direction: column; gap: 30px; padding: 20px 24px 60px; max-width: 1160px; margin: 0 auto; }
+.guide-hero { display: flex; flex-direction: column; gap: 12px; }
+.guide-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.guide-title { font-family: var(--sans); font-size: clamp(26px, 4vw, 38px); font-weight: 780; letter-spacing: -0.025em; line-height: 1.06; color: var(--ink); margin: 0; max-width: 20ch; }
+.guide-sub { font-family: var(--sans); font-size: 16px; line-height: 1.55; color: var(--dim); max-width: 70ch; margin: 0; }
+.guide-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.gchip { font-family: var(--mono); font-size: 11px; color: var(--dim); background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; }
+.gchip b { color: var(--ink); }
+
+.chapter { display: flex; flex-direction: column; gap: 16px; padding-top: 24px; border-top: 1px solid var(--border); }
+.chapter-head { display: flex; flex-direction: column; gap: 8px; }
+.chapter-num { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; color: var(--accent); font-weight: 700; }
+.chapter-title { font-family: var(--sans); font-size: 22px; font-weight: 740; letter-spacing: -0.02em; color: var(--ink); margin: 0; line-height: 1.15; }
+.chapter-lede { font-family: var(--sans); font-size: 14.5px; line-height: 1.6; color: var(--dim); max-width: 76ch; margin: 0; }
+.chapter-lede b { color: var(--ink); font-weight: 650; }
+
+/* Callout — the punchline, with a big figure + explanation */
+.callout { display: flex; gap: 18px; align-items: center; padding: 16px 20px; border-radius: 6px;
+  background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border)); }
+.callout.warn { background: color-mix(in srgb, var(--warn) 9%, var(--panel)); border-color: color-mix(in srgb, var(--warn) 32%, var(--border)); }
+.callout-figure { font-family: var(--mono); font-size: 30px; font-weight: 800; color: var(--accent); line-height: 1; white-space: nowrap; }
+.callout.warn .callout-figure { color: var(--warn); }
+.callout-body { font-family: var(--sans); font-size: 14px; line-height: 1.5; color: var(--dim); }
+.callout-body b { color: var(--ink); font-weight: 650; }
+
+/* The overfitting gauntlet — 3 checks, each explained (what it asks · the bar to pass) */
+.gauntlet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.gcheck { border: 1px solid var(--border); border-radius: 5px; padding: 14px 16px; background: var(--panel); box-shadow: var(--shadow); }
+.gcheck-name { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.3px; }
+.gcheck-q { font-family: var(--sans); font-size: 12.5px; color: var(--ink); margin: 7px 0; line-height: 1.45; }
+.gcheck-bar { font-family: var(--mono); font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 7px; }
+.gcheck-bar b { color: var(--dim); }
+
+/* Construction layers — each: what it does · the result · why it matters */
+.layers { display: flex; flex-direction: column; gap: 10px; }
+.layer-card { display: grid; grid-template-columns: 180px 1fr 150px; gap: 18px; align-items: center;
+  padding: 15px 18px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 5px; background: var(--panel); box-shadow: var(--shadow); }
+.lc-name { font-family: var(--sans); font-weight: 700; font-size: 14px; color: var(--ink); }
+.lc-name small { display: block; font-family: var(--mono); font-size: 10px; color: var(--muted); font-weight: 400; margin-top: 3px; }
+.lc-what { font-family: var(--sans); font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+.lc-what b { color: var(--ink); font-weight: 650; }
+.lc-result { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--buy); text-align: right; }
+.lc-result small { display: block; font-family: var(--sans); font-weight: 400; color: var(--muted); font-size: 10.5px; margin-top: 3px; line-height: 1.3; }
+
+/* Contextual metric — value + what it means + what "good" looks like */
+.mctx { border: 1px solid var(--border); border-radius: 5px; padding: 11px 13px; background: var(--panel-2); }
+.mctx-label { display: block; font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--dim); }
+.mctx-value { display: block; font-family: var(--mono); font-size: 21px; font-weight: 700; margin: 4px 0 3px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.mctx-value.good { color: var(--buy); } .mctx-value.bad { color: var(--sell); } .mctx-value.warn { color: var(--warn); }
+.mctx-ctx { display: block; font-family: var(--sans); font-size: 10.5px; color: var(--muted); line-height: 1.4; }
+
+/* Labeled equity chart */
+.eqchart { width: 100%; height: auto; display: block; }
+.eqc-grid { stroke: var(--border); stroke-width: 1; }
+.eqc-base { stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3 3; }
+.eqc-tick { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+.eqc-axis-title { fill: var(--dim); font-family: var(--sans); font-size: 11px; font-weight: 600; }
+
+/* Interactive backtest panel (reference layout) */
+.lab2 { display: grid; grid-template-columns: 260px 1fr; gap: 18px; align-items: start; }
+.lab2-controls { display: flex; flex-direction: column; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); box-shadow: var(--shadow); }
+.lab2-field { display: flex; flex-direction: column; gap: 6px; }
+.lab2-field > span { font-family: var(--sans); font-size: 11px; font-weight: 600; color: var(--dim); }
+.lab2-field select { font-family: var(--mono); font-size: 13px; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--panel); color: var(--ink); }
+.lab2-field input[type='range'] { accent-color: var(--accent); }
+.lab2-toggle { display: flex; align-items: center; gap: 8px; font-family: var(--sans); font-size: 12px; color: var(--dim); cursor: pointer; }
+.lab2-toggle input { accent-color: var(--accent); width: 15px; height: 15px; }
+.lab2-result { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); box-shadow: var(--shadow); padding: 16px; }
+.lab2-chart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.lab2-chart-head h4 { font-family: var(--sans); font-size: 13px; font-weight: 700; color: var(--ink); margin: 0; }
+.lab2-final { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+.lab2-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.lab2-verdict { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: 5px; font-family: var(--sans); font-size: 13px; color: var(--dim); line-height: 1.45; }
+.lab2-verdict.good { background: color-mix(in srgb, var(--buy) 8%, var(--panel)); border: 1px solid color-mix(in srgb, var(--buy) 28%, var(--border)); }
+.lab2-verdict.warn { background: color-mix(in srgb, var(--warn) 8%, var(--panel)); border: 1px solid color-mix(in srgb, var(--warn) 28%, var(--border)); }
+.lab2-verdict.neutral { background: var(--panel-2); border: 1px solid var(--border); }
+.lab2-chip { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.8px; padding: 4px 9px; border-radius: 3px; white-space: nowrap; border: 1px solid currentColor; }
+.lab2-verdict.good .lab2-chip { color: var(--buy); }
+.lab2-verdict.warn .lab2-chip { color: var(--warn); }
+.lab2-verdict.neutral .lab2-chip { color: var(--muted); }
+
+@media (max-width: 860px) {
+  .gauntlet, .lab2, .lab2-stats { grid-template-columns: 1fr; }
+  .layer-card { grid-template-columns: 1fr; gap: 8px; }
+  .lc-result { text-align: left; }
 }
