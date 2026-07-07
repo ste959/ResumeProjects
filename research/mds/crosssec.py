@@ -30,16 +30,54 @@ def returns_panel(field: str = "close"):
     return px, rets
 
 
+def _market_return(rets: pd.DataFrame) -> pd.Series:
+    """Equal-weight universe return each day — our market proxy (the free feed has no index)."""
+    return rets.mean(axis=1, skipna=True)
+
+
+def _rolling_beta(rets: pd.DataFrame, mkt: pd.Series, window: int = 126) -> pd.DataFrame:
+    """Rolling market beta per name: cov(r_i, mkt) / var(mkt). Slow-moving → low turnover."""
+    mkt_var = mkt.rolling(window).var()
+    return pd.DataFrame({col: rets[col].rolling(window).cov(mkt) / mkt_var for col in rets.columns})
+
+
+def _idio_vol(rets: pd.DataFrame, mkt: pd.Series, window: int = 126) -> pd.DataFrame:
+    """Rolling idiosyncratic volatility per name: the vol left after removing the market
+    component. idio_var = var(r_i) − cov(r_i, mkt)² / var(mkt) (residual variance from a single
+    CAPM regression). Distinct from raw total vol — that's what makes it a real anomaly."""
+    mkt_var = mkt.rolling(window).var()
+    out = {}
+    for col in rets.columns:
+        cov = rets[col].rolling(window).cov(mkt)
+        var_i = rets[col].rolling(window).var()
+        out[col] = np.sqrt((var_i - cov ** 2 / mkt_var).clip(lower=0))
+    return pd.DataFrame(out)
+
+
 def signals(px: pd.DataFrame, rets: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """A few classic cross-sectional signals, each a dates × symbols score (higher = long)."""
+    """Cross-sectional signals, each a dates × symbols score (higher = long).
+
+    All are price/volume-only — the free IEX feed has no fundamentals, so true value/quality/
+    profitability factors are honestly off the table. These are technical/risk factors chosen to
+    DIVERSIFY momentum (the lone survivor so far), not just pile on more trend."""
     logpx = np.log(px)
+    mom = logpx.diff(252) - logpx.diff(21)
+    mkt = _market_return(rets)
+    beta = _rolling_beta(rets, mkt)
+    idio = _idio_vol(rets, mkt)
     return {
         # 12–1 month momentum: last ~12m return skipping the most recent month.
-        "momentum": logpx.diff(252) - logpx.diff(21),
+        "momentum": mom,
         # short-term reversal: last week's losers tend to bounce → negate the 5-day return.
         "reversal": -rets.rolling(5).sum(),
-        # low-volatility: prefer calmer names → negate trailing vol.
+        # low-volatility: prefer calmer names → negate trailing total vol.
         "low_vol": -rets.rolling(21).std(),
+        # betting-against-beta: long low-β names, short high-β (a risk bet, not a trend bet).
+        "bab": -beta,
+        # idiosyncratic-vol anomaly: long low residual-vol names (market component removed).
+        "idio_vol": -idio,
+        # risk-adjusted momentum: scale 12–1 momentum by idio-vol — a cleaner momentum.
+        "risk_adj_mom": mom / idio.replace(0, np.nan),
     }
 
 

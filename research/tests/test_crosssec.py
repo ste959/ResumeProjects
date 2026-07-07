@@ -45,3 +45,37 @@ def test_backtest_lag_defeats_lookahead():
     honest = (weights.shift(1) * rets).sum(axis=1)   # what backtest() does — lagged
 
     assert xs._sharpe(cheating) > 5 * abs(xs._sharpe(honest))  # the lag destroys the fake edge
+
+
+def test_rolling_beta_recovers_known_beta():
+    # A stock built as 1.5×market (plus negligible noise) must have a rolling beta ≈ 1.5.
+    idx = pd.date_range("2020-01-01", periods=300)
+    rng = np.random.default_rng(0)
+    mkt = pd.Series(rng.normal(0, 0.01, 300), index=idx)
+    rets = pd.DataFrame({"X": 1.5 * mkt + rng.normal(0, 1e-4, 300)})
+    beta = xs._rolling_beta(rets, mkt, window=126)
+    assert abs(beta["X"].dropna().iloc[-1] - 1.5) < 0.1
+
+
+def test_idio_vol_zero_for_pure_market_positive_for_noise():
+    # A stock that IS the market has no idiosyncratic vol; a market-unrelated stock has plenty.
+    idx = pd.date_range("2020-01-01", periods=300)
+    rng = np.random.default_rng(1)
+    mkt = pd.Series(rng.normal(0, 0.01, 300), index=idx)
+    rets = pd.DataFrame({"pure": 1.0 * mkt,
+                         "noisy": pd.Series(rng.normal(0, 0.02, 300), index=idx)})
+    idio = xs._idio_vol(rets, mkt, window=126)
+    assert idio["pure"].dropna().iloc[-1] < 1e-6
+    assert idio["noisy"].dropna().iloc[-1] > 0.01
+
+
+def test_signals_returns_expected_keys_and_shape():
+    idx = pd.date_range("2020-01-01", periods=400)
+    rng = np.random.default_rng(2)
+    px = pd.DataFrame(100 * np.exp(np.cumsum(rng.normal(0, 0.01, (400, 5)), axis=0)),
+                      index=idx, columns=list("ABCDE"))
+    rets = np.log(px).diff()
+    sigs = xs.signals(px, rets)
+    assert set(sigs) == {"momentum", "reversal", "low_vol", "bab", "idio_vol", "risk_adj_mom"}
+    for s in sigs.values():
+        assert s.shape == px.shape

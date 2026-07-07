@@ -280,10 +280,22 @@ Validated on the ground truth above, the pipeline behaves correctly and the hone
 | SYNTH signal (α=2.5) | +0.922 | recovers the planted signal, but **dies after spread** at tick frequency |
 | REAL BTC-USD microstructure | +0.287 | real predictive signal, but **dies after spread** — bid-ask bounce, not tradable |
 | REAL equity momentum (cross-sectional) | — | **survives** net +0.36 Sharpe at low turnover (0.08) |
-| REAL equity reversal / low-vol | — | **die** — reversal bleeds to costs at 0.62 turnover |
+| REAL equity risk-adjusted momentum | — | **survives** net +0.40 — a cleaner momentum, but 0.83-correlated to it (a refinement, not a new bet) |
+| REAL equity reversal | — | **dies** — bleeds to costs at 0.62 turnover |
+| REAL equity low-vol / betting-against-beta / idio-vol | — | **die** here (net −0.19 to −0.39) — the low-risk family, and all three are 0.85+ correlated to each other (one bet in three costumes) |
 
 The lesson the whole layer is built to teach: **what survives is low turnover, not high IC.** A +0.29 IC
 that trades every tick is worthless; a weak monthly signal can be a business. IC is not tradability.
+
+A second lesson emerges from *expanding* the signal set (six price/volume-only factors — no
+fundamentals in the free feed, so no true value/quality). The low-risk family (low-vol, BAB, idio-vol)
+is beautifully *orthogonal* to momentum (P&L correlation ≈ 0) — exactly what a portfolio wants — **but
+loses money** on this 2020–2024 mega-cap universe, a regime where high-beta growth dominated and the
+low-risk anomaly reversed. Orthogonal-but-unprofitable is not a diversifier. So even with six signals we
+still hold effectively **one bet** (momentum, in two correlated flavours), which is why the Phase 6
+optimizer can't beat it. Testing six also inflates the best in-sample Sharpe by multiple comparison —
+survivors are candidates, not conclusions. Reporting that, rather than fishing for a flattering combo,
+is the discipline.
 
 ## Portfolio construction (Phase 6 — the quant *trader*)
 

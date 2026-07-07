@@ -11,6 +11,8 @@ Ensure the universe is cached first:  python -c "from mds import alpaca_data as 
 
 from __future__ import annotations
 
+import pandas as pd
+
 from mds import crosssec as xs
 
 
@@ -40,8 +42,20 @@ def main() -> None:
         print(f"  {name:<10} {r['gross_sharpe']:>+11.2f} {r['net_sharpe']:>+9.2f} "
               f"{r['ann_return']:>+9.1%} {r['max_drawdown']:>+8.1%} {r['avg_turnover']:>9.2f}")
 
+    # P&L correlation — a signal only earns a seat in the portfolio if it DIVERSIFIES the others.
+    # This is the number the Phase 6 optimizer actually cares about, not raw signal correlation.
+    net = pd.DataFrame({name: r["net"] for name, r in results.items()}).dropna()
+    corr = net.corr()
+    print("\nNet-P&L correlation (diversification check — near-0 off-diagonal is what we want):")
+    print("  " + "".join(f"{c[:8]:>9}" for c in corr.columns))
+    for row in corr.index:
+        print(f"  {row:<8}" + "".join(f"{corr.loc[row, c]:>+9.2f}" for c in corr.columns))
+
     print(f"\nVerdict: {verdict(results)}")
-    print("\n(Caveats: free IEX = ~4.5y history, understated volume, 40 mega-caps only. A real "
+    print("\nNote: six signals tested → the best in-sample Sharpe is upward-biased by multiple "
+          "testing; treat survivors as candidates, not conclusions. All are price/volume-only "
+          "(no fundamentals in the free feed), so no true value/quality factor is present.")
+    print("(Caveats: free IEX = ~4.5y history, understated volume, 40 mega-caps only. A real "
           "study needs a far broader universe and point-in-time membership incl. delistings.)")
 
 
