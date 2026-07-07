@@ -318,6 +318,27 @@ Reporting the second result rather than fishing for a flattering combination is 
 vol-targeting (scale to a risk budget) and a Kelly-fraction helper (with the standard caveat that full
 Kelly is too aggressive to run).
 
+### Capacity & crowding (Phase 6b — game theory of size and competition)
+
+**Naive:** a backtest Sharpe is the strategy's value.
+**Reality:** that Sharpe is measured at *infinitesimal* size. The trader's real questions are how much
+capital the alpha absorbs before its own market impact eats it, and how many others are already in the
+trade. `research/mds/capacity.py` models both with standard linear-impact (Kyle-λ) machinery:
+
+- **Capacity (own size).** Realised rate falls linearly with deployed capital, `rate(C) = μ − λC`, so
+  profit `μC − λC²` is concave and maxes at capacity `C* = μ/2λ`. The profit-maximising allocation is
+  therefore **water-filling** across signals (fund each to its own capacity), *not* all-in on the top
+  Sharpe. Demo: three signals with equal edge but different impact — concentration earns +0.120,
+  capacity-aware +0.155 from the *same* capital.
+- **Crowding (others' size).** K players trading the same book is a Cournot game; the symmetric Nash is
+  `C* = μ/(λ(K+1))`. As the crowd grows, total capital rises toward `μ/λ` but the shared rate collapses
+  toward 0 and **aggregate profit falls monotonically from the monopoly optimum** (0.050 → 0.011 for
+  K = 1 → 16) — the tragedy of the commons that makes a crowded factor un-investable.
+
+Read across to the real signals (with λ proxied from turnover — an assumption, flagged), the capacity
+allocator funds only the positive-edge signals and refuses the money-losers automatically (`C* < 0`).
+It confirms the same honest conclusion one layer up: two 0.83-correlated winners are still one bet.
+
 ---
 
 ## Bias register — every known simplification and which way it cuts
@@ -341,6 +362,8 @@ they can't drift silently.
 | Bond pricing: **par yield as discount yield**, 30/360 for Treasuries (should be ACT/ACT) | Small indicative-pricing inaccuracy that grows with curve steepness | `DealerQuoteEngine`, `BondMath` |
 | Synthetic imbalance IC ≈ **+0.86** | Idealised — real order-book imbalance predicts with IC ~0.01–0.05; a model getting 0.03 on real data is a *win*, not a failure | `SyntheticMarketGenerator` |
 | Markout horizon drifts long on **sparse** tapes | Biases the adverse-selection metric (not P&L) on thin/synthetic sessions | `BacktestService` markouts |
+| Capacity model uses **linear** (Kyle-λ) impact; real impact is concave (√-law) | Over-penalises small size, under-penalises very large — capacity `C*` is indicative, not a number to trade on | `capacity.py` |
+| Crowding λ proxied from **turnover**, not measured; crowd assumed **identical** players | The read-across capacities are illustrative; real crowds are heterogeneous and λ needs real ADV/impact data | `capacity.py`, `run_capacity.py` |
 
 ### Bugs found by adversarial review and fixed (with regression tests)
 
