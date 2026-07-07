@@ -24,6 +24,13 @@ app = FastAPI(title="BondDesk Research Service", version="1.0.0",
 # The fresh Quant Desk surface (Alpaca-backed research → backtest → live).
 app.include_router(desk_router)
 
+
+@app.on_event("startup")
+def _start_engine() -> None:
+    """Launch the (disarmed) live strategy loop once the app is up, if Alpaca keys are present."""
+    from . import engine
+    engine.start()
+
 # Same localhost-friendly CORS as the OMS backend (direct access in dev; the proxy is same-origin).
 app.add_middleware(
     CORSMiddleware,

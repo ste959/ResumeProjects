@@ -9,9 +9,10 @@ a "connect Alpaca" state rather than an error.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from . import alpaca
+from . import engine
 
 router = APIRouter(prefix="/api/research", tags=["desk"])
 
@@ -109,3 +110,48 @@ def live_history(period: str = "1M", timeframe: str = "1D") -> dict:
     points = [{"t": int(ts[i]), "equity": _f(eq[i]), "pl": _f(pl[i] if i < len(pl) else None, default=None)}
               for i in range(min(len(ts), len(eq))) if eq[i] is not None]
     return {"configured": True, "base_value": _f(h.get("base_value")), "timeframe": timeframe, "points": points}
+
+
+# ── Live strategy engine ─────────────────────────────────────────────────────────────────────────
+@router.get("/strategies")
+def strategies() -> dict:
+    """Per-strategy attribution + engine state (armed set, kill switch, action log)."""
+    if not alpaca.configured():
+        return {"configured": False, "running": False, "strategies": [], "armed": [], "actions": []}
+    return {"configured": True, **engine.snapshot()}
+
+
+@router.post("/strategies/{sid}/arm")
+def arm(sid: str) -> dict:
+    try:
+        engine.arm(sid)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown strategy: {sid}")
+    return {"ok": True, **engine.snapshot()}
+
+
+@router.post("/strategies/{sid}/disarm")
+def disarm(sid: str) -> dict:
+    engine.disarm(sid)
+    return {"ok": True, **engine.snapshot()}
+
+
+@router.post("/strategies/{sid}/flatten")
+def flatten(sid: str) -> dict:
+    try:
+        engine.flatten(sid)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown strategy: {sid}")
+    return {"ok": True, **engine.snapshot()}
+
+
+@router.post("/strategies/kill")
+def kill() -> dict:
+    engine.kill()
+    return {"ok": True, **engine.snapshot()}
+
+
+@router.post("/strategies/resume")
+def resume() -> dict:
+    engine.resume()
+    return {"ok": True, **engine.snapshot()}
