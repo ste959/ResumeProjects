@@ -75,6 +75,23 @@ def vol_target(returns: pd.Series, target_annual_vol: float = 0.10,
     return returns * scale
 
 
+def vol_managed(returns: pd.Series, target_annual_vol: float = 0.10, window: int = 21,
+                min_periods: int = 10, max_leverage: float = 3.0) -> pd.Series:
+    """Moreira–Muir (2017) vol-managed overlay: scale each period's exposure inversely to the
+    strategy's OWN recent realized variance, targeting `target_annual_vol`, with a leverage cap.
+
+    Unlike `vol_target` (which uses an expanding std, mainly to normalize the level), this uses a
+    short ROLLING window — it is a *timing* overlay. The claim (and the reason it's one of the few
+    factor-timing results that survives out-of-sample) is that variance is persistent and only
+    weakly related to next-period return, so cutting exposure when vol is high raises the Sharpe;
+    for momentum specifically it dodges the crash/rebound (Barroso–Santa-Clara). Causal: the scale
+    at t uses a trailing window shifted by one, and leverage is capped so a quiet stretch can't
+    blow up the book."""
+    trailing_ann = returns.rolling(window, min_periods=min_periods).std(ddof=0).shift(1) * np.sqrt(TRADING_DAYS)
+    scale = (target_annual_vol / trailing_ann.where(trailing_ann > 0)).clip(upper=max_leverage)
+    return returns * scale
+
+
 def kelly_fraction(returns: pd.Series) -> float:
     """Full-Kelly leverage f* = mean / variance (per period). Practitioners use a FRACTION of
     this — full Kelly is famously too aggressive (its drawdowns are brutal)."""

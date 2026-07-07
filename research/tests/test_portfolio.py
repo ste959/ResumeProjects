@@ -76,3 +76,14 @@ def test_kelly_is_positive_for_positive_edge_and_zero_for_flat():
     edge = _panel(n=2000, k=1, mu=0.0005)["s0"]
     assert pf.kelly_fraction(edge) > 0
     assert pf.kelly_fraction(pd.Series([0.0, 0.0, 0.0])) == 0.0
+
+
+def test_vol_managed_is_causal_and_near_target():
+    r = _panel(n=1500, k=1)["s0"]
+    vm = pf.vol_managed(r, target_annual_vol=0.10)
+    realized = vm.dropna().std(ddof=0) * np.sqrt(pf.TRADING_DAYS)
+    assert 0.05 < realized < 0.25                      # rolling estimate + leverage cap → near target
+    mid = 700
+    r2 = r.copy(); r2.iloc[mid] += 1.0                 # shock one mid-series return
+    vm2 = pf.vol_managed(r2)
+    pd.testing.assert_series_equal(vm.iloc[:mid], vm2.iloc[:mid])   # earlier sizing untouched (causal)

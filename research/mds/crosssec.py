@@ -101,13 +101,28 @@ def signals(px: pd.DataFrame, rets: pd.DataFrame, bars: pd.DataFrame | None = No
     beta = _rolling_beta(rets, loo)
     idio = _idio_vol(rets, loo)
 
-    # New signals draw on the previously-unused OHLC/vwap fields (injectable for testing).
+    # New signals draw on the previously-unused OHLC/vwap/volume/trades fields (injectable for testing).
     if bars is None:
         bars = ad.load_bars()
-    open_p = ad.close_panel(bars, "open").reindex(index=px.index, columns=px.columns)
-    vwap_p = ad.close_panel(bars, "vwap").reindex(index=px.index, columns=px.columns)
+
+    def _panel(field):
+        return ad.close_panel(bars, field).reindex(index=px.index, columns=px.columns)
+
+    open_p, vwap_p = _panel("open"), _panel("vwap")
+    volume, trades = _panel("volume"), _panel("trades")
     overnight = np.log(open_p) - np.log(px.shift(1))           # open_t vs prior close: the overnight leg
     resid_ret = _sector_relative(rets, SECTORS)               # daily return net of its sector
+
+    # Order-flow proxies — daily-bar shadows of the microstructure order-flow that drives real
+    # microstructure alpha (Cont et al. OFI). A day that closes ABOVE its VWAP had net buying
+    # pressure, so sign each day's volume by (close − vwap) and net it over a short window.
+    signed_vol = volume * np.sign(px - vwap_p)
+    flow_pressure = signed_vol.rolling(5).sum() / volume.rolling(5).sum().replace(0, np.nan)
+    # Average trade size (volume / #trades) is an institutional-participation proxy; a rising one
+    # signals accumulation. The raw ratio is noisy day-to-day, so SMOOTH it (21d mean) and take the
+    # slow trend vs its 63d mean — a low-turnover accumulation signal, not a tick-noise machine.
+    avg_trade_size = (volume / trades.replace(0, np.nan)).rolling(21).mean()
+    participation_trend = np.log(avg_trade_size) - np.log(avg_trade_size.rolling(63).mean())
 
     return {
         # 12–1 month momentum: last ~12m return skipping the most recent month.
@@ -138,6 +153,13 @@ def signals(px: pd.DataFrame, rets: pd.DataFrame, bars: pd.DataFrame | None = No
         # ⑤ MAX / lottery-demand (Bali–Cakici–Whitelaw): short names with extreme recent up-days;
         #    a skewness/attention effect distinct from the second-moment vol signals.
         "max_lottery": -rets.rolling(21).apply(lambda x: np.mean(np.sort(x)[-5:]), raw=True),
+        # ── order flow (the last unused fields: volume, trades) ────────────────────────────────
+        # ⑥ flow pressure — net signed volume (buy if close>vwap) over a week; the daily-bar OFI
+        #    proxy, the closest thing to real order flow in daily data. Higher = persistent buying.
+        "flow_pressure": flow_pressure,
+        # ⑦ participation trend — smoothed average trade size (volume/#trades) vs its own slower
+        #    mean; rising institutional participation as a low-turnover accumulation signal.
+        "trade_size_trend": participation_trend,
     }
 
 

@@ -287,9 +287,10 @@ Validated on the ground truth above, the pipeline behaves correctly and the hone
 | REAL BTC-USD microstructure | +0.289 (t≈91) | a real, *strongly significant* predictive signal, yet **untradable** as a taker (fees) *and* as a maker (locked book) — see the maker study below |
 | REAL equity momentum (cross-sectional, 123 names, ~5.9y) | — | net +0.56 (best) at low turnover (0.10) — **HAC t ≈ +1.35: not significant** |
 | REAL equity risk-adjusted momentum | — | net +0.53, correlated to momentum — **HAC t ≈ +1.26: not significant** |
-| REAL equity reversal / sector-rel reversal / VWAP-pressure | — | high-turnover (~0.63) **losers** (net −1.0 to −1.2); two clear |t|>2.84 but are losers, not edges |
+| REAL equity reversal / sector-rel reversal / VWAP-pressure | — | high-turnover (~0.63) **losers** (net −1.0 to −1.2); two clear |t|>2.89 but are losers, not edges |
 | REAL equity low-vol / BAB / idio-vol / MAX | — | all negative, none a positive edge — the low-risk / lottery family |
 | REAL equity **sector-relative momentum** (new) | — | net **+0.41** (HAC t +0.98) — see below: this *flipped* from ≈0 on the shorter window |
+| REAL equity **order flow** (new — signed-volume vs VWAP, participation trend) | — | flow-pressure is a high-turnover reversal loser (−1.10); participation-trend a mild +0.38, neither significant |
 
 Two lessons the whole layer is built to teach. First, **what survives is low turnover, not high IC** — a
 +0.29 IC that trades every tick is worthless; IC is not tradability. Note the discipline in the IC column:
@@ -315,14 +316,26 @@ significance.** On the **full ~5.9-year window (1491 days — the max the free I
 2020-07-27 is a hard stop)**, momentum's +0.56 Sharpe still straddles zero (HAC t ≈ 1.35). This is
 *computed, not asserted* (`mds/validation.py`): significance uses an **autocorrelation-consistent
 Newey–West** t-stat (not a naive IID one) with a **block-bootstrap** CI, and the multiple-testing bar is
-applied **symmetrically** — a Bonferroni-corrected **|t| > 2.84 for 11 tests**, to winners *and* losers
+applied **symmetrically** — a Bonferroni-corrected **|t| > 2.89 for 13 tests**, to winners *and* losers
 alike. No positive signal clears it; two high-turnover **losers** (sector-rel reversal, VWAP-pressure) do,
-but losers are not edges. Across the eleven signals the **Deflated Sharpe** of the best is **≈0.11** (bar
-0.95 — after correcting for the tries, ~11% chance its true Sharpe is even positive) and the **PBO** (CPCV)
-is **≈0.09**. The walk-forward is **purged and embargoed** so the label can't leak across the train/test
+but losers are not edges. Across the thirteen signals the **Deflated Sharpe** of the best is **≈0.09** (bar
+0.95 — after correcting for the tries, ~9% chance its true Sharpe is even positive) and the **PBO** (CPCV)
+is **≈0.06**. The walk-forward is **purged and embargoed** so the label can't leak across the train/test
 boundary. Reporting these — rather than the positive point estimate — is the discipline.
 
-**A finding that flipped — the most honest lesson of all.** The set was expanded to eleven signals (tapping
+**Two more QR-motivated signal families, and a timing overlay — all honest nulls.** (1) *Order flow* from the
+last unused fields: a daily-bar **OFI proxy** (sign each day's volume by close-vs-VWAP, net it over a week) and
+a **participation trend** (smoothed average trade size = volume/#trades). Flow-pressure is another high-turnover
+**reversal** loser (−1.10) — daily-bar order flow encodes short-term mean-reversion, un-monetizable at 0.63
+turnover; the real OFI edge needs the L2 tape (see the crypto microstructure layer / the data roadmap).
+Participation-trend is a mild low-turnover **+0.38** (t 0.98) — the most interesting new positive, still not
+significant. (2) A **vol-managed overlay** (Moreira–Muir / Barroso momentum crash-scaling) — scale each signal's
+exposure inversely to its trailing realized vol (`run_portfolio.py`). It produces **no consistent lift** and
+does not rescue momentum (+0.56 → +0.49) or create significance: these signals have no exploitable vol-timing
+structure on this universe/period. Both are the disciplined, documented negatives a QR delivers — real tests,
+honest results.
+
+**A finding that flipped — the most honest lesson of all.** The set was expanded (tapping
 the previously-unused OHLC/vwap fields): sector-relative momentum, overnight, sector-relative reversal,
 close-vs-VWAP pressure, MAX/lottery. On the shorter 4.4-year window, **sector-relative momentum netted ≈0**,
 which looked like clean evidence that momentum's edge was pure sector exposure (and neutralization agreed).
@@ -332,8 +345,8 @@ mostly sector exposure. Neither number is significant, and that is the point: **
 reversed under a modest data change** — exactly what an underpowered, regime-driven null looks like, and the
 strongest possible evidence that none of these are durable edges. (The short-horizon signals remain the
 biggest-|t| losers at ~0.63 turnover — a real continuation/microstructure effect, un-monetizable at that
-turnover.) Adding five signals also correctly **raised the Deflated-Sharpe bar** (0.21 → 0.11 as the window
-grew and the family widened) — the honest cost of more tries.
+turnover.) Widening the family to **thirteen** signals also correctly **deflated the best Deflated Sharpe**
+(0.31 → 0.09 as the window grew and more signals were tried) — the honest, automatic cost of more tries.
 
 **Realism, power, and regime — four checks that finish the honest picture** (`run_crosssec.py`):
 

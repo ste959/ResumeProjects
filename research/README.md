@@ -34,6 +34,9 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 
 The stat-arb study below is the entry point; the microstructure-ML, cross-sectional, portfolio
 and capacity layers (Phases 5–6) are documented in [`../MARKET-REALISM.md`](../MARKET-REALISM.md).
+The technique is built and honest but the price-only data is exhausted (no significant edge) —
+[`ALPHA-DATA-ROADMAP.md`](ALPHA-DATA-ROADMAP.md) is the QR plan for the data that would actually move
+the needle (SEC-EDGAR fundamentals, macro/credit overlays, survivorship-free breadth, crypto L2).
 
 ## Run it
 
@@ -42,7 +45,7 @@ cd research
 pip install -r requirements.txt         # pinned versions (numpy/pandas/sklearn/…)
 python run_statarb.py           # fetches ~75 days of BTC/ETH, caches to Parquet, runs the study
 python run_crosssec.py          # cross-sectional equity signals, with t-stats / 95% CIs
-python -m pytest                # 54 tests on synthetic data (no network)
+python -m pytest                # 55 tests on synthetic data (no network)
 ```
 
 ## The philosophy: honest results beat pretty backtests

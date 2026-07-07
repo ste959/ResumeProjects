@@ -77,13 +77,16 @@ def test_signals_returns_expected_keys_and_shape():
                       index=idx, columns=syms)
     rets = np.log(px).diff()
     # Inject a synthetic OHLCV+vwap bars frame so the OHLC-based signals compute without the cache.
+    rng2 = np.random.default_rng(3)
     bars = pd.concat([
         pd.DataFrame({"symbol": s, "ts": idx, "open": px[s].shift(1).bfill(), "high": px[s] * 1.01,
-                      "low": px[s] * 0.99, "close": px[s], "volume": 1e6, "vwap": px[s], "trades": 100})
+                      "low": px[s] * 0.99, "close": px[s], "volume": rng2.integers(1e5, 1e6, 400),
+                      "vwap": px[s] * (1 + rng2.normal(0, 1e-3, 400)), "trades": rng2.integers(50, 500, 400)})
         for s in syms], ignore_index=True)
     sigs = xs.signals(px, rets, bars=bars)
     assert set(sigs) == {"momentum", "reversal", "low_vol", "bab", "idio_vol", "risk_adj_mom",
-                         "sector_rel_mom", "overnight", "sector_rel_rev", "vwap_pressure", "max_lottery"}
+                         "sector_rel_mom", "overnight", "sector_rel_rev", "vwap_pressure", "max_lottery",
+                         "flow_pressure", "trade_size_trend"}
     for s in sigs.values():
         assert s.shape == px.shape
 

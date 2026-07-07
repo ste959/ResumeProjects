@@ -86,6 +86,21 @@ def main() -> None:
           "window-dependent, and a costed loser regardless. No positive edge is distinguishable from "
           "zero; the allocation study is machinery, not a claimed edge.")
 
+    # Vol-managed overlay (Moreira–Muir 2017 / Barroso momentum crash-scaling): timing exposure to
+    # trailing realized vol. One of the few factor-timing results that survives OOS — it lifts the
+    # Sharpe by cutting risk before vol spikes. Test whether it helps here, honestly (HAC t).
+    print("\nVol-managed overlay (Moreira–Muir): raw net Sharpe → vol-managed, with the managed HAC t:")
+    print(f"  {'signal':<14} {'raw Shrp':>9} {'vm Shrp':>8} {'vm HAC t':>9} {'lift':>6}")
+    for col in net.columns:
+        raw = pf.sharpe(net[col])
+        vm = pf.vol_managed(net[col]).dropna()
+        vms = pf.sharpe(vm)
+        vmt = val.newey_west_sharpe_tstat(vm.to_numpy())
+        print(f"  {col:<14} {raw:>+9.2f} {vms:>+8.2f} {vmt:>+9.2f} {vms - raw:>+6.2f}")
+    print("  (Vol-management is a risk-timing OVERLAY, not new alpha: it can raise a signal's Sharpe "
+          "without changing its sign. A consistent lift that also clears HAC significance would be the "
+          "finding; a wash confirms the signal has no exploitable vol-timing structure here.)")
+
 
 if __name__ == "__main__":
     main()
