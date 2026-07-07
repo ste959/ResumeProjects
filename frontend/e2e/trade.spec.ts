@@ -8,7 +8,9 @@ test('stage → route → fill a market order', async ({ page }) => {
   await page.goto('/');
 
   // The app opens on the Overview cockpit; the order ticket / blotter live on the Desk tab.
-  await page.getByRole('button', { name: 'Desk' }).click();
+  // exact:true targets the nav button (whose name is exactly "Desk"), not the Overview
+  // "Fixed Income Desk" cockpit card, which also exposes a button role.
+  await page.getByRole('button', { name: 'Desk', exact: true }).click();
 
   // Order ticket: pick a liquid treasury, market order, and stage it.
   await expect(page.getByRole('heading', { name: 'Order Ticket' })).toBeVisible();
