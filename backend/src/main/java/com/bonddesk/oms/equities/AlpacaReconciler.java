@@ -7,17 +7,21 @@ import com.bonddesk.oms.equities.AlpacaBrokerClient.AlpacaOrder;
 import com.bonddesk.oms.matching.DeskFillEvent;
 import com.bonddesk.oms.repository.OrderRepository;
 import com.bonddesk.oms.service.OrderService;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Polls Alpaca for the status of working equity orders and books any new fills back into
@@ -43,6 +47,15 @@ public class AlpacaReconciler {
     private final OrderService orderService;
     private final ApplicationEventPublisher events;
 
+    // Broker polling can block for seconds (the HTTP client uses a multi-second timeout). Running
+    // it on its own single-thread executor keeps it entirely off Spring's shared scheduling pool,
+    // so a slow broker call can never stall the live strategy / market-making @Scheduled loops.
+    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "alpaca-reconciler");
+        t.setDaemon(true);
+        return t;
+    });
+
     public AlpacaReconciler(AlpacaProperties props, AlpacaBrokerClient broker, OrderRepository orders,
                             OrderService orderService, ApplicationEventPublisher events) {
         this.props = props;
@@ -52,7 +65,25 @@ public class AlpacaReconciler {
         this.events = events;
     }
 
-    @Scheduled(fixedDelayString = "${oms.equities.reconcile-ms:2000}")
+    @PostConstruct
+    void schedule() {
+        long delay = Math.max(1, props.getReconcileMs());
+        executor.scheduleWithFixedDelay(this::reconcileSafely, delay, delay, TimeUnit.MILLISECONDS);
+    }
+
+    @PreDestroy
+    void shutdown() {
+        executor.shutdownNow();
+    }
+
+    private void reconcileSafely() {
+        try {
+            reconcile();
+        } catch (RuntimeException e) {
+            log.debug("Reconcile cycle failed: {}", e.getMessage());
+        }
+    }
+
     public void reconcile() {
         if (!props.hasCredentials()) {
             return;

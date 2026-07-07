@@ -111,8 +111,10 @@ aggregates breaches, so adding a rule means adding one class:
 - **Max order notional** — blocks oversized single orders (> $25MM).
 - **Concentration limit** — blocks orders that would over-expose a portfolio to one name.
 
-A breach doesn't error out — the order is persisted as `REJECTED` with the reason, mirroring
-a real desk's audit trail.
+Beyond per-order compliance, an **aggregate pre-trade risk guard** (`PreTradeRiskGuard`) caps the
+book's total gross notional across all open positions (`oms.risk.max-gross-notional`), so live
+protection isn't limited to the backtester's kill-switches. A breach doesn't error out — the order
+is persisted as `REJECTED` with the reason, mirroring a real desk's audit trail.
 
 ---
 
@@ -141,13 +143,16 @@ always reconciles. (One of these caught a real modeling bug during development.)
 
 ```
 throughput   : ~3,300,000 orders/sec
-latency p50  : ~150 ns      p99 : ~1.9 µs      p99.9 : ~4.7 µs
+latency p50  : ~150 ns      p99 : ~1.9 µs      p99.9 : ~9 µs (tail varies run-to-run)
 ```
 
-> Design note: the demo records fills synchronously inside the routing transaction for
-> simplicity. A production HFT path would decouple matching from persistence via an
-> append-only event queue so the matching core never blocks on I/O — the benchmark above
-> measures that pure core.
+Measured on an Intel Core i5-8279U (JDK 21); throughput and p50/p99 reproduce consistently,
+the p99.9 tail is noisy. Re-run the harness above to reproduce on your own hardware.
+
+> Design note: matching now happens under the per-book lock, but fills are collected and the
+> `@Transactional` persistence runs *after* the lock is released, so the matching core never
+> blocks on DB I/O while holding the book. A production HFT path would go further and hand fills
+> to an append-only event queue; the benchmark above measures the pure in-memory core.
 
 ---
 
@@ -203,10 +208,12 @@ research** over a columnar data warehouse. (Polyglot *for the right reason*.)
   cointegration**, **Ornstein–Uhlenbeck half-life**.
 - **Honest backtester**: transaction costs + a **one-period execution lag (no look-ahead)**,
   reporting Sharpe / drawdown / turnover / hit-rate.
-- **BTC/ETH stat-arb study** that is built to *catch itself out*: on real data the pair is
-  **not cointegrated**, so the study flags its shiny in-sample Sharpe as **likely spurious/
-  overfit** rather than reporting it as alpha. Rigor and intellectual honesty over pretty
-  equity curves. 9 tests on synthetic data. See [`research/README.md`](research/README.md).
+- **BTC/ETH stat-arb study** that is built to *catch itself out*: it separates an in-sample
+  cointegration **diagnostic** from a **walk-forward out-of-sample** backtest (β re-fit on a
+  trailing window, traded on the next block). On real data the pair is **not cointegrated**, and
+  the shiny in-sample Sharpe of **3.56 collapses to −0.62 out-of-sample** — the "edge" was the
+  leakage. Reported as an honest negative result, not alpha. 38 tests on synthetic data. See
+  [`research/README.md`](research/README.md).
 
 ---
 
@@ -322,7 +329,7 @@ PostgreSQL-compatibility mode (dev/test), and is covered by integration tests.
 ## Testing
 
 ```bash
-cd backend      && ./mvnw test         # 50 tests (unit + integration)
+cd backend      && ./mvnw test         # 105 tests (unit + integration; integration needs Docker)
 cd risk-service && ./mvnw test         #  3 tests
 cd frontend     && npm test            #  8 component tests (Vitest + RTL)
 cd frontend     && npm run test:e2e    #  Playwright E2E (needs the stack running)

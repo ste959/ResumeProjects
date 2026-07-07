@@ -70,9 +70,11 @@ literally what the live engine's maker fill does — it's labelled "optimistic q
 **Reality:** you are in a **price-time (FIFO) queue**. When you post a bid, there is already
 size resting ahead of you; a sell only reaches *you* after it has cleared everyone in front.
 Fill probability depends on queue position, not just price.
-**What we do:** on posting, queue-ahead = total size at prices at least as good as ours
-(`LiveOrderBook.sizeAtOrBetter`). Reaching trade volume first depletes the queue; only the
-overflow fills us, up to our size. Re-quoting cancels and re-posts, so it **resets the queue**
+**What we do:** on posting, queue-ahead = the size resting *at our own price level*
+(`LiveOrderBook.sizeAt`), the traders genuinely in front of us in the FIFO queue. (Using
+size at *all* better-or-equal levels would over-state the queue and starve the fill — better
+prices trade against incoming flow separately, not ahead of us in our level's queue.) Reaching
+trade volume first depletes the queue; only the overflow fills us, up to our size. Re-quoting cancels and re-posts, so it **resets the queue**
 (a fresh order joins at the back). Result on real data: an Avellaneda–Stoikov maker quoted
 91 times but filled only 6 — the queue gates fills, exactly as it should.
 
@@ -279,23 +281,25 @@ Validated on the ground truth above, the pipeline behaves correctly and the hone
 | SYNTH noise (α=0) | +0.005 | finds nothing — the false-positive check passes |
 | SYNTH signal (α=2.5) | +0.922 | recovers the planted signal, but **dies after spread** at tick frequency |
 | REAL BTC-USD microstructure | +0.287 | real predictive signal, but **dies after spread** — bid-ask bounce, not tradable |
-| REAL equity momentum (cross-sectional) | — | **survives** net +0.36 Sharpe at low turnover (0.08) |
-| REAL equity risk-adjusted momentum | — | **survives** net +0.40 — a cleaner momentum, but 0.83-correlated to it (a refinement, not a new bet) |
-| REAL equity reversal | — | **dies** — bleeds to costs at 0.62 turnover |
-| REAL equity low-vol / betting-against-beta / idio-vol | — | **die** here (net −0.19 to −0.39) — the low-risk family, and all three are 0.85+ correlated to each other (one bet in three costumes) |
+| REAL equity momentum (cross-sectional) | — | best raw performer, net +0.41 at low turnover (0.10) — but **t ≈ +0.76, 95% CI [−0.65, +1.47]: not significant** |
+| REAL equity risk-adjusted momentum | — | net +0.45, a cleaner momentum but 0.83-correlated to it — **t ≈ +0.84: also not significant** |
+| REAL equity reversal | — | net −1.07, **t ≈ −2.24: the ONLY statistically significant result — and it's a loser** |
+| REAL equity low-vol / betting-against-beta / idio-vol | — | all negative (net −0.20 to −0.39), none significant; the low-risk family, all 0.85+ correlated (one bet in three costumes) |
 
-The lesson the whole layer is built to teach: **what survives is low turnover, not high IC.** A +0.29 IC
-that trades every tick is worthless; a weak monthly signal can be a business. IC is not tradability.
+Two lessons the whole layer is built to teach. First, **what survives is low turnover, not high IC** — a
++0.29 IC that trades every tick is worthless; IC is not tradability. Second, and more important once we
+report **t-stats and confidence intervals** (see `run_crosssec.py`): **no signal clears statistical
+significance.** Momentum's +0.41 Sharpe sounds like an edge but its 95% CI straddles zero (t ≈ 0.76) on a
+survivorship-selected 40-name, 4.4-year sample; the *only* significant result is reversal, and it loses.
+The honest headline is therefore **a rigorous harness that finds no edge distinguishable from noise** —
+not a momentum finding. Testing six signals only makes it worse: the best-of-six in-sample Sharpe is
+upward-biased, and a deflated/Bonferroni bar (α/6 ⇒ ~|t| > 2.6) raises the threshold further. Reporting
+that plainly — rather than presenting the positive point estimate as alpha — is the discipline.
 
-A second lesson emerges from *expanding* the signal set (six price/volume-only factors — no
-fundamentals in the free feed, so no true value/quality). The low-risk family (low-vol, BAB, idio-vol)
-is beautifully *orthogonal* to momentum (P&L correlation ≈ 0) — exactly what a portfolio wants — **but
-loses money** on this 2020–2024 mega-cap universe, a regime where high-beta growth dominated and the
-low-risk anomaly reversed. Orthogonal-but-unprofitable is not a diversifier. So even with six signals we
-still hold effectively **one bet** (momentum, in two correlated flavours), which is why the Phase 6
-optimizer can't beat it. Testing six also inflates the best in-sample Sharpe by multiple comparison —
-survivors are candidates, not conclusions. Reporting that, rather than fishing for a flattering combo,
-is the discipline.
+(The expansion still teaches a portfolio lesson: the low-risk family is beautifully *orthogonal* to
+momentum, P&L correlation ≈ 0 — but loses money on this 2020–2024 high-beta-growth regime. Orthogonal-
+but-unprofitable is not a diversifier, so even with six signals there is effectively *one* bet, which is
+why the Phase 6 optimizer can't beat it.)
 
 ## Portfolio construction (Phase 6 — the quant *trader*)
 
@@ -303,16 +307,19 @@ is the discipline.
 **Reality:** naive Markowitz over-fits the estimated means and blows up out-of-sample; and no optimizer
 can create alpha that isn't in the inputs. The allocator (`research/mds/portfolio.py`) is therefore
 **walk-forward** (weights fit on a trailing window, applied to the *next* block) and offers equal-weight,
-inverse-vol / risk-parity, and **shrunk** max-Sharpe (Ledoit-Wolf-style covariance shrinkage, long-only).
+inverse-vol / risk-parity, and **shrunk** max-Sharpe (fixed-intensity λ = 0.3 shrinkage toward a scaled
+identity — *not* the analytic Ledoit-Wolf optimum, long-only).
 
 Two honest results, deliberately shown side by side:
 
 - **Machinery works (ground truth):** across four uncorrelated synthetic Sharpe-0.7 signals, walk-forward
   allocation lifts the Sharpe from ~0.8 (avg single) to ~1.6 — the ~√N diversification benefit, pinned by
   a test.
-- **Machinery can't rescue bad inputs (real):** allocating across the three equity signals **fails to beat
-  momentum alone** (best allocation −0.48 vs momentum +0.36), because two of the three lose money.
-  Garbage in, garbage out — the optimizer's value appears only with a richer set of *good* signals.
+- **Machinery can't rescue bad inputs (real):** allocating across the six equity signals **fails to beat
+  the best single one** (best allocation, inverse-vol, −0.38 vs risk-adj-momentum +0.45), because most of
+  the signals lose money — and, printed with t-stats, *none* of the allocations is statistically
+  distinguishable from zero either. Garbage in, garbage out — the optimizer's value appears only with a
+  richer set of *good* signals.
 
 Reporting the second result rather than fishing for a flattering combination is the point. Also included:
 vol-targeting (scale to a risk budget) and a Kelly-fraction helper (with the standard caveat that full

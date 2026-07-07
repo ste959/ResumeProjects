@@ -100,6 +100,37 @@ def half_life(spread: np.ndarray) -> float:
     return float(-np.log(2) / b)
 
 
+def sharpe_tstat(sharpe: float, n_obs: int, ppy: int = 252) -> float:
+    """t-statistic for an annualized Sharpe ratio under the large-sample IID approximation.
+
+    A Sharpe is an estimate, not a truth — with few observations even a decent-looking Sharpe
+    can be indistinguishable from zero. The standard large-sample SE (Lo, 2002) for an
+    ANNUALIZED Sharpe is SE(SR_ann) ≈ sqrt((1 + 0.5·SR_daily²)/n) · sqrt(ppy), where
+    SR_daily = SR_ann/sqrt(ppy). The sqrt(ppy) factors cancel in the ratio, so the t-stat is
+    simply SR_ann / SE — equivalently SR_daily·sqrt(n) / sqrt(1 + 0.5·SR_daily²). |t| ≳ 2 is
+    the usual bar for "distinguishable from zero"; this ignores autocorrelation/fat tails, so
+    it is if anything optimistic.
+    """
+    if n_obs <= 1:
+        return 0.0
+    sr_daily = sharpe / np.sqrt(ppy)
+    se_ann = np.sqrt((1.0 + 0.5 * sr_daily ** 2) / n_obs) * np.sqrt(ppy)
+    return float(sharpe / se_ann) if se_ann > 0 else 0.0
+
+
+def sharpe_ci(sharpe: float, n_obs: int, z: float = 1.96, ppy: int = 252) -> tuple[float, float]:
+    """Approximate (lower, upper) confidence interval for an annualized Sharpe.
+
+    Uses the same large-sample SE as `sharpe_tstat`; z=1.96 is the 95% two-sided band. If the
+    interval straddles 0, the Sharpe is NOT statistically distinguishable from zero.
+    """
+    if n_obs <= 1:
+        return (float("nan"), float("nan"))
+    sr_daily = sharpe / np.sqrt(ppy)
+    se_ann = np.sqrt((1.0 + 0.5 * sr_daily ** 2) / n_obs) * np.sqrt(ppy)
+    return (float(sharpe - z * se_ann), float(sharpe + z * se_ann))
+
+
 def rolling_zscore(series: np.ndarray, window: int) -> np.ndarray:
     """Rolling z-score using a trailing window (NaN until the window fills)."""
     import pandas as pd

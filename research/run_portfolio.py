@@ -15,6 +15,7 @@ import pandas as pd
 
 from mds import crosssec as xs
 from mds import portfolio as pf
+from mds.stats import sharpe_ci, sharpe_tstat
 
 
 def demo_diversification() -> None:
@@ -44,24 +45,33 @@ def main() -> None:
     ).dropna()
 
     print(f"Signals: {list(net.columns)}   ({len(net)} days)\n")
-    print("Individual signals (after-cost Sharpe):")
+    print("Individual signals (after-cost Sharpe, with significance):")
+    print(f"  {'signal':<10} {'Sharpe':>7} {'t-stat':>7} {'95% CI':>16} {'sig?':>5}")
     best_single_name, best_single = None, -1e9
     for col in net.columns:
         s = pf.sharpe(net[col])
-        print(f"  {col:<10} {s:>+6.2f}")
+        n = int(net[col].notna().sum())
+        t = sharpe_tstat(s, n)
+        lo, hi = sharpe_ci(s, n)
+        print(f"  {col:<10} {s:>+7.2f} {t:>+7.2f} [{lo:>+5.2f},{hi:>+5.2f}] "
+              f"{'yes' if abs(t) >= 1.96 else 'no':>5}")
         if s > best_single:
             best_single_name, best_single = col, s
 
     print("\nAllocated portfolio (weights estimated on the past, applied to the future):")
-    print(f"  {'method':<14} {'Sharpe':>7} {'ann ret':>9} {'max DD':>8}")
+    print(f"  {'method':<12} {'Sharpe':>7} {'t-stat':>7} {'95% CI':>16} {'sig?':>5} {'ann ret':>9} {'max DD':>8}")
     best_alloc_name, best_alloc = None, -1e9
     for method in ("equal", "inverse_vol", "max_sharpe"):
         combined, _ = pf.walk_forward_allocate(net, method=method, lookback=126, rebalance=21)
         m = pf.metrics(combined)
-        print(f"  {method:<14} {m['sharpe']:>+7.2f} {m['ann_return']:>+9.1%} {m['max_drawdown']:>+8.1%}")
+        t = sharpe_tstat(m["sharpe"], m["days"])
+        lo, hi = sharpe_ci(m["sharpe"], m["days"])
+        print(f"  {method:<12} {m['sharpe']:>+7.2f} {t:>+7.2f} [{lo:>+5.2f},{hi:>+5.2f}] "
+              f"{'yes' if abs(t) >= 1.96 else 'no':>5} {m['ann_return']:>+9.1%} {m['max_drawdown']:>+8.1%}")
         if m["sharpe"] > best_alloc:
             best_alloc_name, best_alloc = method, m["sharpe"]
 
+    print("  (t-stat/CI: large-sample SE for an annualized Sharpe; |t|>~2 ⇒ 95% CI excludes 0.)")
     print(f"\nBest single signal: {best_single_name} ({best_single:+.2f}).  "
           f"Best allocation: {best_alloc_name} ({best_alloc:+.2f}).")
     if best_alloc > best_single + 0.05:
@@ -70,6 +80,9 @@ def main() -> None:
         print("Allocation does NOT beat the best single signal — honest, and expected when most of "
               "the signals are weak: an optimizer cannot manufacture alpha from bad inputs "
               "(garbage in, garbage out). Its value shows up with a richer set of GOOD signals.")
+    print("Significance note: none of these Sharpes clears |t|>~2, so none is statistically "
+          "distinguishable from zero at this sample size — the allocation study is machinery, "
+          "not a claimed edge.")
 
 
 if __name__ == "__main__":

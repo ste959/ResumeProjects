@@ -32,12 +32,16 @@ def main() -> None:
     print("=" * 66)
     print(f"  observations         : {r['observations']}  ({r['granularity_s']}s candles)")
     print(f"  return correlation   : {r['return_correlation']:.3f}")
+    print("  --- in-sample DIAGNOSTIC (describes the window, NOT tradeable) ---")
     print(f"  hedge ratio (beta)   : {r['hedge_ratio_beta']:.4f}")
     print(f"  Engle-Granger ADF    : {r['adf_stat']:.3f}   (5% crit {r['coint_crit']['5%']})")
     print(f"  cointegrated @ 5%    : {r['cointegrated_5pct']}")
     hl = r["half_life_periods"]
     print(f"  half-life (periods)  : {hl:.1f}" if hl != float("inf") else "  half-life          : inf (no reversion)")
     print("  " + "-" * 62)
+    wf = r["walk_forward"]
+    print(f"  OUT-OF-SAMPLE walk-forward backtest (beta re-fit on trailing {wf['lookback']} bars,")
+    print(f"    rolled every {wf['step']}; {bt['oos_observations']} OOS bars scored):")
     print(f"  net Sharpe (ann.)    : {bt['sharpe']:.2f}")
     print(f"  total return         : {bt['total_return'] * 100:.2f}%")
     print(f"  max drawdown         : {bt['max_drawdown'] * 100:.2f}%")

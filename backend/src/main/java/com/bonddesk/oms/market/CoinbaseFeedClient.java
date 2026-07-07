@@ -146,7 +146,9 @@ public class CoinbaseFeedClient {
         }
     }
 
-    private void handle(JsonNode root) {
+    /** Parse and apply one decoded feed message. Package-private so it can be unit-tested
+     * with captured JSON frames, without opening a live socket. */
+    void handle(JsonNode root) {
         String channel = root.path("channel").asText();
         switch (channel) {
             case "l2_data" -> root.path("events").forEach(this::applyBookEvent);

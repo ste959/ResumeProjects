@@ -26,30 +26,39 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/stats.py` | **Hand-rolled econometrics** — OLS, ADF unit-root, **Engle–Granger cointegration**, **Ornstein–Uhlenbeck half-life** (no statsmodels) |
 | `mds/features.py` | log returns, realized vol, order-book **imbalance → forward-return IC** |
 | `mds/backtest.py` | vectorized backtester: transaction costs, **one-period execution lag (no look-ahead)**, Sharpe / drawdown / turnover / hit-rate |
-| `mds/statarb.py` | the **BTC/ETH stat-arb study** (cointegration → z-score signal → cost-aware backtest → honest verdict) |
+| `mds/statarb.py` | the **BTC/ETH stat-arb study** (cointegration diagnostic → walk-forward OOS z-score backtest → honest verdict) |
+| `mds/lob.py`, `mds/models.py` | **microstructure ML** — leakage-free L2 feature/label harness + model zoo (ridge/GBM/MLP), walk-forward, cost-aware |
+| `mds/crosssec.py`, `mds/portfolio.py`, `mds/capacity.py` | **cross-sectional factors** (momentum/reversal/low-vol/BAB/idio-vol), a **walk-forward allocator**, and a **capacity/crowding** sizing model |
+
+The stat-arb study below is the entry point; the microstructure-ML, cross-sectional, portfolio
+and capacity layers (Phases 5–6) are documented in [`../MARKET-REALISM.md`](../MARKET-REALISM.md).
 
 ## Run it
 
 ```bash
 cd research
-pip install -r requirements.txt
+pip install -r requirements.txt         # pinned versions (numpy/pandas/sklearn/…)
 python run_statarb.py           # fetches ~75 days of BTC/ETH, caches to Parquet, runs the study
-python -m pytest                # 9 tests on synthetic data (no network)
+python run_crosssec.py          # cross-sectional equity signals, with t-stats / 95% CIs
+python -m pytest                # 38 tests on synthetic data (no network)
 ```
 
 ## The philosophy: honest results beat pretty backtests
 
-The study is built to *catch itself out*. Example real output:
+The study is built to *catch itself out*. It separates an **in-sample cointegration diagnostic**
+(which only *describes* the window) from a **walk-forward out-of-sample backtest** (β re-fit on a
+trailing window, traded on the next block). Example real output:
 
 ```
 return correlation : 0.892      hedge ratio (beta) : 0.75
-Engle-Granger ADF  : -1.88   (5% crit -3.34)   cointegrated @ 5% : False
-net Sharpe (ann.)  : 3.56    total return : 10.5%    max drawdown : -5.6%
-VERDICT: RED FLAG: the in-sample Sharpe looks strong (3.56), but the pair is NOT
-cointegrated at 5% — the mean-reversion premise fails, so this is almost certainly
-spurious/overfit and would not survive out-of-sample. Do not trade it.
+Engle-Granger ADF  : -1.88   (5% crit -3.34)   cointegrated @ 5% : False   [in-sample diagnostic]
+OUT-OF-SAMPLE walk-forward:  net Sharpe -0.62   total return -1.94%   max drawdown -11.85%
+VERDICT: No stable cointegration and no out-of-sample edge — the pairs assumption does not
+hold over this window. An honest negative result.
 ```
 
-A shiny Sharpe with no cointegration is a **warning, not a win**. Surfacing that — rather
-than reporting the 3.56 as "alpha" — is the whole point: rigorous methodology and
-intellectual honesty about overfitting, costs, and out-of-sample risk.
+The point: an in-sample z-score backtest on this pair shows a shiny **Sharpe 3.56** — which
+**collapses to −0.62 out-of-sample** once the hedge ratio is estimated causally. The "edge" was
+the leakage. Surfacing that — rather than reporting the 3.56 as "alpha" — is the whole point.
+Throughout the layer, Sharpes are now reported **with t-stats and 95% confidence intervals**, so
+a positive point estimate that isn't distinguishable from zero is named as such.

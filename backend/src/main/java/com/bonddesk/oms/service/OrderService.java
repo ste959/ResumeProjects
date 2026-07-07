@@ -18,6 +18,7 @@ import com.bonddesk.oms.exception.NotFoundException;
 import com.bonddesk.oms.matching.MatchingGateway;
 import com.bonddesk.oms.repository.OrderRepository;
 import com.bonddesk.oms.repository.SecurityRepository;
+import com.bonddesk.oms.risk.PreTradeRiskGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -46,17 +48,20 @@ public class OrderService {
     private final OrderRepository orders;
     private final SecurityRepository securities;
     private final ComplianceService compliance;
+    private final PreTradeRiskGuard riskGuard;
     private final PositionService positions;
     private final OrderEventPublisher events;
     private final MatchingGateway matching;
     private final Clock clock;
 
     public OrderService(OrderRepository orders, SecurityRepository securities,
-                        ComplianceService compliance, PositionService positions,
-                        OrderEventPublisher events, MatchingGateway matching, Clock clock) {
+                        ComplianceService compliance, PreTradeRiskGuard riskGuard,
+                        PositionService positions, OrderEventPublisher events,
+                        MatchingGateway matching, Clock clock) {
         this.orders = orders;
         this.securities = securities;
         this.compliance = compliance;
+        this.riskGuard = riskGuard;
         this.positions = positions;
         this.events = events;
         this.matching = matching;
@@ -124,12 +129,14 @@ public class OrderService {
 
         ComplianceResult result = compliance.check(order);
         if (!result.approved()) {
-            order.setStatus(OrderStatus.REJECTED);
-            order.setStatusReason(result.summary());
-            Order saved = orders.save(order);
-            log.info("Order {} REJECTED at entry: {}", saved.getOrderRef(), result.summary());
-            publish(OrderEvent.Type.ORDER_REJECTED, saved);
-            return saved;
+            return rejectAtEntry(order, result.summary());
+        }
+
+        // Aggregate pre-trade risk: reject if this order would breach the portfolio's
+        // desk-wide gross-notional limit (protection that used to exist only in backtests).
+        Optional<String> riskBreach = riskGuard.check(order);
+        if (riskBreach.isPresent()) {
+            return rejectAtEntry(order, riskBreach.get());
         }
 
         Order saved = orders.save(order);
@@ -256,6 +263,16 @@ public class OrderService {
     }
 
     // ---------- Internals ----------
+
+    /** Persist an order as REJECTED at entry with a reason, emit the event, and return it. */
+    private Order rejectAtEntry(Order order, String reason) {
+        order.setStatus(OrderStatus.REJECTED);
+        order.setStatusReason(reason);
+        Order saved = orders.save(order);
+        log.info("Order {} REJECTED at entry: {}", saved.getOrderRef(), reason);
+        publish(OrderEvent.Type.ORDER_REJECTED, saved);
+        return saved;
+    }
 
     private void transitionTo(Order order, OrderStatus target) {
         if (!order.getStatus().canTransitionTo(target)) {

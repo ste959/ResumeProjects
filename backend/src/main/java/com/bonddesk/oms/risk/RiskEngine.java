@@ -27,6 +27,12 @@ import java.util.TreeMap;
  * expresses a parametric 1-day 95% VaR (diversified vs. undiversified so the diversification
  * benefit is explicit), and stresses the book against scenarios, including a correlated
  * risk-off shock where rates, equities and credit move together (the tail that hurts most).
+ *
+ * <p><b>Precision boundary (deliberate):</b> VaR, DV01 and scenario P&amp;L are statistical
+ * <em>estimates</em> built on representative factor volatilities, so {@code double} is the
+ * standard and appropriate type here — this is analytics, not the general ledger. Reported
+ * dollar figures are rounded to the cent at the edge (see {@link #round}); do not read exactness
+ * into them. Cent-exact money lives in the tax/position/fill path, which uses {@link BigDecimal}.
  */
 @Service
 public class RiskEngine {

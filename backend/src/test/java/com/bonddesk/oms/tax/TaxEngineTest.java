@@ -9,7 +9,6 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
 
 class TaxEngineTest {
 
@@ -30,8 +29,8 @@ class TaxEngineTest {
         TaxReport fifo = engine.compute(new TaxRequest("CRYPTO", "FIFO", "RETAIL", null, null, null, trades));
         TaxReport hifo = engine.compute(new TaxRequest("CRYPTO", "HIFO", "RETAIL", null, null, null, trades));
 
-        assertThat(fifo.realizedGain()).isEqualTo(20.0);
-        assertThat(hifo.realizedGain()).isEqualTo(10.0); // HIFO minimises the gain
+        assertThat(fifo.realizedGain()).isEqualByComparingTo("20.00");
+        assertThat(hifo.realizedGain()).isEqualByComparingTo("10.00"); // HIFO minimises the gain
     }
 
     @Test
@@ -46,10 +45,10 @@ class TaxEngineTest {
         TaxReport lt = engine.compute(new TaxRequest("CRYPTO", "FIFO", "RETAIL", 0.37, 0.20, null, longTerm));
         TaxReport st = engine.compute(new TaxRequest("CRYPTO", "FIFO", "RETAIL", 0.37, 0.20, null, shortTerm));
 
-        assertThat(lt.longTermGain()).isEqualTo(20.0);
-        assertThat(lt.taxOwed()).isEqualTo(4.0);          // 20 * 20%
-        assertThat(st.shortTermGain()).isEqualTo(20.0);
-        assertThat(st.taxOwed()).isCloseTo(7.4, within(1e-6)); // 20 * 37% — turnover has a tax cost
+        assertThat(lt.longTermGain()).isEqualByComparingTo("20.00");
+        assertThat(lt.taxOwed()).isEqualByComparingTo("4.00");          // 20 * 20%
+        assertThat(st.shortTermGain()).isEqualByComparingTo("20.00");
+        assertThat(st.taxOwed()).isEqualByComparingTo("7.40"); // 20 * 37% — turnover has a tax cost
     }
 
     @Test
@@ -63,10 +62,10 @@ class TaxEngineTest {
         TaxReport equity = engine.compute(new TaxRequest("EQUITY", "FIFO", "RETAIL", null, null, null, trades));
         TaxReport crypto = engine.compute(new TaxRequest("CRYPTO", "FIFO", "RETAIL", null, null, null, trades));
 
-        assertThat(equity.washSaleDisallowed()).isEqualTo(10.0); // loss disallowed
-        assertThat(equity.taxableGain()).isEqualTo(0.0);         // -10 realized + 10 added back
-        assertThat(crypto.washSaleDisallowed()).isEqualTo(0.0);  // crypto is property — rule N/A
-        assertThat(crypto.taxableGain()).isEqualTo(-10.0);       // loss stands
+        assertThat(equity.washSaleDisallowed()).isEqualByComparingTo("10.00"); // loss disallowed
+        assertThat(equity.taxableGain()).isEqualByComparingTo("0.00");         // -10 realized + 10 added back
+        assertThat(crypto.washSaleDisallowed()).isEqualByComparingTo("0.00");  // crypto is property — rule N/A
+        assertThat(crypto.taxableGain()).isEqualByComparingTo("-10.00");       // loss stands
     }
 
     @Test
@@ -76,10 +75,10 @@ class TaxEngineTest {
 
         TaxReport r = engine.compute(new TaxRequest("CRYPTO", "FIFO", "TRADER_MTM", 0.37, 0.20, 120.0, trades));
 
-        assertThat(r.unrealizedMtm()).isEqualTo(20.0);
-        assertThat(r.taxableGain()).isEqualTo(20.0);
-        assertThat(r.longTermGain()).isEqualTo(0.0);           // no long-term under MTM
-        assertThat(r.taxOwed()).isCloseTo(7.4, within(1e-6));  // 20 * ordinary 37%
+        assertThat(r.unrealizedMtm()).isEqualByComparingTo("20.00");
+        assertThat(r.taxableGain()).isEqualByComparingTo("20.00");
+        assertThat(r.longTermGain()).isEqualByComparingTo("0.00");           // no long-term under MTM
+        assertThat(r.taxOwed()).isEqualByComparingTo("7.40");  // 20 * ordinary 37%
     }
 
     // --- Regression tests for bugs the earlier suite missed ---
@@ -95,8 +94,8 @@ class TaxEngineTest {
 
         TaxReport r = engine.compute(new TaxRequest("EQUITY", "FIFO", "RETAIL", null, null, null, trades));
 
-        assertThat(r.washSaleDisallowed()).isEqualTo(0.0);
-        assertThat(r.taxableGain()).isEqualTo(-200.0); // the loss stands
+        assertThat(r.washSaleDisallowed()).isEqualByComparingTo("0.00");
+        assertThat(r.taxableGain()).isEqualByComparingTo("-200.00"); // the loss stands
     }
 
     @Test
@@ -113,7 +112,7 @@ class TaxEngineTest {
 
         TaxReport r = engine.compute(new TaxRequest("EQUITY", "FIFO", "RETAIL", null, null, null, trades));
 
-        assertThat(r.washSaleDisallowed()).isEqualTo(500.0);
+        assertThat(r.washSaleDisallowed()).isEqualByComparingTo("500.00");
     }
 
     @Test
@@ -125,8 +124,8 @@ class TaxEngineTest {
 
         TaxReport r = engine.compute(new TaxRequest("CRYPTO", "FIFO", "RETAIL", 0.37, 0.20, null, trades));
 
-        assertThat(r.shortTermGain()).isEqualTo(20.0);
-        assertThat(r.longTermGain()).isEqualTo(0.0);
+        assertThat(r.shortTermGain()).isEqualByComparingTo("20.00");
+        assertThat(r.longTermGain()).isEqualByComparingTo("0.00");
     }
 
     @Test
@@ -143,8 +142,8 @@ class TaxEngineTest {
 
         TaxReport r = engine.compute(new TaxRequest("CRYPTO", "LIFO", "RETAIL", 0.37, 0.20, null, trades));
 
-        assertThat(r.preTaxPnl()).isEqualTo(0.0);        // economically break-even
-        assertThat(r.taxOwed()).isLessThan(0.0);         // yet a net tax "benefit" — the bias
-        assertThat(r.afterTaxPnl()).isGreaterThan(0.0);
+        assertThat(r.preTaxPnl()).isEqualByComparingTo("0.00");        // economically break-even
+        assertThat(r.taxOwed()).isNegative();            // yet a net tax "benefit" — the bias
+        assertThat(r.afterTaxPnl()).isPositive();
     }
 }

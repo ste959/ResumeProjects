@@ -18,8 +18,10 @@ TRADING_DAYS = 252
 
 
 def _shrink_cov(returns: np.ndarray, lam: float = 0.3) -> np.ndarray:
-    """Ledoit-Wolf-style shrinkage of the sample covariance toward a scaled identity — this is
-    what keeps mean-variance from exploding on a noisy, short estimation window."""
+    """Shrink the sample covariance toward a scaled identity with a FIXED intensity λ — this is
+    what keeps mean-variance from exploding on a noisy, short estimation window. Note: this is a
+    fixed-λ shrink, NOT the analytic Ledoit-Wolf optimum (which derives λ from the data); we keep
+    it fixed for transparency and reproducibility, accepting it is not the MSE-optimal intensity."""
     cov = np.atleast_2d(np.cov(returns, rowvar=False))
     avg_var = float(np.mean(np.diag(cov)))
     return (1.0 - lam) * cov + lam * avg_var * np.eye(cov.shape[0])
@@ -59,12 +61,18 @@ def walk_forward_allocate(signal_returns: pd.DataFrame, method: str = "risk_pari
     return combined.dropna(), log
 
 
-def vol_target(returns: pd.Series, target_annual_vol: float = 0.10) -> pd.Series:
-    """Scale a return series to a target annualized volatility (portfolio-level risk control)."""
-    realized = returns.std(ddof=0) * np.sqrt(TRADING_DAYS)
-    if realized <= 0:
-        return returns
-    return returns * (target_annual_vol / realized)
+def vol_target(returns: pd.Series, target_annual_vol: float = 0.10,
+               min_periods: int = 20) -> pd.Series:
+    """Scale a return series to a target annualized volatility, CAUSALLY.
+
+    The sizing at time t may only use information through t-1, otherwise it is look-ahead: a
+    full-sample std peeks at the whole path. We estimate volatility with a trailing EXPANDING
+    std shifted by one period, so the scale applied to return t is built from returns up to t-1.
+    Days before `min_periods` of history (no reliable estimate yet) are left NaN rather than
+    sized on a guess."""
+    trailing_ann = returns.expanding(min_periods=min_periods).std(ddof=0).shift(1) * np.sqrt(TRADING_DAYS)
+    scale = target_annual_vol / trailing_ann.where(trailing_ann > 0)
+    return returns * scale
 
 
 def kelly_fraction(returns: pd.Series) -> float:

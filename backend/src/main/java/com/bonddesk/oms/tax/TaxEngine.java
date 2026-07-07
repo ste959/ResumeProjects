@@ -7,6 +7,8 @@ import com.bonddesk.oms.tax.dto.TaxDtos.TaxRequest;
 import com.bonddesk.oms.tax.dto.TaxDtos.TaxTrade;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -144,13 +146,15 @@ public class TaxEngine {
 
         List<Disposition> dispViews = new ArrayList<>(disps.size());
         for (Disp d : disps) {
-            dispViews.add(new Disposition(d.acquired, d.sold, round(d.qty, 8), round(d.proceeds, 2),
-                    round(d.basis, 2), round(d.gain, 2), d.days, d.longTerm, round(d.wash, 2)));
+            dispViews.add(new Disposition(d.acquired, d.sold, round(d.qty, 8), money(d.proceeds),
+                    money(d.basis), money(d.gain), d.days, d.longTerm, money(d.wash)));
         }
 
-        return new TaxReport(assetClass, regime, lotMethod, round(proceeds, 2), round(realized, 2),
-                round(st, 2), round(lt, 2), round(wash, 2), round(unrealizedMtm, 2), round(taxableGain, 2),
-                round(taxOwed, 2), round(preTax, 2), round(afterTax, 2), round(effRate, 4),
+        // Reported dollars are exact to the cent (BigDecimal, scale 2, HALF_UP at the edge);
+        // ratios and quantities stay double.
+        return new TaxReport(assetClass, regime, lotMethod, money(proceeds), money(realized),
+                money(st), money(lt), money(wash), money(unrealizedMtm), money(taxableGain),
+                money(taxOwed), money(preTax), money(afterTax), round(effRate, 4),
                 round(openQty, 8), round(openAvgBasis, 6), dispViews);
     }
 
@@ -256,5 +260,10 @@ public class TaxEngine {
     private static double round(double v, int dp) {
         double scale = Math.pow(10, dp);
         return Math.round(v * scale) / scale;
+    }
+
+    /** A reported dollar amount, exact to the cent (scale 2, HALF_UP at the boundary). */
+    private static BigDecimal money(double v) {
+        return BigDecimal.valueOf(v).setScale(2, RoundingMode.HALF_UP);
     }
 }

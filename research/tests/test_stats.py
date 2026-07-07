@@ -1,6 +1,6 @@
 import numpy as np
 
-from mds.stats import adf, engle_granger, half_life, ols
+from mds.stats import adf, engle_granger, half_life, ols, sharpe_ci, sharpe_tstat
 
 
 def test_ols_recovers_known_coefficients():
@@ -49,3 +49,33 @@ def test_half_life_matches_ar1():
         s[t] = phi * s[t - 1] + rng.normal()
     expected = -np.log(2) / np.log(phi)  # ≈ 6.58
     assert abs(half_life(s) - expected) < 1.5
+
+
+def test_sharpe_tstat_small_sharpe_approximation():
+    # For a small Sharpe the SE ≈ sqrt(ppy/n), so t ≈ SR·sqrt(n/ppy). Check both the direction
+    # (more obs ⇒ larger |t|) and the closed-form value on a case where the correction is tiny.
+    n, sr = 1116, 0.36
+    t = sharpe_tstat(sr, n)
+    approx = sr * np.sqrt(n / 252.0)  # ignores the 0.5·SR_daily² correction (negligible here)
+    assert abs(t - approx) < 0.01
+    assert 0.7 < t < 0.8                       # momentum-scale Sharpe is well under the |t|>2 bar
+    assert sharpe_tstat(sr, 4 * n) > t         # more observations tighten the estimate
+
+
+def test_sharpe_tstat_matches_ci_boundary():
+    # A 95% CI (z=1.96) excludes 0 exactly when |t| > 1.96 — the two views must agree.
+    n = 1116
+    for sr in (0.36, 0.40, -0.72, 1.5):
+        t = sharpe_tstat(sr, n)
+        lo, hi = sharpe_ci(sr, n, z=1.96)
+        straddles_zero = lo < 0 < hi
+        assert straddles_zero == (abs(t) < 1.96), sr
+    # CI is centered on the point estimate.
+    lo, hi = sharpe_ci(0.40, n)
+    assert abs((lo + hi) / 2 - 0.40) < 1e-9
+
+
+def test_sharpe_significance_degenerate_n():
+    assert sharpe_tstat(1.0, 1) == 0.0
+    lo, hi = sharpe_ci(1.0, 1)
+    assert np.isnan(lo) and np.isnan(hi)

@@ -3,7 +3,16 @@ name = "bonddesk-research"
 version = "0.1.0"
 description = "Quant research / backtesting over the BondDesk live market feed"
 requires-python = ">=3.10"
-dependencies = ["numpy", "pandas", "pyarrow", "duckdb", "requests"]
+# Lower bounds pinned for reproducibility; requirements.txt carries the exact tested versions.
+dependencies = [
+    "numpy>=2.4",
+    "pandas>=3.0",
+    "pyarrow>=24.0",
+    "duckdb>=1.5",
+    "requests>=2.32",
+    "scikit-learn>=1.8",
+    "scipy>=1.17",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

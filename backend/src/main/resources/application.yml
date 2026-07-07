@@ -2,6 +2,16 @@ spring:
   application:
     name: bonddesk-oms
 
+  # ~7 @Scheduled jobs (strategy tick, liquidity refresh, L2 flush, curve refresh, recorders)
+  # share this pool. Default size is 1, which serialises them, so one slow job stalls the live
+  # strategy/market-making loop. A pool of 4 lets them run concurrently. (The Alpaca broker
+  # reconciler, whose HTTP calls can block for seconds, runs on its own dedicated executor and
+  # is deliberately not on this shared pool.)
+  task:
+    scheduling:
+      pool:
+        size: 4
+
   # Optional, git-ignored file holding Alpaca API keys for the equities module. "optional:"
   # means the app still boots if it is absent (the equities feed just stays idle).
   config:
@@ -72,6 +82,11 @@ oms:
     live-curve: true         # fetch the real daily US Treasury par-yield curve (keyless)
     dealer-count: 5          # dealers responding to each RFQ
     rfq-ttl-seconds: 30      # how long dealer quotes stay firm
+  risk:
+    # Aggregate pre-trade breaker on the live order path: reject an order that would push a
+    # portfolio's total gross notional (open positions + this order) over this limit. A
+    # non-positive value disables the check.
+    max-gross-notional: 1000000000
   # Origin patterns allowed to call the API from a browser. "*" port covers the Vite
   # dev server (:5173) and the nginx-served UI (:8088). Set to your real domain in prod.
   cors:

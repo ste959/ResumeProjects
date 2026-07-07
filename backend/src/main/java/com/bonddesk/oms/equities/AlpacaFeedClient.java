@@ -151,7 +151,9 @@ public class AlpacaFeedClient {
         }
     }
 
-    private void handle(WebSocket ws, JsonNode node) {
+    /** Parse and apply one decoded feed message (or drive the auth handshake). Package-private
+     * so it can be unit-tested with captured JSON frames and a stub socket. */
+    void handle(WebSocket ws, JsonNode node) {
         switch (node.path("T").asText()) {
             case "success" -> {
                 String msg = node.path("msg").asText();

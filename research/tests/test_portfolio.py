@@ -56,11 +56,20 @@ def test_diversification_raises_sharpe_on_good_uncorrelated_signals():
     assert pf.sharpe(combined) > 1.4 * avg_single
 
 
-def test_vol_target_scales_to_requested_vol():
+def test_vol_target_is_causal_and_near_target():
+    # Causal sizing: the scale applied at t uses only returns through t-1. Perturbing a middle
+    # observation must therefore leave every EARLIER scaled value untouched (no look-ahead), and
+    # the realized vol over the active span should land in the neighbourhood of the target.
     r = _panel(n=1000, k=1)["s0"]
     scaled = pf.vol_target(r, target_annual_vol=0.10)
-    realized = scaled.std(ddof=0) * np.sqrt(pf.TRADING_DAYS)
-    assert abs(realized - 0.10) < 1e-9
+    realized = scaled.dropna().std(ddof=0) * np.sqrt(pf.TRADING_DAYS)
+    assert 0.05 < realized < 0.20  # roughly on target (a trailing estimate can't be exact)
+
+    mid = 500
+    r2 = r.copy()
+    r2.iloc[mid] += 1.0  # shock a single mid-series return
+    scaled2 = pf.vol_target(r2, target_annual_vol=0.10)
+    pd.testing.assert_series_equal(scaled.iloc[:mid], scaled2.iloc[:mid])  # earlier sizing unchanged
 
 
 def test_kelly_is_positive_for_positive_edge_and_zero_for_flat():

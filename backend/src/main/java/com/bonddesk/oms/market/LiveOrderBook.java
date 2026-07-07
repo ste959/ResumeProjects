@@ -12,37 +12,50 @@ import java.util.concurrent.ConcurrentSkipListMap;
  * feed. Bids are keyed high-to-low and asks low-to-high, so the best of each side is the
  * first entry. Backed by {@link ConcurrentSkipListMap} so the feed thread can apply
  * updates while request threads read a weakly-consistent view.
+ *
+ * <p>The two sides live together behind one {@code volatile} {@link Sides} holder so a
+ * snapshot replace ({@link #resetTo}) can swap in a fully-built book atomically. Every read
+ * captures the holder once, so a reader always sees one internally consistent book — never an
+ * empty or crossed intermediate state while a snapshot is being applied.
  */
 public final class LiveOrderBook {
 
     /** [price, size] pair for a depth level. */
     public record Level(BigDecimal price, BigDecimal size) {}
 
+    /** The two book sides, swapped as a unit on a snapshot replace. */
+    private record Sides(ConcurrentSkipListMap<BigDecimal, BigDecimal> bids,
+                         ConcurrentSkipListMap<BigDecimal, BigDecimal> asks) {}
+
     private final String product;
-    private final ConcurrentSkipListMap<BigDecimal, BigDecimal> bids =
-            new ConcurrentSkipListMap<>(Collections.reverseOrder());
-    private final ConcurrentSkipListMap<BigDecimal, BigDecimal> asks =
-            new ConcurrentSkipListMap<>();
+    private volatile Sides sides = emptySides();
 
     public LiveOrderBook(String product) {
         this.product = product;
+    }
+
+    private static Sides emptySides() {
+        return new Sides(new ConcurrentSkipListMap<>(Collections.reverseOrder()),
+                new ConcurrentSkipListMap<>());
     }
 
     public String product() {
         return product;
     }
 
-    /** Replace the entire book (a fresh snapshot). */
+    /** Replace the entire book (a fresh snapshot). Built fully off to the side, then swapped
+     * in atomically so readers never observe a half-cleared or crossed book. */
     public void resetTo(List<Level> bidLevels, List<Level> askLevels) {
-        bids.clear();
-        asks.clear();
-        bidLevels.forEach(l -> bids.put(l.price(), l.size()));
-        askLevels.forEach(l -> asks.put(l.price(), l.size()));
+        Sides next = emptySides();
+        bidLevels.forEach(l -> next.bids().put(l.price(), l.size()));
+        askLevels.forEach(l -> next.asks().put(l.price(), l.size()));
+        sides = next;
     }
 
     /** Apply one incremental change; size 0 removes the level. */
     public void apply(boolean bid, BigDecimal price, BigDecimal size) {
-        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? bids : asks;
+        Sides s = sides;
+        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? s.bids() : s.asks();
         if (size.signum() <= 0) {
             side.remove(price);
         } else {
@@ -51,48 +64,56 @@ public final class LiveOrderBook {
     }
 
     public BigDecimal bestBid() {
-        Map.Entry<BigDecimal, BigDecimal> e = bids.firstEntry();
+        Map.Entry<BigDecimal, BigDecimal> e = sides.bids().firstEntry();
         return e == null ? null : e.getKey();
     }
 
     public BigDecimal bestAsk() {
-        Map.Entry<BigDecimal, BigDecimal> e = asks.firstEntry();
+        Map.Entry<BigDecimal, BigDecimal> e = sides.asks().firstEntry();
         return e == null ? null : e.getKey();
     }
 
     public BigDecimal bestBidSize() {
-        Map.Entry<BigDecimal, BigDecimal> e = bids.firstEntry();
+        Map.Entry<BigDecimal, BigDecimal> e = sides.bids().firstEntry();
         return e == null ? null : e.getValue();
     }
 
     public BigDecimal bestAskSize() {
-        Map.Entry<BigDecimal, BigDecimal> e = asks.firstEntry();
+        Map.Entry<BigDecimal, BigDecimal> e = sides.asks().firstEntry();
         return e == null ? null : e.getValue();
     }
 
     /** Size-weighted fair value: leans toward the side with more size behind it. */
     public BigDecimal microprice() {
-        BigDecimal bid = bestBid(), ask = bestAsk(), bs = bestBidSize(), as = bestAskSize();
-        if (bid == null || ask == null || bs == null || as == null) {
+        Sides s = sides; // one consistent view of both sides
+        Map.Entry<BigDecimal, BigDecimal> b = s.bids().firstEntry();
+        Map.Entry<BigDecimal, BigDecimal> a = s.asks().firstEntry();
+        if (b == null || a == null) {
             return null;
         }
+        BigDecimal bid = b.getKey(), ask = a.getKey(), bs = b.getValue(), as = a.getValue();
         BigDecimal denom = bs.add(as);
         if (denom.signum() == 0) {
-            return mid();
+            return midOf(bid, ask);
         }
         // microprice = (bid*askSize + ask*bidSize) / (bidSize + askSize)
         return bid.multiply(as).add(ask.multiply(bs)).divide(denom, 8, java.math.RoundingMode.HALF_UP);
     }
 
     public BigDecimal mid() {
-        BigDecimal b = bestBid();
-        BigDecimal a = bestAsk();
-        return (b == null || a == null) ? null : b.add(a).movePointLeft(0).divide(BigDecimal.valueOf(2));
+        Sides s = sides; // read both sides from one consistent view
+        Map.Entry<BigDecimal, BigDecimal> b = s.bids().firstEntry();
+        Map.Entry<BigDecimal, BigDecimal> a = s.asks().firstEntry();
+        return (b == null || a == null) ? null : midOf(b.getKey(), a.getKey());
+    }
+
+    private static BigDecimal midOf(BigDecimal b, BigDecimal a) {
+        return b.add(a).divide(BigDecimal.valueOf(2));
     }
 
     /** Top {@code depth} levels of a side, best first. */
     public List<Level> depth(boolean bid, int depth) {
-        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? bids : asks;
+        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? sides.bids() : sides.asks();
         List<Level> rows = new ArrayList<>(depth);
         for (Map.Entry<BigDecimal, BigDecimal> e : side.entrySet()) {
             if (rows.size() >= depth) break;
@@ -109,7 +130,8 @@ public final class LiveOrderBook {
      * which includes better levels and therefore over-counts the queue.)
      */
     public BigDecimal sizeAt(boolean bid, BigDecimal price) {
-        BigDecimal size = (bid ? bids : asks).get(price);
+        Sides s = sides;
+        BigDecimal size = (bid ? s.bids() : s.asks()).get(price);
         return size == null ? BigDecimal.ZERO : size;
     }
 
@@ -119,7 +141,7 @@ public final class LiveOrderBook {
      * queries; for queue position prefer {@link #sizeAt}.
      */
     public BigDecimal sizeAtOrBetter(boolean bid, BigDecimal price) {
-        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? bids : asks;
+        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? sides.bids() : sides.asks();
         BigDecimal total = BigDecimal.ZERO;
         for (Map.Entry<BigDecimal, BigDecimal> e : side.entrySet()) {
             boolean atOrBetter = bid ? e.getKey().compareTo(price) >= 0 : e.getKey().compareTo(price) <= 0;
@@ -133,7 +155,7 @@ public final class LiveOrderBook {
 
     /** A point-in-time copy of one side (best first) for matching a paper order. */
     public List<Level> snapshot(boolean bid) {
-        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? bids : asks;
+        ConcurrentSkipListMap<BigDecimal, BigDecimal> side = bid ? sides.bids() : sides.asks();
         List<Level> rows = new ArrayList<>(side.size());
         side.forEach((price, size) -> rows.add(new Level(price, size)));
         return rows;

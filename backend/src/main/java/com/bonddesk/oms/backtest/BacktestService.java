@@ -55,6 +55,13 @@ import java.util.stream.Stream;
  * recorded depth (honest multi-level slippage). The realistic microstructure fill model
  * (queue position, adverse selection, latency, our own market impact) layers on in later
  * phases — see MARKET-REALISM.md.
+ *
+ * <p><b>Precision boundary (deliberate):</b> P&amp;L, slippage, market impact and cost figures
+ * here are statistical estimates of execution quality (square-root impact, size-weighted
+ * markouts, participation), where {@code double} is the standard and appropriate type — this is
+ * analytics, not the general ledger. Every reported dollar/bps figure is rounded at the edge
+ * (see {@link #round}) before it leaves the service; cent-exact money lives in the
+ * tax/position/fill path, which uses {@link java.math.BigDecimal}.
  */
 @Service
 public class BacktestService {

@@ -8,6 +8,10 @@
 #
 # Alternatively, set the ALPACA_KEY_ID / ALPACA_SECRET_KEY environment variables instead
 # of using this file. Either way, no keys are ever committed.
+#
+# SECURITY: alpaca-local.yml holds the key in cleartext on disk. Keep it paper-only, and
+# rotate the key from the Alpaca dashboard if it was ever shared, screen-captured, or pasted
+# anywhere. Prefer the env-var route on shared machines.
 
 oms:
   equities:

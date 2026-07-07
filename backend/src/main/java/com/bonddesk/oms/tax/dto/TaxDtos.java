@@ -1,5 +1,6 @@
 package com.bonddesk.oms.tax.dto;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -29,34 +30,44 @@ public final class TaxDtos {
     ) {
     }
 
-    /** One realized disposal: which lot, gain/loss, holding period, and any wash-sale disallowance. */
+    /**
+     * One realized disposal: which lot, gain/loss, holding period, and any wash-sale disallowance.
+     * Reported dollar figures ({@code proceeds}, {@code costBasis}, {@code gain}, {@code washDisallowed})
+     * are {@link BigDecimal} at scale 2 so they are exact to the cent; {@code quantity} stays a
+     * double as it is a share/coin count, not money.
+     */
     public record Disposition(
             Instant acquired,
             Instant sold,
             double quantity,
-            double proceeds,
-            double costBasis,
-            double gain,
+            BigDecimal proceeds,
+            BigDecimal costBasis,
+            BigDecimal gain,
             long holdingDays,
             boolean longTerm,
-            double washDisallowed
+            BigDecimal washDisallowed
     ) {
     }
 
+    /**
+     * Tax report. All reported dollar figures are {@link BigDecimal} at scale 2 (cent-exact);
+     * {@code effectiveTaxRate} is a ratio and {@code openPosition}/{@code openAvgBasis} are a
+     * quantity and a per-unit basis, so those stay doubles.
+     */
     public record TaxReport(
             String assetClass,
             String regime,
             String lotMethod,
-            double proceeds,
-            double realizedGain,
-            double shortTermGain,
-            double longTermGain,
-            double washSaleDisallowed,
-            double unrealizedMtm,
-            double taxableGain,
-            double taxOwed,
-            double preTaxPnl,
-            double afterTaxPnl,
+            BigDecimal proceeds,
+            BigDecimal realizedGain,
+            BigDecimal shortTermGain,
+            BigDecimal longTermGain,
+            BigDecimal washSaleDisallowed,
+            BigDecimal unrealizedMtm,
+            BigDecimal taxableGain,
+            BigDecimal taxOwed,
+            BigDecimal preTaxPnl,
+            BigDecimal afterTaxPnl,
             double effectiveTaxRate,
             double openPosition,
             double openAvgBasis,

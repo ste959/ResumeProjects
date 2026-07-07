@@ -63,10 +63,10 @@ class OrderControllerIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void invalidPayloadReturns400WithFieldErrors() throws Exception {
-        // quantity below the 1,000 minimum and a blank trader
+        // quantity below the minimum (must be >= 1) and a blank trader
         String bad = """
                 {"cusip":"912828YK0","portfolio":"P","trader":"","side":"BUY",
-                 "orderType":"MARKET","timeInForce":"DAY","quantity":100}""";
+                 "orderType":"MARKET","timeInForce":"DAY","quantity":0}""";
         mvc.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON).content(bad))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.quantity").exists())

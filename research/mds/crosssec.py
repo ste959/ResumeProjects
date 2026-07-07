@@ -59,7 +59,8 @@ def signals(px: pd.DataFrame, rets: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     All are price/volume-only — the free IEX feed has no fundamentals, so true value/quality/
     profitability factors are honestly off the table. These are technical/risk factors chosen to
-    DIVERSIFY momentum (the lone survivor so far), not just pile on more trend."""
+    DIVERSIFY momentum (the best raw performer, though NOT statistically significant at this
+    sample size — see the t-stat/CI reporting in run_crosssec.py), not just pile on more trend."""
     logpx = np.log(px)
     mom = logpx.diff(252) - logpx.diff(21)
     mkt = _market_return(rets)
@@ -96,10 +97,24 @@ def backtest(signal: pd.DataFrame, rets: pd.DataFrame, cost_bps: float = 5.0) ->
     weights = weights.div(gross_exposure, axis=0).fillna(0.0)
 
     # Held one day: weights decided at t earn the t→t+1 return (no look-ahead).
-    gross = (weights.shift(1) * rets).sum(axis=1, skipna=True)
+    held = weights.shift(1)
+    gross = (held * rets).sum(axis=1, skipna=True)
     turnover = (weights - weights.shift(1)).abs().sum(axis=1)
     costs = turnover * (cost_bps / 1e4)
     net = gross - costs
+
+    # Active period only: during a signal's warm-up (e.g. 252-day momentum) every weight is 0,
+    # so `sum(skipna=True)` yields a stream of flat 0.0 returns — dead capital, not a real flat
+    # position. Counting those days would understate the Sharpe and skew the annualization
+    # exponent. Mask everything before the first day the portfolio actually holds risk, so all
+    # metrics reflect the active window. (No look-ahead: this only trims leading dead days.)
+    active = held.abs().sum(axis=1) > 0
+    if active.any():
+        first = active.idxmax()
+        pre = gross.index < first
+        gross = gross.mask(pre)
+        net = net.mask(pre)
+        turnover = turnover.mask(pre)
 
     return {"gross": gross, "net": net, "turnover": turnover, **_metrics(gross, net, turnover)}
 
@@ -111,15 +126,18 @@ def _sharpe(x: pd.Series) -> float:
 
 
 def _metrics(gross: pd.Series, net: pd.Series, turnover: pd.Series) -> dict:
-    net0 = net.fillna(0.0)
-    equity = (1.0 + net0).cumprod()
-    max_dd = float((equity / equity.cummax() - 1.0).min()) if len(equity) else 0.0
-    ann = float(equity.iloc[-1] ** (TRADING_DAYS / max(len(net0), 1)) - 1.0) if len(net0) else 0.0
+    # Only the active (non-warm-up) days count: NaN days are dropped so the equity curve, the
+    # annualization exponent and the day count all reflect the period capital was actually at work.
+    net_active = net.dropna()
+    n = len(net_active)
+    equity = (1.0 + net_active).cumprod()
+    max_dd = float((equity / equity.cummax() - 1.0).min()) if n else 0.0
+    ann = float(equity.iloc[-1] ** (TRADING_DAYS / max(n, 1)) - 1.0) if n else 0.0
     return {
         "gross_sharpe": _sharpe(gross),
         "net_sharpe": _sharpe(net),
         "ann_return": ann,
         "max_drawdown": max_dd,
-        "avg_turnover": float(turnover.mean()) if len(turnover) else 0.0,
-        "days": int(net.notna().sum()),
+        "avg_turnover": float(turnover.mean()) if len(turnover.dropna()) else 0.0,
+        "days": n,
     }

@@ -54,13 +54,18 @@ public class MatchingService implements MatchingGateway {
         }
         BookOrder bo = new BookOrder(id, order.getSide(), order.getOrderType(), priceTicks, qty, order.getOrderRef());
 
+        // Match under the book lock (the engine's single-threaded core), but publish/persist the
+        // resulting fills only AFTER releasing it. Fill publishing runs FillRecorder ->
+        // OrderService.recordFill, a @Transactional DB write; holding the matching lock across
+        // that would let a slow DB stall every other order on this instrument.
+        List<Trade> trades;
         synchronized (book) {
-            List<Trade> trades = book.submit(bo);
+            trades = book.submit(bo);
             if (bo.isActive() && bo.remaining() > 0) {
                 deskRefToEngineId.put(order.getOrderRef(), id); // rests — remember it for cancels
             }
-            publishFills(trades);
         }
+        publishFills(trades);
     }
 
     @Override
@@ -80,9 +85,11 @@ public class MatchingService implements MatchingGateway {
         OrderBook book = bookFor(cusip);
         long id = idSeq.incrementAndGet();
         BookOrder bo = new BookOrder(id, side, OrderType.LIMIT, priceTicks, qty, null);
+        List<Trade> trades;
         synchronized (book) {
-            publishFills(book.submit(bo));
+            trades = book.submit(bo);
         }
+        publishFills(trades); // persist/publish outside the matching lock (see route())
         return id;
     }
 
