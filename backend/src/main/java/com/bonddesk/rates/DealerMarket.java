@@ -32,11 +32,17 @@ public final class DealerMarket {
     public DealerMarket(long seed) {
         this.rng = new Random(seed);
         this.leakageLambda = 0.006;                        // price points per $mm per ln(1+n)
-        for (String nm : NAMES) {
-            double half = 0.04 + rng.nextDouble() * 0.10;  // 4–14¢ base half-spread per 100
-            double skew = 0.003 + rng.nextDouble() * 0.004; // shaded per $mm inventory
-            double inv0 = (rng.nextDouble() * 2 - 1) * 8;   // ±8mm starting axe
-            dealers.add(new Dealer(nm, half, skew, inv0));
+        for (int i = 0; i < NAMES.length; i++) {
+            if (i == 0) {
+                // Dealer 0 is "our desk" — a competitive, flat-started market maker so it wins a
+                // healthy share of the flow and actually builds a book to risk-manage.
+                dealers.add(new Dealer(NAMES[i], 0.08, 0.005, 0));
+            } else {
+                double half = 0.05 + rng.nextDouble() * 0.10;   // 5–15¢ base half-spread per 100
+                double skew = 0.003 + rng.nextDouble() * 0.004; // shaded per $mm inventory
+                double inv0 = (rng.nextDouble() * 2 - 1) * 8;   // ±8mm starting axe
+                dealers.add(new Dealer(NAMES[i], half, skew, inv0));
+            }
         }
     }
 
@@ -60,10 +66,13 @@ public final class DealerMarket {
         double midAdj = mid + sideSign * leakage;          // effective mid moves against the client
         double competitionShade = 0.006 * (n - 1);         // dealers widen a touch when they know they compete
 
+        // Dealer 0 ("our desk") is always on the panel; the rest of the n are a random subset.
+        List<Integer> others = new ArrayList<>();
+        for (int i = 1; i < dealers.size(); i++) others.add(i);
+        Collections.shuffle(others, rng);
         List<Integer> pool = new ArrayList<>();
-        for (int i = 0; i < dealers.size(); i++) pool.add(i);
-        Collections.shuffle(pool, rng);
-        pool = pool.subList(0, n);
+        pool.add(0);
+        for (int k = 0; k < n - 1 && k < others.size(); k++) pool.add(others.get(k));
 
         int winnerPos = 0;
         double bestPrice = 0, second = Double.NaN;
