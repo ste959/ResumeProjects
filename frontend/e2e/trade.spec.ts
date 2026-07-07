@@ -7,6 +7,9 @@ import { expect, test } from '@playwright/test';
 test('stage → route → fill a market order', async ({ page }) => {
   await page.goto('/');
 
+  // The app opens on the Overview cockpit; the order ticket / blotter live on the Desk tab.
+  await page.getByRole('button', { name: 'Desk' }).click();
+
   // Order ticket: pick a liquid treasury, market order, and stage it.
   await expect(page.getByRole('heading', { name: 'Order Ticket' })).toBeVisible();
   await page.getByLabel('Security').selectOption('912828YK0');
