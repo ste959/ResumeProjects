@@ -80,7 +80,7 @@ the same numbers).
 | **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions, transaction cost analysis |
 | **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → separate `risk-service` consumer |
 | **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
-| **Test automation (unit/integration/UI)** | 105 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + 54 Python research + **Vitest/RTL** component tests + **Playwright** E2E |
+| **Test automation (unit/integration/UI)** | 116 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + 54 Python research + **Vitest/RTL** component tests + **Playwright** E2E |
 | **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
 | **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
 | **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
@@ -93,7 +93,8 @@ the same numbers).
 ## Domain model
 
 - **Security** — bond reference data (CUSIP, ISIN, coupon, maturity, rating, sector,
-  clean price, restricted flag). Seeded with 12 realistic bonds (Treasuries + corporates).
+  clean price, restricted flag). Seeded with 12 realistic bonds (Treasuries + corporates) and the
+  **123-name equity universe** (all 11 GICS sectors) the research trades.
 - **Order** — a bond order with quantity in **par notional** and prices as **% of par**
   (the market convention). Lifecycle: `NEW → STAGED → ROUTED → PARTIALLY_FILLED → FILLED`,
   or `CANCELLED` / `REJECTED`. Legal transitions are encoded on the `OrderStatus` enum.
@@ -112,9 +113,31 @@ aggregates breaches, so adding a rule means adding one class:
 - **Concentration limit** — blocks orders that would over-expose a portfolio to one name.
 
 Beyond per-order compliance, an **aggregate pre-trade risk guard** (`PreTradeRiskGuard`) caps the
-book's total gross notional across all open positions (`oms.risk.max-gross-notional`), so live
+book's total gross notional across all open positions (`oms.risk.max-gross-notional`, a real **$50MM**
+desk cap — kept above the bond side's $25MM/order compliance so compliant blocks still route), so live
 protection isn't limited to the backtester's kill-switches. A breach doesn't error out — the order
 is persisted as `REJECTED` with the reason, mirroring a real desk's audit trail.
+
+---
+
+## Research → execution bridge (paper)
+
+The alpha research lives in Python; the live OMS is Java. They're bridged the way real desks do it —
+a **target-portfolio file**. `research/export_target_book.py` writes the beta+sector-neutral momentum
+book (weights + reference prices) to `target-book/target-book.json`; the Java **`RebalanceService`**
+reads it, sizes each weight to whole shares against a configured gross capital, **diffs vs current
+positions**, classifies each delta (incl. **short-sale** flag + an Alpaca shortability check), and
+routes the deltas through the standard `create → stage → route` lifecycle to the Alpaca **paper** venue.
+
+It is deliberately fenced: **disabled by default** (`oms.rebalance.enabled=false`, controller not even
+registered), **dry-run by default**, and gated on the **tighter** of the desk cap and a $250k
+rebalance-book cap. A dry-run on the 123-name book plans ~110 dollar-neutral delta orders (~57 long /
+~53 short, ~$100k gross); an oversized request returns `BLOCKED_RISK_LIMIT` and routes nothing.
+
+> **This is execution-infrastructure validation, not an alpha deployment.** The research found *no*
+> statistically significant edge (Deflated Sharpe ≈0.11); the bridge exists to prove the
+> signal → order → fill → reconcile plumbing works end-to-end, and it is labeled as such in the code
+> and the target-book file itself.
 
 ---
 
@@ -290,6 +313,7 @@ kubectl -n bonddesk get pods
 | `POST` | `/api/orders/{ref}/route` | Route to venue (`STAGED → ROUTED`) |
 | `POST` | `/api/orders/{ref}/fills` | Report a fill |
 | `POST` | `/api/orders/{ref}/cancel` | Cancel a working order |
+| `POST` | `/api/equity/rebalance` | Rebalance the equity book toward the research target (dry-run by default; disabled by default) |
 | `GET` | `/api/portfolios/{portfolio}/positions` | Positions with mark-to-market |
 | `GET` | `/api/analytics/desk-summary` | Order counts, fill rate, filled notional (aggregate SQL) |
 | `GET` | `/api/analytics/execution-quality` | TCA: avg fill vs. benchmark, slippage (bps) by security/side |

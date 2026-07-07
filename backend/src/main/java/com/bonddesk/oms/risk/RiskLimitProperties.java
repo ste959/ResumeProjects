@@ -18,7 +18,10 @@ public class RiskLimitProperties {
      * portfolio's open positions plus the incoming order — allowed on the live order path.
      * A non-positive value (or null) disables the aggregate check.
      */
-    private BigDecimal maxGrossNotional = new BigDecimal("1000000000"); // $1bn desk-wide default
+    // $50MM desk-wide default: a real cap (vs the old $1bn no-op), kept ABOVE the bond side's
+    // per-order compliance ($25MM) so a compliant block order can still route. The equity paper
+    // book is held to a much tighter, separate cap (oms.rebalance.max-gross-notional).
+    private BigDecimal maxGrossNotional = new BigDecimal("50000000");
 
     public BigDecimal getMaxGrossNotional() {
         return maxGrossNotional;

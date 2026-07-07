@@ -51,6 +51,46 @@ public class AlpacaBrokerClient {
                               BigDecimal equity, String currency) {
     }
 
+    /** Broker's tradability metadata for a symbol. */
+    public record AlpacaAsset(String symbol, boolean tradable, boolean shortable) {
+    }
+
+    /** True when broker credentials are present, so the venue can be called. */
+    public boolean brokerReachable() {
+        return props.hasCredentials();
+    }
+
+    /**
+     * Whether the venue will accept a short sale of {@code symbol}: the asset must be both
+     * tradable and shortable. Returns false (never throws) on any error or when credentials
+     * are absent, so the rebalance path can safely skip a name it cannot short.
+     */
+    public boolean isShortable(String symbol) {
+        if (!props.hasCredentials()) {
+            log.debug("Shortability check for {} skipped — no Alpaca credentials", symbol);
+            return false;
+        }
+        try {
+            String encoded = URLEncoder.encode(symbol, StandardCharsets.UTF_8);
+            HttpResponse<String> res = send(HttpRequest.newBuilder()
+                    .uri(URI.create(props.getTradingBaseUrl() + "/v2/assets/" + encoded))
+                    .GET());
+            if (res.statusCode() / 100 != 2) {
+                log.debug("Alpaca asset lookup for {} returned {}", symbol, res.statusCode());
+                return false;
+            }
+            JsonNode n = readTree(res.body());
+            AlpacaAsset asset = new AlpacaAsset(
+                    n.path("symbol").asText(symbol),
+                    n.path("tradable").asBoolean(false),
+                    n.path("shortable").asBoolean(false));
+            return asset.shortable() && asset.tradable();
+        } catch (RuntimeException e) {
+            log.debug("Shortability check for {} failed: {}", symbol, e.getMessage());
+            return false;
+        }
+    }
+
     /** Submit a new order to Alpaca, tagging it with our order reference as client_order_id. */
     public AlpacaOrder submit(Order order) {
         ObjectNode body = json.createObjectNode();

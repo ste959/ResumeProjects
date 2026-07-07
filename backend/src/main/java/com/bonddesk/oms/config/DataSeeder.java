@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -30,12 +31,44 @@ public class DataSeeder implements CommandLineRunner {
         this.securities = securities;
     }
 
+    /**
+     * The 123-name large-cap equity universe the rebalance path trades, as
+     * {@code TICKER=GICS_SECTOR} pairs. Equities are keyed by their ticker as a CUSIP
+     * stand-in: the free market-data/execution feed identifies names by ticker, not CUSIP,
+     * and every ticker here is ≤5 characters so it fits the 9-char CUSIP column and stays
+     * unique. The reference price is seeded nominal (100.00) and refreshed from the
+     * target-book price before the rebalance sizes any order.
+     */
+    private static final String EQUITY_UNIVERSE =
+            "AAPL=InfoTech;MSFT=InfoTech;NVDA=InfoTech;AVGO=InfoTech;AMD=InfoTech;INTC=InfoTech;"
+            + "CRM=InfoTech;ORCL=InfoTech;CSCO=InfoTech;QCOM=InfoTech;TXN=InfoTech;IBM=InfoTech;"
+            + "ADBE=InfoTech;ACN=InfoTech;NOW=InfoTech;AMAT=InfoTech;MU=InfoTech;LRCX=InfoTech;"
+            + "ADI=InfoTech;KLAC=InfoTech;SNPS=InfoTech;CDNS=InfoTech;INTU=InfoTech;"
+            + "GOOGL=CommSvcs;META=CommSvcs;NFLX=CommSvcs;DIS=CommSvcs;CMCSA=CommSvcs;VZ=CommSvcs;"
+            + "T=CommSvcs;TMUS=CommSvcs;CHTR=CommSvcs;"
+            + "AMZN=ConsDisc;TSLA=ConsDisc;HD=ConsDisc;MCD=ConsDisc;NKE=ConsDisc;LOW=ConsDisc;"
+            + "SBUX=ConsDisc;BKNG=ConsDisc;TJX=ConsDisc;GM=ConsDisc;F=ConsDisc;MAR=ConsDisc;"
+            + "JPM=Financials;BAC=Financials;WFC=Financials;GS=Financials;MS=Financials;C=Financials;"
+            + "V=Financials;MA=Financials;AXP=Financials;BLK=Financials;SCHW=Financials;SPGI=Financials;"
+            + "CB=Financials;PGR=Financials;USB=Financials;PNC=Financials;"
+            + "XOM=Energy;CVX=Energy;COP=Energy;SLB=Energy;EOG=Energy;MPC=Energy;PSX=Energy;OXY=Energy;"
+            + "JNJ=HealthCare;UNH=HealthCare;PFE=HealthCare;MRK=HealthCare;ABBV=HealthCare;LLY=HealthCare;"
+            + "TMO=HealthCare;ABT=HealthCare;DHR=HealthCare;BMY=HealthCare;AMGN=HealthCare;MDT=HealthCare;"
+            + "GILD=HealthCare;CVS=HealthCare;CI=HealthCare;"
+            + "PG=Staples;KO=Staples;PEP=Staples;WMT=Staples;COST=Staples;MDLZ=Staples;CL=Staples;"
+            + "MO=Staples;PM=Staples;TGT=Staples;KMB=Staples;GIS=Staples;"
+            + "BA=Industrials;CAT=Industrials;HON=Industrials;UPS=Industrials;GE=Industrials;RTX=Industrials;"
+            + "UNP=Industrials;LMT=Industrials;DE=Industrials;MMM=Industrials;EMR=Industrials;ADP=Industrials;"
+            + "NEE=Utilities;DUK=Utilities;SO=Utilities;D=Utilities;AEP=Utilities;"
+            + "AMT=RealEstate;PLD=RealEstate;EQIX=RealEstate;SPG=RealEstate;O=RealEstate;"
+            + "LIN=Materials;APD=Materials;SHW=Materials;FCX=Materials;NEM=Materials;ECL=Materials";
+
     @Override
     public void run(String... args) {
         if (securities.count() > 0) {
             return;
         }
-        List<Security> seed = List.of(
+        List<Security> seed = new ArrayList<>(List.of(
                 bond("912828YK0", "US912828YK08", "US TREASURY N/B 1.5% 2030", "US TREASURY",
                         "1.5000", "2030-08-15", "SOVEREIGN", CreditRating.AAA, "97.8200", false),
                 bond("91282CFX4", "US91282CFX41", "US TREASURY N/B 4.0% 2034", "US TREASURY",
@@ -61,18 +94,18 @@ public class DataSeeder implements CommandLineRunner {
                         "6.2500", "2036-04-15", "CORPORATE", CreditRating.B_PLUS, "84.5000", false),
                 // Restricted: all trading blocked by RestrictedSecurityRule.
                 bond("999999XX9", "US999999XX90", "PROJECT MERIDIAN 5.0% 2032 (RESTRICTED)", "MERIDIAN SPV",
-                        "5.0000", "2032-09-30", "CORPORATE", CreditRating.BBB_MINUS, "100.0000", true),
+                        "5.0000", "2032-09-30", "CORPORATE", CreditRating.BBB_MINUS, "100.0000", true)
+        ));
 
-                // Listed equities — routed to the lit order book (Alpaca) rather than RFQ.
-                // The clean_price here is only an indicative fallback; the live feed overrides it.
-                // Tickers match the equity market-data / execution symbols.
-                equity("037833100", "AAPL", "US0378331005", "APPLE INC", "TECHNOLOGY", "232.50"),
-                equity("594918104", "MSFT", "US5949181045", "MICROSOFT CORP", "TECHNOLOGY", "430.00"),
-                equity("67066G104", "NVDA", "US67066G1040", "NVIDIA CORP", "SEMICONDUCTORS", "128.00"),
-                equity("023135106", "AMZN", "US0231351067", "AMAZON.COM INC", "CONSUMER DISCRETIONARY", "205.00"),
-                equity("46625H100", "JPM", "US46625H1005", "JPMORGAN CHASE & CO", "FINANCIALS", "265.00"),
-                equity("88160R101", "TSLA", "US88160R1014", "TESLA INC", "CONSUMER DISCRETIONARY", "340.00")
-        );
+        // Listed equities — routed to the lit venue (Alpaca paper) rather than RFQ. Generated
+        // over the full rebalance universe; keyed by ticker as a CUSIP stand-in (see
+        // EQUITY_UNIVERSE). The nominal 100.00 price is refreshed from the target book before
+        // the rebalance sizes any order, so it is only a boot-time placeholder.
+        for (String pair : EQUITY_UNIVERSE.split(";")) {
+            String[] parts = pair.split("=");
+            seed.add(equity(parts[0].trim(), parts[1].trim()));
+        }
+
         securities.saveAll(seed);
         long bonds = seed.stream().filter(s -> s.getAssetClass() == AssetClass.FIXED_INCOME).count();
         long equities = seed.size() - bonds;
@@ -101,21 +134,21 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     /**
-     * A listed equity: no coupon/maturity/rating (those are fixed-income concepts), a
-     * ticker for the market-data feed, and a price quoted in dollars per share.
+     * A listed equity: no coupon/maturity/rating (those are fixed-income concepts). The ticker
+     * doubles as the CUSIP because the free feed identifies names by ticker, not CUSIP. The
+     * nominal 100.00 reference price is a placeholder the rebalance refreshes from the target
+     * book before sizing.
      */
-    private static Security equity(String cusip, String ticker, String isin, String issuer,
-                                   String sector, String price) {
+    private static Security equity(String ticker, String sector) {
         Security s = new Security();
         s.setAssetClass(AssetClass.EQUITY);
-        s.setCusip(cusip);
+        s.setCusip(ticker);
         s.setTicker(ticker);
-        s.setIsin(isin);
-        s.setDescription(issuer + " COMMON STOCK");
-        s.setIssuer(issuer);
+        s.setDescription(ticker);
+        s.setIssuer(ticker);
         s.setCurrency("USD");
         s.setSector(sector);
-        s.setCleanPrice(new BigDecimal(price));
+        s.setCleanPrice(new BigDecimal("100.00"));
         s.setRestricted(false);
         return s;
     }

@@ -82,11 +82,22 @@ oms:
     live-curve: true         # fetch the real daily US Treasury par-yield curve (keyless)
     dealer-count: 5          # dealers responding to each RFQ
     rfq-ttl-seconds: 30      # how long dealer quotes stay firm
+  rebalance:
+    # Equity rebalance path (target book -> delta orders -> paper venue). Plumbing validation
+    # only, so it is DISABLED by default: the controller is not registered unless enabled=true,
+    # and the endpoint dry-runs by default. No validated edge — this is not a live strategy.
+    enabled: false
+    gross-capital: 100000          # dollars the unit-gross target weights are scaled to
+    portfolio: EQUITY-PAPER
+    target-book-path: target-book/target-book.json
+    max-gross-notional: 250000     # tight cap on the paper equity book (rebalance uses the tighter
+                                   # of this and the desk-wide oms.risk.max-gross-notional)
   risk:
     # Aggregate pre-trade breaker on the live order path: reject an order that would push a
     # portfolio's total gross notional (open positions + this order) over this limit. A
-    # non-positive value disables the check.
-    max-gross-notional: 1000000000
+    # non-positive value disables the check. $50MM desk-wide — a real cap (not the old $1bn no-op),
+    # above the bond side's $25MM/order compliance so compliant block orders still route.
+    max-gross-notional: 50000000
   # Origin patterns allowed to call the API from a browser. "*" port covers the Vite
   # dev server (:5173) and the nginx-served UI (:8088). Set to your real domain in prod.
   cors:

@@ -31,3 +31,6 @@ research/output/
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# Generated target book (research -> execution handoff)
+backend/target-book/
