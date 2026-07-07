@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { ExLevel, ExQueueOrder, ExStats, ExTrade } from '../api/types';
 import { useExchangeStream } from '../hooks/useExchangeStream';
@@ -37,6 +38,7 @@ export function ExchangeTerminal() {
         <div className="xt-title">
           <span className="xt-logo">◧</span>
           <div>
+            <Link to="/" className="xt-hublink">← Projects</Link>
             <h1>Matching Engine <span className="xt-inst">· BTC-USD</span></h1>
             <p>
               A price-time-priority central limit order book — <b>our engine, live</b>. Real BTC price ·

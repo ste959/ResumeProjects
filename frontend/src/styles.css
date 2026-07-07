@@ -1710,3 +1710,54 @@ code {
 .xt-aggr.you { color: var(--warn); border: 1px solid var(--warn); }
 
 @media (max-width: 1000px) { .xt-an-grid, .xt-pnl { grid-template-columns: 1fr 1fr; } }
+
+/* ============================================================================
+   LANDING HUB (portfolio front door) + per-app identity shells
+   ============================================================================ */
+.hub {
+  --bg: #0a0e16; --panel: #131826; --line: #263149; --ink: #e8eef8; --dim: #94a3ba; --muted: #5d6b83;
+  --a-exchange: #37d6c4; --a-oms: #5b9dff; --a-research: #b98bff;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  background: var(--bg); color: var(--ink); min-height: 100vh; font-family: var(--sans); padding: 0 24px 64px;
+}
+.hub-head { max-width: 1120px; margin: 0 auto; padding: 66px 0 38px; text-align: center; }
+.hub-mark { color: var(--a-exchange); font-size: 34px; }
+.hub-head h1 { font-size: clamp(28px, 4vw, 38px); font-weight: 780; margin: 14px 0 12px; letter-spacing: -0.025em; }
+.hub-head p { color: var(--dim); font-size: 16px; max-width: 66ch; margin: 0 auto; line-height: 1.55; }
+.hub-grid { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.hub-card { display: flex; flex-direction: column; gap: 11px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--card); border-radius: 10px; padding: 22px; text-decoration: none; color: inherit; transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; }
+.hub-card:hover { transform: translateY(-4px); border-color: var(--card); box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+.hub-eyebrow { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--card); display: flex; align-items: center; gap: 8px; }
+.hub-flag { color: #04120c; background: var(--card); padding: 1px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+.hub-card h2 { font-size: 22px; font-weight: 750; margin: 2px 0; letter-spacing: -0.01em; }
+.hub-pitch { color: var(--dim); font-size: 13px; line-height: 1.55; flex: 1; }
+.hub-stat { font-family: var(--mono); font-size: 11.5px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 8px 10px; }
+.hub-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.hub-tags span { font-family: var(--mono); font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
+.hub-enter { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--card); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+.hub-arrow { display: inline-block; transition: transform 0.15s ease; }
+.hub-card:hover .hub-arrow { transform: translateX(5px); }
+.hub-foot { max-width: 1120px; margin: 36px auto 0; text-align: center; color: var(--muted); font-size: 12px; }
+.hub-foot code { background: var(--panel); padding: 2px 6px; border-radius: 3px; }
+
+/* per-app identity shell (light apps: OMS + research) */
+.app-shell { min-height: 100vh; background: var(--bg); }
+.shell-head { display: flex; align-items: center; gap: 20px; padding: 9px 16px; background: var(--panel); border-bottom: 2px solid var(--accent); box-shadow: var(--shadow); }
+.shell-back { font-family: var(--mono); font-size: 12px; color: var(--dim); text-decoration: none; white-space: nowrap; padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px; }
+.shell-back:hover { color: var(--accent); border-color: var(--accent); }
+.shell-brand { display: flex; align-items: center; gap: 10px; }
+.shell-mark { font-size: 20px; color: var(--accent); }
+.shell-brand h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--ink); }
+.shell-brand p { margin: 0; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.shell-nav { margin-left: auto; display: flex; gap: 6px; }
+.shell-nav button { background: transparent; border: 1px solid var(--border-strong); color: var(--dim); padding: 6px 14px; font-family: var(--mono); font-size: 12px; font-weight: 600; text-transform: uppercase; border-radius: 2px; cursor: pointer; }
+.shell-nav button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.shell-note { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.research-shell .shell-head { border-bottom-color: #7c3aed; } .research-shell .shell-mark { color: #7c3aed; }
+
+/* exchange header "← Projects" link */
+.xt-hublink { font-family: var(--mono); font-size: 11px; color: var(--muted); text-decoration: none; letter-spacing: 0.5px; display: inline-block; margin-bottom: 4px; }
+.xt-hublink:hover { color: var(--accent); }
+
+@media (max-width: 860px) { .hub-grid { grid-template-columns: 1fr; } }
