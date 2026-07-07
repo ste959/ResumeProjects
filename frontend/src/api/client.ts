@@ -18,6 +18,8 @@ import type {
   Order,
   PaperOrder,
   PaperOrderRequest,
+  PlaceExRequest,
+  PlaceExResponse,
   Position,
   ProductQuote,
   Rfq,
@@ -146,6 +148,12 @@ export const api = {
 
   // Equity operational loop (read-only ops status; always available).
   equityStatus: () => request<EquityStatus>('/equity/status'),
+
+  // Matching engine (place/cancel into our exchange; market data streams over /ws/exchange).
+  placeExchangeOrder: (req: PlaceExRequest) =>
+    request<PlaceExResponse>('/exchange/orders', { method: 'POST', body: JSON.stringify(req) }),
+  cancelExchangeOrder: (id: number) =>
+    request<{ orderId: number; cancelled: boolean }>(`/exchange/orders/${id}/cancel`, { method: 'POST' }),
 
   // Research service (Python/FastAPI over the mds research layer).
   researchHealth: () =>

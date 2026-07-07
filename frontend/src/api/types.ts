@@ -388,6 +388,59 @@ export type StreamFrame =
   | { type: 'trade'; product: string; trades: TradePrint[] }
   | { type: 'metrics'; product: string; metrics: StreamMetrics };
 
+// ---- Matching engine / exchange (WebSocket /ws/exchange + /api/exchange) ----
+
+export interface ExStats {
+  fair: number;
+  mid: number;
+  spreadBps: number | null;
+  mmInventoryLots: number;
+  mmInventory: number;
+  mmPnl: number;
+  mmFills: number;
+  ordersPerSec: number;
+  tradeCount: number;
+  peakOrdersPerSec: number;
+  p50LatencyNs: number;
+  p99LatencyNs: number;
+  restingSize: number;
+}
+
+export interface ExLevel { price: number; size: number; orders: number; mm: boolean; you: boolean }
+export interface ExQueueOrder { id: number; price: number; size: number; owner: string }
+export interface ExTrade { seq: number; price: number; size: number; aggressor: string; maker: string; taker: string }
+
+export interface ExchangeSnapshot {
+  instrument: string;
+  tickSize: number;
+  lotSize: number;
+  tick: number;
+  stats: ExStats;
+  bids: ExLevel[];
+  asks: ExLevel[];
+  bidQueue: ExQueueOrder[];
+  askQueue: ExQueueOrder[];
+  trades: ExTrade[];
+}
+
+export interface PlaceExRequest {
+  side: 'BUY' | 'SELL';
+  type: 'LIMIT' | 'MARKET';
+  tif?: 'GTC' | 'IOC' | 'FOK';
+  postOnly: boolean;
+  price?: number;
+  size: number;
+}
+
+export interface PlaceExResponse {
+  orderId: number;
+  status: string;
+  reason: string | null;
+  trades: number;
+  filledSize: number;
+  restingSize: number;
+}
+
 // ---- Fixed-income OTC desk (RFQ), yield curve, bond analytics, tax ----
 
 export interface DealerQuote {

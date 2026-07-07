@@ -1543,3 +1543,123 @@ code {
   .layer-card { grid-template-columns: 1fr; gap: 8px; }
   .lc-result { text-align: left; }
 }
+
+/* ============================================================================
+   EXCHANGE TERMINAL — the matching engine (scoped dark trading-desk theme)
+   ============================================================================ */
+.xt {
+  --bg: #0a0e16; --panel: #121826; --panel2: #1a2233; --line: #263149;
+  --ink: #e8eef8; --dim: #94a3ba; --muted: #5d6b83;
+  --accent: #4aa8ff; --buy: #23d18b; --sell: #ff5470; --warn: #f5b545;
+  --mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--ink); min-height: 100vh;
+  padding: 0 22px 48px; font-family: var(--sans);
+}
+.xt h1, .xt h2 { font-family: var(--sans); }
+.xt .mono { font-family: var(--mono); }
+.xt .pos { color: var(--buy); } .xt .neg { color: var(--sell); }
+.xt .empty.sm { color: var(--muted); font-size: 11px; padding: 10px; text-align: center; }
+
+/* header */
+.xt-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 0 18px; }
+.xt-title { display: flex; align-items: flex-start; gap: 14px; }
+.xt-logo { font-size: 26px; color: var(--accent); line-height: 1; margin-top: 2px; }
+.xt-head h1 { margin: 0; font-size: 22px; font-weight: 750; letter-spacing: -0.01em; }
+.xt-inst { color: var(--accent); font-weight: 600; }
+.xt-head p { margin: 5px 0 0; font-size: 13px; color: var(--dim); max-width: 78ch; line-height: 1.5; }
+.xt-head p b { color: var(--ink); }
+.xt-conn { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.xt-conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.xt-conn.up { color: var(--buy); } .xt-conn.up .dot { background: var(--buy); box-shadow: 0 0 0 3px rgba(35,209,139,0.18); }
+.xt-conn.down .dot { background: var(--sell); }
+.xt-loading { padding: 80px; text-align: center; color: var(--muted); font-family: var(--mono); }
+
+/* stats strip */
+.xt-stats { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 14px; }
+.xt-stat { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 11px 13px; position: relative; overflow: hidden; }
+.xt-stat.accent::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--accent); }
+.xts-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+.xts-value { display: block; font-family: var(--mono); font-size: 19px; font-weight: 700; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+.xts-value.good { color: var(--buy); } .xts-value.bad { color: var(--sell); } .xts-value.warn { color: var(--warn); }
+.xts-sub { display: block; font-size: 10px; color: var(--dim); }
+
+/* main grid */
+.xt-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; align-items: start; }
+.xt-side { display: flex; flex-direction: column; gap: 14px; }
+.xt-book, .xt-entry, .xt-tape, .xt-queue { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.xt-book h2, .xt-entry h2, .xt-tape h2, .xt-queue h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.3px; }
+.xt-h-sub { font-weight: 400; font-size: 11px; color: var(--muted); }
+
+/* order book */
+.xt-book-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; }
+.xt-book-cols { display: grid; grid-template-columns: 1fr 1fr 44px; gap: 10px; font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); width: 62%; text-align: right; }
+.xt-book-cols span:first-child { text-align: left; }
+.xt-book-body { padding: 2px 0; }
+.xt-row { position: relative; display: grid; grid-template-columns: 1fr 1fr 44px; gap: 10px; align-items: center; padding: 3px 14px; font-family: var(--mono); font-size: 12px; }
+.xt-row > span { position: relative; z-index: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.xt-depth { position: absolute; top: 1px; bottom: 1px; right: 0; opacity: 0.16; border-radius: 2px 0 0 2px; }
+.xt-depth.bid { background: var(--buy); } .xt-depth.ask { background: var(--sell); }
+.xtr-price { text-align: left !important; display: flex; align-items: center; gap: 6px; }
+.xt-row.bid .xtr-price { color: var(--buy); } .xt-row.ask .xtr-price { color: var(--sell); }
+.xtr-size { color: var(--ink); } .xtr-orders { color: var(--muted); }
+.xtr-tag { font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 2px; letter-spacing: 0.4px; }
+.xtr-tag.mm { color: var(--accent); border: 1px solid var(--accent); }
+.xtr-tag.you { color: var(--warn); border: 1px solid var(--warn); }
+.xt-row.you { background: rgba(245,181,69,0.06); }
+.xt-row.flash { animation: xtFlash 0.5s ease-out; }
+@keyframes xtFlash { from { background: rgba(74,168,255,0.28); } to { background: transparent; } }
+.xt-mid { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 8px 14px; margin: 4px 0; background: var(--panel2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-family: var(--mono); font-weight: 700; }
+.xtm-side.bid { color: var(--buy); } .xtm-side.ask { color: var(--sell); text-align: right; }
+.xtm-spread { font-size: 11px; color: var(--dim); font-weight: 600; }
+.xt-book-foot { padding: 9px 14px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
+.xt-book-foot b { color: var(--dim); }
+
+/* order entry */
+.xt-entry { padding: 14px; }
+.xt-entry h2 { margin-bottom: 12px; }
+.xt-side-toggle { display: flex; margin-bottom: 10px; }
+.xt-side-toggle button { flex: 1; background: var(--panel2); border: 1px solid var(--line); color: var(--dim); padding: 8px; font-family: var(--mono); font-size: 12px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+.xt-side-toggle button:first-child { border-radius: 4px 0 0 4px; }
+.xt-side-toggle button:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+.xt-side-toggle button.buy.active { background: var(--buy); color: #04120c; border-color: var(--buy); }
+.xt-side-toggle button.sell.active { background: var(--sell); color: #1a040a; border-color: var(--sell); }
+.xt-entry-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.xt-entry-row label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+.xt-entry-row select, .xt-entry-row input { font-family: var(--mono); font-size: 12px; padding: 7px 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; color: var(--ink); }
+.xt-po { flex-direction: row !important; align-items: center; gap: 6px !important; justify-content: flex-start; }
+.xt-po input { accent-color: var(--accent); }
+.xt-place { width: 100%; border: none; border-radius: 4px; padding: 11px; font-family: var(--mono); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; margin-top: 4px; }
+.xt-place.buy { background: var(--buy); color: #04120c; } .xt-place.sell { background: var(--sell); color: #1a040a; }
+.xt-result { margin-top: 10px; padding: 9px 11px; background: var(--panel2); border-radius: 4px; border-left: 3px solid var(--accent); font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
+.xt-myorders { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.xt-mo-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 6px; }
+.xt-mo-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; align-items: center; font-family: var(--mono); font-size: 11px; padding: 3px 0; }
+.xt-mo-row button { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 3px; padding: 2px 8px; font-size: 10px; cursor: pointer; }
+.xt-mo-row button:hover { color: var(--sell); border-color: var(--sell); }
+
+/* tape */
+.xt-tape { padding: 14px; }
+.xt-tape-body { margin-top: 10px; max-height: 300px; overflow-y: auto; }
+.xt-tape-row { display: grid; grid-template-columns: 14px 1fr auto 62px; gap: 8px; align-items: center; padding: 2px 4px; font-family: var(--mono); font-size: 11.5px; animation: xtIn 0.35s ease-out; }
+.xt-tape-row.buy { color: var(--buy); } .xt-tape-row.sell { color: var(--sell); }
+.xtt-size { color: var(--dim); text-align: right; } .xtt-parties { color: var(--muted); font-size: 9.5px; text-align: right; }
+@keyframes xtIn { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
+
+/* top-of-book queue */
+.xt-queue { margin-top: 14px; padding: 14px; }
+.xt-queue-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.xt-queue-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.xt-qlabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 7px; }
+.xt-qtokens { display: flex; gap: 5px; flex-wrap: wrap; }
+.xt-token { display: inline-flex; flex-direction: column; align-items: center; min-width: 40px; padding: 5px 6px; border-radius: 3px; font-family: var(--mono); font-size: 9px; font-weight: 700; border: 1px solid var(--line); background: var(--panel2); color: var(--muted); }
+.xt-token.mm { border-color: var(--accent); color: var(--accent); }
+.xt-token.you { border-color: var(--warn); color: var(--warn); }
+.xt-token-sz { font-weight: 400; font-size: 9px; color: var(--dim); margin-top: 2px; }
+.xt-qtokens.bid .xt-token:first-child { box-shadow: inset 0 -2px 0 var(--buy); }
+.xt-qtokens.ask .xt-token:first-child { box-shadow: inset 0 -2px 0 var(--sell); }
+
+@media (max-width: 1000px) {
+  .xt-stats { grid-template-columns: repeat(4, 1fr); }
+  .xt-grid, .xt-queue-body { grid-template-columns: 1fr; }
+}
