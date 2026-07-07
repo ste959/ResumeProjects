@@ -2,6 +2,7 @@ package com.bonddesk.oms.exchange;
 
 import com.bonddesk.exchange.CompositeListener;
 import com.bonddesk.exchange.ExchangeListener;
+import com.bonddesk.exchange.MakerAnalytics;
 import com.bonddesk.exchange.MarketMaker;
 import com.bonddesk.exchange.FlowGenerator;
 import com.bonddesk.exchange.Order;
@@ -59,16 +60,18 @@ public class ExchangeSimulation {
     private final ReentrantLock lock = new ReentrantLock();
     private final Random rng = new Random(7);
     private final MarketMaker mm = new MarketMaker(3, 1, 15, 400);
+    private final MakerAnalytics makerAnalytics = new MakerAnalytics(mm);
     private final FlowGenerator flow = new FlowGenerator(11, 6, 0.35);
     private final Recorder rec = new Recorder();
     private final OrderBook book =
-            new OrderBook(INSTRUMENT, new CompositeListener(List.of(mm, rec)), System::nanoTime);
+            new OrderBook(INSTRUMENT, new CompositeListener(List.of(mm, makerAnalytics, rec)), System::nanoTime);
 
     private long fair = FALLBACK_FAIR;
     private long tickCount;
     private long lastOrders;
     private double ordersPerSec;
-    private long peakOrdersPerSec, p50LatencyNs, p99LatencyNs;
+    private long peakOrdersPerSec, p50LatencyNs, p99LatencyNs, maxLatencyNs;
+    private List<ExchangeDtos.LatencyBucket> latencyBuckets = List.of();
     private volatile Snapshot latest;
 
     public ExchangeSimulation(ObjectProvider<MarketDataService> marketData,
@@ -85,6 +88,8 @@ public class ExchangeSimulation {
         try {
             for (int i = 0; i < 60; i++) {             // seed a live book before the first client connects
                 evolveFair();
+                tickCount++;
+                makerAnalytics.beginTick(tickCount, midTicks(), spreadTicks());
                 flow.step(book, fair, 0, INTENSITY);
                 mm.requote(book, fair);
             }
@@ -101,9 +106,10 @@ public class ExchangeSimulation {
         try {
             long prev = fair;
             evolveFair();
+            tickCount++;
+            makerAnalytics.beginTick(tickCount, midTicks(), spreadTicks());  // reference mid + mark out matured fills
             flow.step(book, fair, fair - prev, INTENSITY);   // flow hits the maker's stale quote
             mm.requote(book, fair);                          // maker refreshes
-            tickCount++;
             updateThroughput();
             snap = buildSnapshot();
         } finally {
@@ -243,34 +249,111 @@ public class ExchangeSimulation {
         ordersPerSec = ordersPerSec == 0 ? inst : 0.7 * ordersPerSec + 0.3 * inst;   // EMA
     }
 
-    // ── boot benchmark (engine capability) ──────────────────────────────────────────────────────
+    // ── analytics ───────────────────────────────────────────────────────────────────────────────
+    public ExchangeDtos.AnalyticsView analytics() {
+        lock.lock();
+        try {
+            double totalUsd = mm.pnl(fair) * TICK * LOT;
+            double spreadUsd = makerAnalytics.sumEdgeTickLots() * TICK * LOT;
+            double adverseUsd = makerAnalytics.sumAdverseTickLots() * TICK * LOT;
+            double inventoryUsd = totalUsd - spreadUsd - adverseUsd;
+            ExchangeDtos.PnlAttribution pnl = new ExchangeDtos.PnlAttribution(
+                    r2(totalUsd), r2(spreadUsd), r2(adverseUsd), r2(inventoryUsd), makerAnalytics.markedOut());
+
+            List<ExchangeDtos.FillView> fills = new ArrayList<>();
+            double edgeSum = 0, moSum = 0;
+            int moCount = 0;
+            for (MakerAnalytics.Fill f : makerAnalytics.recentFills(60)) {
+                double edgeBps = f.mid0Ticks > 0 ? f.edgeTicks / f.mid0Ticks * 1e4 : 0;
+                Double moBps = (f.markoutTicks != null && f.mid0Ticks > 0) ? f.markoutTicks / f.mid0Ticks * 1e4 : null;
+                double spreadBps = f.mid0Ticks > 0 ? (double) f.spreadTicks / f.mid0Ticks * 1e4 : 0;
+                fills.add(new ExchangeDtos.FillView(f.seq, f.tick, f.mmBought ? "BUY" : "SELL",
+                        f.priceTicks * TICK, f.sizeLots * LOT, aggrLabel(f.aggr), r1(spreadBps),
+                        r4(f.invAfterLots * LOT), r2(edgeBps), moBps == null ? null : r2(moBps)));
+                edgeSum += edgeBps;
+                if (moBps != null) { moSum += moBps; moCount++; }
+            }
+            int nF = fills.size();
+            ExchangeDtos.LatencyReport latency = new ExchangeDtos.LatencyReport(p50LatencyNs, p99LatencyNs,
+                    maxLatencyNs, latencyBuckets,
+                    "Match latency scales with how many resting orders a submit sweeps — the tail is large market orders walking the book.");
+            long fc = makerAnalytics.fillCount();
+            ExchangeDtos.Summary summary = new ExchangeDtos.Summary(fc, makerAnalytics.adverseCount(),
+                    fc > 0 ? r4((double) makerAnalytics.informedFills() / fc) : 0,
+                    nF > 0 ? r2(edgeSum / nF) : 0, moCount > 0 ? r2(moSum / moCount) : 0);
+            return new ExchangeDtos.AnalyticsView(pnl, latency, fills, summary);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private static String aggrLabel(char c) {
+        return switch (c) { case 'I' -> "INFORMED"; case 'N' -> "NOISE"; case 'Y' -> "YOU"; default -> "OTHER"; };
+    }
+
+    private long midTicks() {
+        Long b = book.bestBid(), a = book.bestAsk();
+        return (b != null && a != null) ? (b + a) / 2 : fair;
+    }
+
+    private long spreadTicks() {
+        Long b = book.bestBid(), a = book.bestAsk();
+        return (b != null && a != null) ? (a - b) : 0;
+    }
+
+    private static double r1(double v) { return Math.round(v * 10) / 10.0; }
+    private static double r2(double v) { return Math.round(v * 100) / 100.0; }
+    private static double r4(double v) { return Math.round(v * 1e4) / 1e4; }
+
+    // ── boot benchmark (engine capability, latency by match depth) ──────────────────────────────
     private void benchmark() {
         OrderBook b = new OrderBook("BENCH");
         Random r = new Random(1);
         long mid = 50_000;
         int n = 200_000;
-        for (int warm = 0; warm < 50_000; warm++) benchOp(b, r, mid += r.nextInt(3) - 1, null, 0);
+        for (int warm = 0; warm < 50_000; warm++) { mid += r.nextInt(3) - 1; benchOp(b, r, mid, null, null, 0); }
         long[] lat = new long[n];
+        int[] depth = new int[n];
         long start = System.nanoTime();
-        for (int i = 0; i < n; i++) benchOp(b, r, mid += r.nextInt(3) - 1, lat, i);
+        for (int i = 0; i < n; i++) { mid += r.nextInt(3) - 1; benchOp(b, r, mid, lat, depth, i); }
         double sec = (System.nanoTime() - start) / 1e9;
         peakOrdersPerSec = (long) (n / sec);
-        Arrays.sort(lat);
-        p50LatencyNs = lat[n / 2];
-        p99LatencyNs = lat[(int) (n * 0.99)];
+        long[] sorted = lat.clone();
+        Arrays.sort(sorted);
+        p50LatencyNs = sorted[n / 2];
+        p99LatencyNs = sorted[(int) (n * 0.99)];
+        maxLatencyNs = sorted[n - 1];
+        latencyBuckets = List.of(
+                bucket("no match", lat, depth, 0, 0),
+                bucket("shallow (1–2)", lat, depth, 1, 2),
+                bucket("mid (3–5)", lat, depth, 3, 5),
+                bucket("deep sweep (6+)", lat, depth, 6, Integer.MAX_VALUE));
     }
 
-    private void benchOp(OrderBook b, Random r, long mid, long[] lat, int i) {
+    private void benchOp(OrderBook b, Random r, long mid, long[] lat, int[] depth, int i) {
         long t0 = lat != null ? System.nanoTime() : 0;
+        int d;
         double u = r.nextDouble();
         if (u < 0.2) {
-            b.submit("t" + (i & 7), r.nextBoolean() ? Side.BUY : Side.SELL, OrderType.MARKET, TimeInForce.IOC, false, 0, 1 + r.nextInt(5));
+            d = b.submit("t" + (i & 7), r.nextBoolean() ? Side.BUY : Side.SELL, OrderType.MARKET, TimeInForce.IOC, false, 0, 1 + r.nextInt(5)).trades().size();
         } else {
             Side s = r.nextBoolean() ? Side.BUY : Side.SELL;
             long px = s == Side.BUY ? mid - 1 - r.nextInt(5) : mid + 1 + r.nextInt(5);
-            b.submit("m" + (i & 15), s, OrderType.LIMIT, TimeInForce.GTC, false, px, 1 + r.nextInt(9));
+            d = b.submit("m" + (i & 15), s, OrderType.LIMIT, TimeInForce.GTC, false, px, 1 + r.nextInt(9)).trades().size();
         }
-        if (lat != null) lat[i] = System.nanoTime() - t0;
+        if (lat != null) { lat[i] = System.nanoTime() - t0; depth[i] = d; }
+    }
+
+    private static ExchangeDtos.LatencyBucket bucket(String label, long[] lat, int[] depth, int lo, int hi) {
+        long[] tmp = new long[lat.length];
+        int m = 0;
+        for (int i = 0; i < lat.length; i++) {
+            if (depth[i] >= lo && depth[i] <= hi) tmp[m++] = lat[i];
+        }
+        if (m == 0) return new ExchangeDtos.LatencyBucket(label, 0, 0, 0);
+        long[] s = Arrays.copyOf(tmp, m);
+        Arrays.sort(s);
+        return new ExchangeDtos.LatencyBucket(label, s[m / 2], s[(int) (m * 0.99)], m);
     }
 
     /** Records trades (for the tape) and counts accepted orders (for throughput). */

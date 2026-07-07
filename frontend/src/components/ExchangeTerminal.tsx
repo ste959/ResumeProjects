@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { api } from '../api/client';
 import type { ExLevel, ExQueueOrder, ExStats, ExTrade } from '../api/types';
 import { useExchangeStream } from '../hooks/useExchangeStream';
+import { ExchangeAnalytics } from './ExchangeAnalytics';
 
 // The one screen: our matching engine, live. A price-time-priority limit order book you can watch
 // match in real time — the market maker and agent flow trade continuously, and you can place your
@@ -61,6 +62,7 @@ export function ExchangeTerminal() {
             </div>
           </div>
           <Queue bidQueue={snapshot.bidQueue} askQueue={snapshot.askQueue} />
+          <ExchangeAnalytics />
         </>
       )}
     </div>
@@ -93,11 +95,19 @@ function Stat({ label, value, sub, tone, accent }: { label: string; value: strin
 }
 
 // ── order book ────────────────────────────────────────────────────────────────────────────────
+const BOOK_ROWS = 11;
+
 function OrderBook({ bids, asks, stats, traded }: { bids: ExLevel[]; asks: ExLevel[]; stats: ExStats; traded: Set<number> }) {
-  const rows = 11;
-  const showAsks = asks.slice(0, rows);
-  const showBids = bids.slice(0, rows);
-  const maxSize = Math.max(1e-9, ...showAsks.map((l) => l.size), ...showBids.map((l) => l.size));
+  // Always render a fixed number of rows per side (padding with empty slots) so the book — and the
+  // rest of the page — never reflows as levels come and go.
+  const pad = (arr: ExLevel[]) => {
+    const out: (ExLevel | null)[] = arr.slice(0, BOOK_ROWS);
+    while (out.length < BOOK_ROWS) out.push(null);
+    return out;
+  };
+  const showAsks = pad(asks);
+  const showBids = pad(bids);
+  const maxSize = Math.max(1e-9, ...asks.slice(0, BOOK_ROWS).map((l) => l.size), ...bids.slice(0, BOOK_ROWS).map((l) => l.size));
 
   return (
     <div className="xt-book">
@@ -106,20 +116,23 @@ function OrderBook({ bids, asks, stats, traded }: { bids: ExLevel[]; asks: ExLev
         <div className="xt-book-cols"><span>Price</span><span>Size (BTC)</span><span>Orders</span></div>
       </div>
       <div className="xt-book-body">
-        {showAsks.slice().reverse().map((l, i) => <BookRow key={`a${i}`} l={l} side="ask" maxSize={maxSize} flash={traded.has(l.price)} />)}
+        {showAsks.slice().reverse().map((l, i) => <BookRow key={`a${i}`} l={l} side="ask" maxSize={maxSize} flash={l != null && traded.has(l.price)} />)}
         <div className="xt-mid">
           <span className="xtm-side bid">{usd(Number(bids[0]?.price ?? stats.mid))}</span>
           <span className="xtm-spread">{stats.spreadBps == null ? '—' : `${stats.spreadBps.toFixed(1)} bps spread`}</span>
           <span className="xtm-side ask">{usd(Number(asks[0]?.price ?? stats.mid))}</span>
         </div>
-        {showBids.map((l, i) => <BookRow key={`b${i}`} l={l} side="bid" maxSize={maxSize} flash={traded.has(l.price)} />)}
+        {showBids.map((l, i) => <BookRow key={`b${i}`} l={l} side="bid" maxSize={maxSize} flash={l != null && traded.has(l.price)} />)}
       </div>
       <div className="xt-book-foot">Depth bars ∝ size · <b>MM</b> = market-maker quote · <b>YOU</b> = your order · levels flash on a match</div>
     </div>
   );
 }
 
-function BookRow({ l, side, maxSize, flash }: { l: ExLevel; side: 'bid' | 'ask'; maxSize: number; flash: boolean }) {
+function BookRow({ l, side, maxSize, flash }: { l: ExLevel | null; side: 'bid' | 'ask'; maxSize: number; flash: boolean }) {
+  if (l == null) {
+    return <div className={`xt-row ${side} empty-row`}><span /><span /><span /></div>;
+  }
   const w = Math.min(100, (l.size / maxSize) * 100);
   return (
     <div className={`xt-row ${side} ${flash ? 'flash' : ''} ${l.you ? 'you' : ''}`}>

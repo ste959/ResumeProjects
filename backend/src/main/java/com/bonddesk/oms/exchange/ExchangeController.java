@@ -1,5 +1,6 @@
 package com.bonddesk.oms.exchange;
 
+import com.bonddesk.oms.exchange.ExchangeDtos.AnalyticsView;
 import com.bonddesk.oms.exchange.ExchangeDtos.PlaceRequest;
 import com.bonddesk.oms.exchange.ExchangeDtos.PlaceResponse;
 import com.bonddesk.oms.exchange.ExchangeDtos.Snapshot;
@@ -30,6 +31,12 @@ public class ExchangeController {
     @Operation(summary = "Current market-data snapshot (book + trades + engine stats)")
     public Snapshot snapshot() {
         return sim.snapshot();
+    }
+
+    @GetMapping("/analytics")
+    @Operation(summary = "Market-maker analytics: P&L attribution, latency-by-match-depth, and the fill log")
+    public AnalyticsView analytics() {
+        return sim.analytics();
     }
 
     @PostMapping("/orders")

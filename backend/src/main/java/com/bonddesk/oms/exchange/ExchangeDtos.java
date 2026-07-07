@@ -40,4 +40,23 @@ public final class ExchangeDtos {
 
     public record PlaceResponse(long orderId, String status, String reason, int trades,
                                 double filledSize, double restingSize) {}
+
+    // ── market-maker analytics ──────────────────────────────────────────────────────────────────
+    public record AnalyticsView(PnlAttribution pnl, LatencyReport latency, List<FillView> fills, Summary summary) {}
+
+    /** Maker P&L split: spread captured (+), adverse selection (−), and the open-inventory residual. */
+    public record PnlAttribution(double totalUsd, double spreadCapturedUsd, double adverseSelectionUsd,
+                                 double inventoryUsd, long markedOutFills) {}
+
+    public record LatencyReport(long p50Ns, long p99Ns, long maxNs, List<LatencyBucket> byMatchDepth, String note) {}
+
+    /** Latency grouped by how many resting orders the submit matched — where the spikes come from. */
+    public record LatencyBucket(String depth, long p50Ns, long p99Ns, long count) {}
+
+    /** One maker fill for the sortable log. {@code markoutBps} is null until the fill matures. */
+    public record FillView(long seq, long tick, String side, double price, double size, String aggressor,
+                           double spreadBps, double inventory, double edgeBps, Double markoutBps) {}
+
+    public record Summary(long fills, long adverseFills, double informedShare,
+                          double avgEdgeBps, double avgMarkoutBps) {}
 }

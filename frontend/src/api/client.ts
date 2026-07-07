@@ -11,6 +11,7 @@ import type {
   DeskRiskSummary,
   DeskSummary,
   EquityStatus,
+  ExAnalytics,
   ExecutionQuality,
   Findings,
   ModifyStrategyRequest,
@@ -154,6 +155,7 @@ export const api = {
     request<PlaceExResponse>('/exchange/orders', { method: 'POST', body: JSON.stringify(req) }),
   cancelExchangeOrder: (id: number) =>
     request<{ orderId: number; cancelled: boolean }>(`/exchange/orders/${id}/cancel`, { method: 'POST' }),
+  exchangeAnalytics: () => request<ExAnalytics>('/exchange/analytics'),
 
   // Research service (Python/FastAPI over the mds research layer).
   researchHealth: () =>

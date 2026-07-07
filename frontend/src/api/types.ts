@@ -441,6 +441,22 @@ export interface PlaceExResponse {
   restingSize: number;
 }
 
+export interface ExPnlAttribution {
+  totalUsd: number;
+  spreadCapturedUsd: number;
+  adverseSelectionUsd: number;
+  inventoryUsd: number;
+  markedOutFills: number;
+}
+export interface ExLatencyBucket { depth: string; p50Ns: number; p99Ns: number; count: number }
+export interface ExLatencyReport { p50Ns: number; p99Ns: number; maxNs: number; byMatchDepth: ExLatencyBucket[]; note: string }
+export interface ExFillView {
+  seq: number; tick: number; side: string; price: number; size: number; aggressor: string;
+  spreadBps: number; inventory: number; edgeBps: number; markoutBps: number | null;
+}
+export interface ExSummary { fills: number; adverseFills: number; informedShare: number; avgEdgeBps: number; avgMarkoutBps: number }
+export interface ExAnalytics { pnl: ExPnlAttribution; latency: ExLatencyReport; fills: ExFillView[]; summary: ExSummary }
+
 // ---- Fixed-income OTC desk (RFQ), yield curve, bond analytics, tax ----
 
 export interface DealerQuote {

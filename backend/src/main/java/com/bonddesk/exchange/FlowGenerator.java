@@ -37,11 +37,11 @@ public final class FlowGenerator {
         for (int i = 0; i < intensity; i++) {
             double u = rng.nextDouble();
             if (u < 0.45) {
-                // noise maker — passive liquidity a few ticks off the fair
+                // noise maker — passive liquidity a few ticks off the fair (participant "MKRn")
                 Side side = rng.nextBoolean() ? Side.BUY : Side.SELL;
                 long off = 1 + rng.nextInt((int) quoteRange);
                 long px = side == Side.BUY ? fairTicks - off : fairTicks + off;
-                SubmitResult r = book.submit("noise" + rng.nextInt(24), side, OrderType.LIMIT,
+                SubmitResult r = book.submit("MKR" + rng.nextInt(24), side, OrderType.LIMIT,
                         TimeInForce.GTC, false, px, 1 + rng.nextInt(3));
                 if (r.status() == SubmitResult.Status.RESTING) {
                     recent[ring] = r.orderId();
@@ -55,15 +55,14 @@ public final class FlowGenerator {
                     recent[idx] = 0;
                 }
             } else {
-                // taker — informed (toward the move) or noise (random)
-                Side side;
-                if (rng.nextDouble() < informedFraction && Math.abs(signal) > 1e-9) {
-                    side = signal > 0 ? Side.BUY : Side.SELL;
-                } else {
-                    side = rng.nextBoolean() ? Side.BUY : Side.SELL;
-                }
-                book.submit("taker" + rng.nextInt(24), side, OrderType.MARKET, TimeInForce.IOC,
-                        false, 0, 1 + rng.nextInt(4));
+                // taker — informed (toward the move, participant "INFn") or noise ("NSEn"). The
+                // participant prefix lets the analytics attribute the maker's adverse selection to
+                // informed vs. uninformed flow.
+                boolean informed = rng.nextDouble() < informedFraction && Math.abs(signal) > 1e-9;
+                Side side = informed ? (signal > 0 ? Side.BUY : Side.SELL)
+                        : (rng.nextBoolean() ? Side.BUY : Side.SELL);
+                String who = (informed ? "INF" : "NSE") + rng.nextInt(24);
+                book.submit(who, side, OrderType.MARKET, TimeInForce.IOC, false, 0, 1 + rng.nextInt(4));
             }
         }
     }
