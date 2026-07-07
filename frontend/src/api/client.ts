@@ -1,11 +1,14 @@
 import type {
+  BacktestResult,
   BookView,
+  Construction,
   CreateOrderRequest,
   CreateStrategyRequest,
   CryptoPosition,
   DeskRiskSummary,
   DeskSummary,
   ExecutionQuality,
+  Findings,
   MicroSnapshot,
   Order,
   PaperOrder,
@@ -14,6 +17,7 @@ import type {
   ProductQuote,
   Security,
   SecurityVolume,
+  SignalMeta,
   StrategyView,
   TradePrint,
   ApiError,
@@ -24,6 +28,8 @@ import type {
 const BASE = (import.meta.env.VITE_API_BASE ?? '') + '/api';
 // The risk microservice is exposed under /risk by the dev proxy and nginx.
 const RISK_BASE = (import.meta.env.VITE_API_BASE ?? '') + '/risk';
+// The Python research service (FastAPI) is exposed under /research.
+const RESEARCH_BASE = (import.meta.env.VITE_API_BASE ?? '') + '/research';
 
 /** Error carrying the parsed {@link ApiError} body so callers can show field errors. */
 export class HttpError extends Error {
@@ -103,4 +109,17 @@ export const api = {
   createStrategy: (req: CreateStrategyRequest) =>
     request<StrategyView>('/strategies', { method: 'POST', body: JSON.stringify(req) }),
   stopStrategy: (id: string) => request<StrategyView>(`/strategies/${id}/stop`, { method: 'POST' }),
+
+  // Research service (Python/FastAPI over the mds research layer).
+  researchHealth: () =>
+    request<{ status: string; snapshot: boolean; signals: number }>('/health', undefined, RESEARCH_BASE),
+  researchSignals: () => request<SignalMeta[]>('/signals', undefined, RESEARCH_BASE),
+  researchBacktest: (signal: string, costBps: number, neutralize: boolean) =>
+    request<BacktestResult>(
+      `/backtest?signal=${encodeURIComponent(signal)}&cost_bps=${costBps}&neutralize=${neutralize}`,
+      undefined,
+      RESEARCH_BASE,
+    ),
+  researchFindings: () => request<Findings>('/findings', undefined, RESEARCH_BASE),
+  researchConstruction: () => request<Construction>('/construction', undefined, RESEARCH_BASE),
 };

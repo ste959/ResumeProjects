@@ -39,6 +39,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/factortiming.py` | **regime-conditional factor timing** — rotate the family mix & time exposure on the FRED credit/VIX state, then vol-budget the book |
 | `mds/structuring.py` | **options structuring overlay** — Black–Scholes tail hedge / covered-call / collar sized off the live IV surface |
 | `mds/taxaware.py` | **tax-aware rebalancing** — tax-lot accounting, HIFO vs FIFO, wash sales, long/short holding periods (after-tax edge) |
+| `service/` | **research bridge (FastAPI)** — exposes the layer to the front-end Research Lab: live backtests + the honest-null / construction snapshot (see [`service/README.md`](service/README.md)) |
 
 The stat-arb study below is the entry point; the microstructure-ML, cross-sectional, portfolio,
 capacity and **portfolio-construction** layers (Phases 5–7) are documented in

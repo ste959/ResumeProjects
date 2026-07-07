@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api } from './api/client';
 import type { Security } from './api/types';
 import { AnalyticsPanel } from './components/AnalyticsPanel';
+import { Architecture } from './components/Architecture';
 import { Blotter } from './components/Blotter';
 import { LiveMarket } from './components/LiveMarket';
 import { OrderTicket } from './components/OrderTicket';
-import { Overview } from './components/Overview';
 import { Positions } from './components/Positions';
+import { ResearchLab } from './components/ResearchLab';
 import { RiskDashboard } from './components/RiskDashboard';
 import { Signals } from './components/Signals';
 import { Strategies } from './components/Strategies';
@@ -14,33 +16,35 @@ import { usePolling } from './hooks/usePolling';
 
 const PORTFOLIO = 'PORT-DEMO';
 
-type Tab = 'overview' | 'trading' | 'risk' | 'analytics' | 'market' | 'strategies' | 'signals';
-
-// Grouped navigation — the structure that tells the "multi-desk platform" story.
-const NAV: { group: string | null; items: { key: Tab; label: string }[] }[] = [
-  { group: null, items: [{ key: 'overview', label: 'Overview' }] },
+// Navigation re-organized around the three quant personas the platform demonstrates
+// (SWE builds infra · researcher finds alpha · trader executes & manages risk). Each destination is
+// a "story surface" — a self-explaining view of one part of the backend, not just a function tab.
+type Persona = 'core' | 'swe' | 'qr' | 'qt';
+interface NavItem { path: string; label: string; persona: Persona }
+const NAV: { group: string | null; items: NavItem[] }[] = [
+  { group: null, items: [{ path: '/', label: 'Architecture', persona: 'core' }] },
+  { group: 'Research', items: [{ path: '/research', label: 'Research Lab', persona: 'qr' }] },
   {
     group: 'Fixed Income',
     items: [
-      { key: 'trading', label: 'Desk' },
-      { key: 'risk', label: 'Risk' },
-      { key: 'analytics', label: 'Analytics' },
+      { path: '/fixed-income', label: 'Desk', persona: 'qt' },
+      { path: '/risk', label: 'Risk & TCA', persona: 'qt' },
     ],
   },
   {
     group: 'Live Markets',
     items: [
-      { key: 'market', label: 'Market' },
-      { key: 'strategies', label: 'Strategies' },
-      { key: 'signals', label: 'Signals' },
+      { path: '/microstructure', label: 'Microstructure', persona: 'swe' },
+      { path: '/execution', label: 'Execution', persona: 'qt' },
     ],
   },
 ];
 
-export default function App() {
+function Shell() {
+  const nav = useNavigate();
+  const loc = useLocation();
   const [securities, setSecurities] = useState<Security[]>([]);
   const [secError, setSecError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('overview');
 
   const orders = usePolling(api.orders, 2000);
   const positions = usePolling(useCallback(() => api.positions(PORTFOLIO), []), 2000);
@@ -75,7 +79,12 @@ export default function App() {
             <div className="nav-group" key={i}>
               {section.group && <span className="nav-group-label">{section.group}</span>}
               {section.items.map((it) => (
-                <button key={it.key} className={tab === it.key ? 'active' : ''} onClick={() => setTab(it.key)}>
+                <button
+                  key={it.path}
+                  className={loc.pathname === it.path ? 'active' : ''}
+                  data-persona={it.persona}
+                  onClick={() => nav(it.path)}
+                >
                   {it.label}
                 </button>
               ))}
@@ -96,82 +105,90 @@ export default function App() {
         </div>
       )}
 
-      {tab === 'overview' && (
-        <main className="risk-main">
-          <Overview onNavigate={(t) => setTab(t as Tab)} />
-        </main>
-      )}
+      <Routes>
+        <Route path="/" element={<Architecture />} />
 
-      {tab === 'trading' && (
-        <main className="layout">
-          <aside className="sidebar">
-            <OrderTicket securities={securities} portfolio={PORTFOLIO} onSubmitted={refresh} />
-          </aside>
-          <section className="content">
-            <Blotter orders={orders.data ?? []} onChanged={refresh} />
-            <Positions positions={positions.data ?? []} />
-          </section>
-        </main>
-      )}
+        <Route path="/research" element={<ResearchLab />} />
 
-      {tab === 'risk' && (
-        <main className="risk-main">
-          <div className="risk-intro">
-            <span className={`dot ${risk.error == null ? 'live' : 'down'}`} />
-            Aggregated by the <b>risk microservice</b> from the Kafka <code>order-events</code> stream
-          </div>
-          <RiskDashboard summary={risk.data} />
-        </main>
-      )}
+        <Route
+          path="/fixed-income"
+          element={
+            <main className="layout">
+              <aside className="sidebar">
+                <OrderTicket securities={securities} portfolio={PORTFOLIO} onSubmitted={refresh} />
+              </aside>
+              <section className="content">
+                <Blotter orders={orders.data ?? []} onChanged={refresh} />
+                <Positions positions={positions.data ?? []} />
+              </section>
+            </main>
+          }
+        />
 
-      {tab === 'analytics' && (
-        <main className="risk-main">
-          <div className="risk-intro">
-            <span className={`dot ${deskSummary.error == null ? 'live' : 'down'}`} />
-            Reporting &amp; TCA computed by the backend in <b>hand-written SQL</b> (joins, aggregates,
-            window functions)
-          </div>
-          <AnalyticsPanel
-            summary={deskSummary.data}
-            execQuality={execQuality.data ?? []}
-            topSecurities={topSecurities.data ?? []}
-          />
-        </main>
-      )}
+        <Route
+          path="/risk"
+          element={
+            <main className="risk-main">
+              <div className="risk-intro">
+                <span className={`dot ${risk.error == null ? 'live' : 'down'}`} />
+                Aggregated by the <b>risk microservice</b> from the Kafka <code>order-events</code> stream
+              </div>
+              <RiskDashboard summary={risk.data} />
+              <div className="risk-intro">
+                <span className={`dot ${deskSummary.error == null ? 'live' : 'down'}`} />
+                Reporting &amp; TCA computed by the backend in <b>hand-written SQL</b> (joins, aggregates,
+                window functions)
+              </div>
+              <AnalyticsPanel
+                summary={deskSummary.data}
+                execQuality={execQuality.data ?? []}
+                topSecurities={topSecurities.data ?? []}
+              />
+            </main>
+          }
+        />
 
-      {tab === 'market' && (
-        <main className="risk-main">
-          <div className="risk-intro">
-            <span className="dot live" />
-            Live <b>Coinbase</b> order book (real depth &amp; price action) — paper-trade against genuine
-            liquidity with real slippage
-          </div>
-          <LiveMarket />
-        </main>
-      )}
+        <Route
+          path="/microstructure"
+          element={
+            <main className="risk-main">
+              <div className="risk-intro">
+                <span className="dot live" />
+                Live <b>Coinbase</b> order book (real depth &amp; price action) with{' '}
+                <b>microstructure signals</b> — imbalance, microprice premium, spread &amp; an
+                information coefficient
+              </div>
+              <LiveMarket />
+              <Signals />
+            </main>
+          }
+        />
 
-      {tab === 'strategies' && (
-        <main className="risk-main">
-          <div className="risk-intro">
-            <span className="dot live" />
-            Execution algos (TWAP / POV / Almgren–Chriss) &amp; an <b>Avellaneda–Stoikov market maker</b>
-            running live on the Coinbase feed, with transaction-cost analysis
-          </div>
-          <Strategies />
-        </main>
-      )}
+        <Route
+          path="/execution"
+          element={
+            <main className="risk-main">
+              <div className="risk-intro">
+                <span className="dot live" />
+                Execution algos (TWAP / POV / Almgren–Chriss) &amp; an{' '}
+                <b>Avellaneda–Stoikov market maker</b> running live on the Coinbase feed, with TCA
+              </div>
+              <Strategies />
+            </main>
+          }
+        />
 
-      {tab === 'signals' && (
-        <main className="risk-main">
-          <div className="risk-intro">
-            <span className="dot live" />
-            Live <b>microstructure signals</b> from the Coinbase book — order-book imbalance, microprice
-            premium, spread, and an imbalance information coefficient
-          </div>
-          <Signals />
-        </main>
-      )}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Shell />
+    </BrowserRouter>
   );
 }
 

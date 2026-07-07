@@ -1,0 +1,4 @@
+# Research service — extends the research layer's own pinned deps (../requirements.txt) with the web
+# framework. Install both:  pip install -r ../requirements.txt -r requirements.txt
+fastapi==0.115.6
+uvicorn[standard]==0.34.0

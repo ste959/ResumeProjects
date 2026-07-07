@@ -19,6 +19,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/risk/, '/api/risk'),
       },
+      // Research service lives on :8082; expose under /research.
+      // /research/backtest -> http://localhost:8082/api/research/backtest
+      '/research': {
+        target: process.env.VITE_RESEARCH_TARGET ?? 'http://localhost:8082',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/research/, '/api/research'),
+      },
     },
   },
 });

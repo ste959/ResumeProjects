@@ -80,6 +80,16 @@ services:
     ports:
       - "8081:8081"
 
+  research-service:
+    build:
+      context: ./research
+      dockerfile: service/Dockerfile
+    volumes:
+      # The columnar warehouse (bars/fundamentals/macro/options), read-only, so live backtests work.
+      - ./research/data:/app/data:ro
+    ports:
+      - "8082:8082"
+
   frontend:
     build: ./frontend
     depends_on:

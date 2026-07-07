@@ -1,0 +1,338 @@
+{
+  "findings": {
+    "universe": {
+      "names": 123,
+      "days": 1491,
+      "start": "2020-07-27",
+      "end": "2026-07-02"
+    },
+    "signals": [
+      {
+        "name": "momentum",
+        "label": "12\u20131 Momentum",
+        "family": "momentum",
+        "net_sharpe": 0.5601198773611659,
+        "hac_t": 1.353090958374913,
+        "turnover": 0.10463727031547336,
+        "significant": false
+      },
+      {
+        "name": "risk_adj_mom",
+        "label": "Risk-Adjusted Momentum",
+        "family": "momentum",
+        "net_sharpe": 0.5342836857550801,
+        "hac_t": 1.2644957943254131,
+        "turnover": 0.10380278438767429,
+        "significant": false
+      },
+      {
+        "name": "sector_rel_mom",
+        "label": "Sector-Relative Momentum",
+        "family": "momentum",
+        "net_sharpe": 0.4102679988599458,
+        "hac_t": 0.9839629235917127,
+        "turnover": 0.10433115057393055,
+        "significant": false
+      },
+      {
+        "name": "trade_size_trend",
+        "label": "Participation Trend",
+        "family": "flow",
+        "net_sharpe": 0.38307372035080955,
+        "hac_t": 0.9845541075737164,
+        "turnover": 0.154793960359263,
+        "significant": false
+      },
+      {
+        "name": "earnings_yield",
+        "label": "Earnings Yield",
+        "family": "value",
+        "net_sharpe": 0.25257405037907565,
+        "hac_t": 0.637488658424054,
+        "turnover": 0.02713565253052486,
+        "significant": false
+      },
+      {
+        "name": "accruals",
+        "label": "Accruals (Sloan)",
+        "family": "quality",
+        "net_sharpe": 0.10712599266295175,
+        "hac_t": 0.2578150137804853,
+        "turnover": 0.011911667462034717,
+        "significant": false
+      },
+      {
+        "name": "overnight",
+        "label": "Overnight Return",
+        "family": "momentum",
+        "net_sharpe": 0.04879028236460497,
+        "hac_t": 0.12761021975241696,
+        "turnover": 0.26645285264086305,
+        "significant": false
+      },
+      {
+        "name": "asset_growth",
+        "label": "Asset Growth",
+        "family": "quality",
+        "net_sharpe": 0.0005652333887070162,
+        "hac_t": 0.0013631108621512133,
+        "turnover": 0.019642749829600698,
+        "significant": false
+      },
+      {
+        "name": "gross_profitability",
+        "label": "Gross Profitability",
+        "family": "quality",
+        "net_sharpe": -0.40113905503792024,
+        "hac_t": -1.022508221442799,
+        "turnover": 0.0028361552038094896,
+        "significant": false
+      },
+      {
+        "name": "idio_vol",
+        "label": "Idiosyncratic-Vol",
+        "family": "low_risk",
+        "net_sharpe": -0.4441198161711626,
+        "hac_t": -1.0875102378535269,
+        "turnover": 0.029843539578922638,
+        "significant": false
+      },
+      {
+        "name": "roe",
+        "label": "Return on Equity",
+        "family": "quality",
+        "net_sharpe": -0.5874754034136714,
+        "hac_t": -1.4261226000375138,
+        "turnover": 0.011935934320195735,
+        "significant": false
+      },
+      {
+        "name": "bab",
+        "label": "Betting-Against-Beta",
+        "family": "low_risk",
+        "net_sharpe": -0.6416913083348643,
+        "hac_t": -1.561898533680601,
+        "turnover": 0.037987867984425445,
+        "significant": false
+      },
+      {
+        "name": "low_vol",
+        "label": "Low Volatility",
+        "family": "low_risk",
+        "net_sharpe": -0.9044085351133655,
+        "hac_t": -2.3156643999168063,
+        "turnover": 0.1292201581835951,
+        "significant": false
+      },
+      {
+        "name": "max_lottery",
+        "label": "Anti-Lottery (MAX)",
+        "family": "low_risk",
+        "net_sharpe": -0.9104738437512742,
+        "hac_t": -2.269555018492002,
+        "turnover": 0.15075559048909548,
+        "significant": false
+      },
+      {
+        "name": "reversal",
+        "label": "Short-term Reversal",
+        "family": "reversal",
+        "net_sharpe": -1.0087283599792565,
+        "hac_t": -2.821049280997127,
+        "turnover": 0.6236212832435235,
+        "significant": false
+      },
+      {
+        "name": "flow_pressure",
+        "label": "Order-Flow Pressure",
+        "family": "flow",
+        "net_sharpe": -1.1043149534405912,
+        "hac_t": -2.7899441043204116,
+        "turnover": 0.6321210962190512,
+        "significant": false
+      },
+      {
+        "name": "sector_rel_rev",
+        "label": "Sector-Relative Reversal",
+        "family": "reversal",
+        "net_sharpe": -1.11566640909826,
+        "hac_t": -3.241358233935972,
+        "turnover": 0.6282885678890505,
+        "significant": true
+      },
+      {
+        "name": "vwap_pressure",
+        "label": "Close-vs-VWAP Pressure",
+        "family": "reversal",
+        "net_sharpe": -1.153775844164687,
+        "hac_t": -2.931776504417488,
+        "turnover": 0.639736635420686,
+        "significant": false
+      }
+    ],
+    "selection": {
+      "best": "momentum",
+      "best_label": "12\u20131 Momentum",
+      "deflated_sharpe": 0.08030244081018595,
+      "pbo": 0.17857142857142858,
+      "bonferroni_z": 2.991316115183781,
+      "n_trials": 18
+    },
+    "verdict": "No signal clears the Bonferroni bar |t|>2.99 for 18 trials; best Deflated Sharpe 0.08 (needs >0.95), PBO 0.18. An honest null \u2014 the price/fundamental data on mega-caps is breadth-limited, not the technique."
+  },
+  "construction": {
+    "composite": {
+      "ic_mean": 0.013942701916307792,
+      "ic_t": 3.382069798314377,
+      "net_sharpe": 0.3100269043343362,
+      "hac_t": 0.7818233652951893,
+      "turnover": 0.09236210800960946,
+      "best_single": "earnings_yield",
+      "best_single_label": "Earnings Yield",
+      "best_single_sharpe": 0.6407736135003861
+    },
+    "families": [
+      {
+        "name": "value",
+        "neutral_sharpe": 0.6339383459726012,
+        "role": "medium-horizon premium"
+      },
+      {
+        "name": "quality",
+        "neutral_sharpe": -0.652872996971857,
+        "role": "medium-horizon premium"
+      },
+      {
+        "name": "momentum",
+        "neutral_sharpe": 0.24785163065859359,
+        "role": "medium-horizon premium"
+      },
+      {
+        "name": "reversal",
+        "neutral_sharpe": -1.735985912018766,
+        "role": "short-horizon (excluded)"
+      },
+      {
+        "name": "low_risk",
+        "neutral_sharpe": -0.9367474022045226,
+        "role": "defensive \u2192 vol-scaled"
+      },
+      {
+        "name": "flow",
+        "neutral_sharpe": -1.3786376336510693,
+        "role": "short-horizon (excluded)"
+      }
+    ],
+    "riskmodel": [
+      {
+        "book": "z-score (dollar-neutral)",
+        "net_sharpe": 0.33455504994649543,
+        "hac_t": 0.8531542450647971,
+        "turnover": 0.09388474799165518,
+        "net_beta": 0.07387042294755088,
+        "max_drawdown": -0.09037578355532272
+      },
+      {
+        "book": "\u03b2+sector-neutralized",
+        "net_sharpe": 0.3100269043343362,
+        "hac_t": 0.7818233652951893,
+        "turnover": 0.09236210800960946,
+        "net_beta": 0.007651566441113609,
+        "max_drawdown": -0.07680410753124345
+      },
+      {
+        "book": "risk-model optimized",
+        "net_sharpe": 0.5372645909874545,
+        "hac_t": 1.2432389055559814,
+        "turnover": 0.009369951534733443,
+        "net_beta": 0.009945181733292412,
+        "max_drawdown": -0.039472870957425465
+      }
+    ],
+    "timing": {
+      "static_sharpe": 0.3100269043343362,
+      "timed_sharpe": 0.31193653170636404,
+      "mkt_raw_sharpe": 0.9209525256279746,
+      "mkt_raw_dd": -0.2279308182766987,
+      "mkt_timed_sharpe": 0.9621121409652782,
+      "mkt_timed_dd": -0.10136957172536454,
+      "dd_cut": 0.12656124655133416
+    },
+    "structuring": {
+      "available": true,
+      "asof": "2026-07-07",
+      "n_names": 123,
+      "vrp_count": 74,
+      "median_iv": 0.35357232216586054,
+      "median_skew": 0.016314231102512955,
+      "tail_hedge": {
+        "annual_drag": 0.03661989038932756,
+        "cheap_drag": 0.0063691934307172895,
+        "avg_iv": 0.4012552306547851,
+        "median_dte": 10.0
+      },
+      "overwrite": [
+        {
+          "symbol": "CHTR",
+          "atm_iv": 0.8507394162436548,
+          "premium_pct": 0.036337767549066695,
+          "vrp": 0.22472995377570326
+        },
+        {
+          "symbol": "UNH",
+          "atm_iv": 0.5317728831582209,
+          "premium_pct": 0.016685103179048005,
+          "vrp": 0.2532552883725755
+        },
+        {
+          "symbol": "T",
+          "atm_iv": 0.487766955616584,
+          "premium_pct": 0.014151436792629469,
+          "vrp": 0.1255773681247847
+        },
+        {
+          "symbol": "BKNG",
+          "atm_iv": 0.47551309912854056,
+          "premium_pct": 0.013459101193243797,
+          "vrp": 0.06705168069285944
+        },
+        {
+          "symbol": "ADBE",
+          "atm_iv": 0.46413107854430646,
+          "premium_pct": 0.012821834204127712,
+          "vrp": -0.029921415251477124
+        }
+      ]
+    },
+    "tax": [
+      {
+        "method": "hifo",
+        "tax": 563713.2359863878,
+        "net_short_term": 1172490.6263157271,
+        "net_long_term": 649458.5212478439,
+        "lt_fraction": 0.27909897981820975,
+        "wash_disallowed": 176039.4942864228,
+        "deferred_gain": 504838.6226161466
+      },
+      {
+        "method": "fifo",
+        "tax": 581144.3103634872,
+        "net_short_term": 1181091.7865524814,
+        "net_long_term": 720701.7466953456,
+        "lt_fraction": 0.30059161977929927,
+        "wash_disallowed": 174352.303886684,
+        "deferred_gain": 423307.0465321499
+      },
+      {
+        "method": "lifo",
+        "tax": 574097.5982291822,
+        "net_short_term": 1210722.4566895093,
+        "net_long_term": 630651.4462703186,
+        "lt_fraction": 0.27164035321881,
+        "wash_disallowed": 171623.23633570893,
+        "deferred_gain": 480997.60926917475
+      }
+    ],
+    "verdict": "Combining/risk-modelling/timing doesn't manufacture a significant standalone alpha on 123 mega-caps \u2014 but the structuring layers deliver real value (a factor-neutral, turnover-capped book at a third the drawdown; exposure timing that halves the directional drawdown; HIFO tax alpha) that needs no significant signal."
+  }
+}

@@ -248,3 +248,115 @@ export interface ApiError {
   path: string;
   fieldErrors?: Record<string, string>;
 }
+
+// ---- Research service (Python/FastAPI bridge over the mds research layer) ----
+
+export interface SignalMeta {
+  name: string;
+  family: string;
+  label: string;
+  desc: string;
+}
+
+export interface EquityPoint {
+  date: string;
+  value: number;
+}
+
+export interface BacktestResult {
+  signal: string;
+  label: string;
+  family: string;
+  cost_bps: number;
+  neutralized: boolean;
+  net_sharpe: number | null;
+  gross_sharpe: number | null;
+  hac_t: number | null;
+  boot_lo: number | null;
+  boot_hi: number | null;
+  ann_return: number | null;
+  max_drawdown: number | null;
+  avg_turnover: number | null;
+  days: number;
+  bonferroni_z: number | null;
+  significant: boolean;
+  equity_curve: EquityPoint[];
+  verdict: string;
+}
+
+export interface FindingRow {
+  name: string;
+  label: string;
+  family: string;
+  net_sharpe: number | null;
+  hac_t: number | null;
+  turnover: number | null;
+  significant: boolean;
+}
+
+export interface Findings {
+  universe: { names: number; days: number; start: string; end: string };
+  signals: FindingRow[];
+  selection: {
+    best: string;
+    best_label: string;
+    deflated_sharpe: number | null;
+    pbo: number | null;
+    bonferroni_z: number | null;
+    n_trials: number;
+  };
+  verdict: string;
+}
+
+export interface BookRow {
+  book: string;
+  net_sharpe: number | null;
+  hac_t: number | null;
+  turnover: number | null;
+  net_beta: number | null;
+  max_drawdown: number | null;
+}
+
+export interface Construction {
+  composite: {
+    ic_mean: number | null;
+    ic_t: number | null;
+    net_sharpe: number | null;
+    hac_t: number | null;
+    turnover: number | null;
+    best_single: string;
+    best_single_label: string;
+    best_single_sharpe: number | null;
+  };
+  families: { name: string; neutral_sharpe: number | null; role: string }[];
+  riskmodel: BookRow[];
+  timing: {
+    static_sharpe: number | null;
+    timed_sharpe: number | null;
+    mkt_raw_sharpe: number | null;
+    mkt_raw_dd: number | null;
+    mkt_timed_sharpe: number | null;
+    mkt_timed_dd: number | null;
+    dd_cut: number | null;
+  };
+  structuring: {
+    available: boolean;
+    asof?: string;
+    n_names?: number;
+    vrp_count?: number;
+    median_iv?: number | null;
+    median_skew?: number | null;
+    tail_hedge?: { annual_drag: number | null; cheap_drag: number | null; avg_iv: number | null; median_dte: number | null } | null;
+    overwrite?: { symbol: string; atm_iv: number | null; premium_pct: number | null; vrp: number | null }[];
+  };
+  tax: {
+    method: string;
+    tax: number | null;
+    net_short_term: number | null;
+    net_long_term: number | null;
+    lt_fraction: number | null;
+    wash_disallowed: number | null;
+    deferred_gain: number | null;
+  }[];
+  verdict: string;
+}
