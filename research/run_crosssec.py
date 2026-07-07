@@ -45,6 +45,49 @@ def verdict(results: dict[str, dict], hac_t: dict[str, float], dsr: float, pbo: 
             "read: a clean harness that finds no edge distinguishable from noise or from selection.")
 
 
+def _realism_and_power(sigs: dict, rets, results: dict, best: str) -> None:
+    """WS3/WS4: statistical power, beta/sector neutralization, cost sensitivity, regime stability."""
+    import numpy as np
+
+    n_best = results[best]["days"]
+    mds = val.min_detectable_sharpe(n_best)
+    print("\nRealism & power:")
+    print(f"  Power: with {n_best} active days this sample can only reliably detect (80% power) an "
+          f"annualized Sharpe ≳ {mds:.2f}. Every observed |Sharpe| is below that — UNDERPOWERED by")
+    print("    construction (40 survivorship-selected mega-caps, ~4.4y); a null is 'too little data'.")
+
+    sig = sigs[best]
+    rw, nw = xs.raw_weights(sig), xs.neutralized_weights(sig, rets)
+    raw_b = float(xs.book_beta(rw, rets).abs().mean())
+    neu_b = float(xs.book_beta(nw, rets).abs().mean())
+    nbt = xs.backtest(sig, rets, weights=nw)
+    nt = val.newey_west_sharpe_tstat(nbt["net"].dropna().to_numpy())
+    print(f"  Neutralization ('{best}'): mean |net market β| {raw_b:.3f} (dollar-neutral only) → "
+          f"{neu_b:.3f} (β + sector-neutral).")
+    print(f"    Factor-neutral book net Sharpe {nbt['net_sharpe']:+.2f} (HAC t={nt:+.2f}).")
+
+    adv = xs.dollar_adv_panel()
+    print(f"  Cost sensitivity ('{best}' net Sharpe; √-law impact coef σ·Y≈2% assumed):")
+    for label, kw in [
+        ("flat 5bps (spread+fee)", dict(cost_bps=5.0)),
+        ("+ impact @ $100M book", dict(cost_bps=5.0, impact_coef=0.02, dollar_vol=adv, gross_capital=1e8)),
+        ("+ impact @ $1B book", dict(cost_bps=5.0, impact_coef=0.02, dollar_vol=adv, gross_capital=1e9)),
+        ("+ impact $1B + 50bps borrow", dict(cost_bps=5.0, impact_coef=0.02, dollar_vol=adv,
+                                             gross_capital=1e9, borrow_bps=50.0)),
+        ("flat 20bps (stress)", dict(cost_bps=20.0)),
+    ]:
+        print(f"    {label:<28} {xs.backtest(sig, rets, **kw)['net_sharpe']:>+6.2f}")
+    print("    (impact scales with book size — the capacity limit; the edge is not robust to it.)")
+
+    net_best = results[best]["net"].dropna()
+    yrs = []
+    for yr, g in net_best.groupby(net_best.index.year):
+        if len(g) > 20 and g.std(ddof=0) > 0:
+            yrs.append(f"{yr}:{g.mean() / g.std(ddof=0) * np.sqrt(252):+.2f}")
+    print(f"  Regime stability ('{best}' net Sharpe by year): " + "  ".join(yrs))
+    print("    (One blended number hides regime dependence; the sign flips across years.)")
+
+
 def main() -> None:
     px, rets = xs.returns_panel()
     print(f"Universe: {px.shape[1]} names, {px.shape[0]} days "
@@ -85,6 +128,8 @@ def main() -> None:
           "after deflating for multiple testing; >0.95 is the bar)")
     print(f"  PBO (prob. of backtest overfitting): {pbo_res['pbo']:.3f}   over "
           f"{pbo_res['n_combos']} CPCV splits — the chance the in-sample-best signal is beaten OOS")
+
+    _realism_and_power(sigs, rets, results, best)
 
     print(f"\nVerdict: {verdict(results, hac_t, dsr, pbo_res['pbo'])}")
     print("\n(All signals are price/volume-only — no fundamentals in the free feed. Caveats: free "

@@ -53,3 +53,7 @@ def test_pbo_high_for_noise_lower_for_a_dominant_strategy():
     dominant[:, 0] += 0.004                                     # one genuinely better strategy
     p_dom = val.pbo(dominant, n_splits=10)["pbo"]
     assert p_dom < p_noise
+
+
+def test_min_detectable_sharpe_decreases_with_more_data():
+    assert val.min_detectable_sharpe(250) > val.min_detectable_sharpe(2500) > 0

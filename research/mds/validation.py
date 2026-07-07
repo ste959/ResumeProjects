@@ -110,6 +110,19 @@ def deflated_sharpe(sharpe_ppp: float, n_obs: int, skew: float, kurt: float,
     return float(norm.cdf((sharpe_ppp - sr0) / np.sqrt(var_sr)))
 
 
+def min_detectable_sharpe(n_obs: int, ppy: int = TRADING_DAYS, alpha: float = 0.05,
+                          power: float = 0.80) -> float:
+    """The smallest ANNUALIZED Sharpe this sample could reliably detect: (z_α/2 + z_power)·√(ppy/n).
+    If the observed Sharpe is well below this, the study is UNDERPOWERED — a null result says 'too
+    little data to tell', not 'no effect exists'. This is the honest counterweight to a survivorship-
+    selected, short sample."""
+    from scipy.stats import norm
+
+    if n_obs < 2:
+        return float("inf")
+    return float((norm.ppf(1 - alpha / 2) + norm.ppf(power)) * np.sqrt(ppy / n_obs))
+
+
 def pbo(returns_matrix, n_splits: int = 12) -> dict:
     """Probability of Backtest Overfitting via combinatorially-symmetric cross-validation
     (Bailey, Borwein, López de Prado, Zhu, 2016). Split time into S blocks; for every way of

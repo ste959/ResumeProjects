@@ -315,6 +315,26 @@ momentum, P&L correlation ≈ 0 — but loses money on this 2020–2024 high-bet
 but-unprofitable is not a diversifier, so even with six signals there is effectively *one* bet, which is
 why the Phase 6 optimizer can't beat it.)
 
+**Realism, power, and regime — four checks that finish the honest picture** (`run_crosssec.py`):
+
+- **Statistical power.** With ~863 active days this sample can only detect (80% power) an annualized
+  Sharpe **≳ 1.5**. Every signal is far below that, so the null is *"too little data to tell"* — a
+  survivorship-selected 40-name, 4.4-year universe is **underpowered by construction**, and the honest
+  fix is a broader point-in-time universe (the one genuine data dependency), not more signals.
+- **Beta + sector neutralization.** Dollar-neutral alone is a toy; the book is now residualized against
+  market β and GICS sector, dropping mean |net β| from **0.14 → 0.00**. The neutral book's net Sharpe
+  falls (**+0.45 → +0.23**), i.e. part of the raw "edge" was uncompensated factor/sector exposure.
+- **Cost realism (capacity).** Adding a √-law market-impact term (participation vs ADV) and short
+  borrow, the best signal's net Sharpe goes **+0.45 (frictionless) → −0.24 ($100M book) → −1.62 ($1B)**.
+  The edge is not robust to impact, and impact scales with size — the capacity wall, quantified on the
+  equity book rather than only in the crypto engine.
+- **Regime dependence.** Per-year net Sharpe **flips sign** (2021 −1.5, 2022 +1.7, 2023 −1.0, 2024 +0.9);
+  one blended number hides that the "signal" is really a few regime bets.
+
+Together these turn "no significant edge" from a p-value into a fully-argued conclusion: underpowered
+data, an edge that is partly factor exposure, dies to realistic impact at size, and isn't stable across
+regimes. That is what an honest research note looks like.
+
 ## Portfolio construction (Phase 6 — the quant *trader*)
 
 **Naive:** run mean-variance on the signals' historical returns and trust the optimal weights.
@@ -385,6 +405,8 @@ they can't drift silently.
 | Markout horizon drifts long on **sparse** tapes | Biases the adverse-selection metric (not P&L) on thin/synthetic sessions | `BacktestService` markouts |
 | Capacity model uses **linear** (Kyle-λ) impact; real impact is concave (√-law) | Over-penalises small size, under-penalises very large — capacity `C*` is indicative, not a number to trade on | `capacity.py` |
 | Crowding λ proxied from **turnover**, not measured; crowd assumed **identical** players | The read-across capacities are illustrative; real crowds are heterogeneous and λ needs real ADV/impact data | `capacity.py`, `run_capacity.py` |
+| Equity √-law impact coefficient (σ·Y ≈ 2%) is **assumed**, and free-IEX volume **understates** ADV | The cost-sensitivity capacity numbers are directional, not calibrated; understated ADV makes impact *conservative* (over-charged) | `crosssec.py` impact model |
+| Sectors are a **static hardcoded** GICS map for the 40 names | Fine for neutralization here, but not point-in-time (a name's sector can change); a real book uses a maintained classification | `crosssec.SECTORS` |
 
 ### Bugs found by adversarial review and fixed (with regression tests)
 

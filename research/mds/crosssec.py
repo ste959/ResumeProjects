@@ -113,18 +113,102 @@ def _xs_zscore(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.sub(mean, axis=0).div(std, axis=0)
 
 
-def backtest(signal: pd.DataFrame, rets: pd.DataFrame, cost_bps: float = 5.0) -> dict:
-    """Backtest a cross-sectional signal as a dollar-neutral, unit-gross portfolio."""
-    weights = _xs_zscore(signal)
-    # Dollar-neutral, unit gross exposure: scale so the day's absolute weights sum to 1.
-    gross_exposure = weights.abs().sum(axis=1).replace(0, np.nan)
-    weights = weights.div(gross_exposure, axis=0).fillna(0.0)
+# GICS-style sector map for the demo universe — used to build a genuinely sector-neutral book
+# (dollar-neutral alone is a toy; a real cross-sectional book neutralizes factor and sector risk).
+SECTORS = {
+    **dict.fromkeys(["AAPL", "MSFT", "NVDA", "AVGO", "AMD", "INTC", "CRM", "ORCL", "CSCO",
+                     "QCOM", "TXN", "IBM"], "InfoTech"),
+    **dict.fromkeys(["GOOGL", "META", "NFLX", "DIS"], "CommSvcs"),
+    **dict.fromkeys(["AMZN", "TSLA", "HD"], "ConsDisc"),
+    **dict.fromkeys(["JPM", "BAC", "WFC", "GS", "MS", "C", "V", "MA"], "Financials"),
+    **dict.fromkeys(["XOM", "CVX", "COP"], "Energy"),
+    **dict.fromkeys(["JNJ", "UNH", "PFE", "MRK", "ABBV"], "HealthCare"),
+    **dict.fromkeys(["PG", "KO", "PEP", "WMT", "COST"], "Staples"),
+}
+
+
+def dollar_adv_panel(window: int = 20) -> pd.DataFrame:
+    """Trailing average dollar volume (close × share volume) per name — an ADV proxy for the market-
+    impact model. Shifted so day-t sizing uses only volume through t−1. NB: free IEX volume is a
+    fraction of consolidated volume, so this OVERSTATES impact (a conservative bias)."""
+    bars = ad.load_bars()
+    dv = (ad.close_panel(bars, "close") * ad.close_panel(bars, "volume")).sort_index()
+    return dv.rolling(window, min_periods=5).mean().shift(1)
+
+
+def neutralize(weights: pd.DataFrame, beta: pd.DataFrame, sectors: dict) -> pd.DataFrame:
+    """Residualize each day's weights against market beta AND sector dummies, then renormalize to
+    unit gross. The residual is orthogonal to beta and to every sector, so the book is beta- and
+    sector-neutral — not merely dollar-neutral. This is the difference between a toy long/short and
+    an investable factor-neutral one."""
+    sec = pd.Series(sectors).reindex(weights.columns)
+    dummies = pd.get_dummies(sec, dtype=float).to_numpy()          # (M symbols × K sectors)
+    out = pd.DataFrame(0.0, index=weights.index, columns=weights.columns)
+    W, B = weights.to_numpy(), beta.reindex_like(weights).to_numpy()
+    for i in range(len(weights)):
+        w = W[i]
+        cols = np.where(np.isfinite(w) & (w != 0))[0]
+        if len(cols) < 4:
+            continue
+        wv = w[cols]
+        b = B[i, cols]
+        b = np.where(np.isfinite(b), b, np.nanmean(b) if np.isfinite(b).any() else 0.0)
+        X = np.column_stack([b - b.mean(), dummies[cols]])         # sectors span the constant
+        X = X[:, X.std(axis=0) > 0]                                # drop absent sectors
+        coef, *_ = np.linalg.lstsq(X, wv, rcond=None)
+        out.iloc[i, cols] = wv - X @ coef                          # residual: β- and sector-neutral
+    g = out.abs().sum(axis=1).replace(0, np.nan)
+    return out.div(g, axis=0).fillna(0.0)
+
+
+def raw_weights(signal: pd.DataFrame) -> pd.DataFrame:
+    """Dollar-neutral, unit-gross weights from a signal (the toy book)."""
+    w = _xs_zscore(signal)
+    g = w.abs().sum(axis=1).replace(0, np.nan)
+    return w.div(g, axis=0).fillna(0.0)
+
+
+def neutralized_weights(signal: pd.DataFrame, rets: pd.DataFrame) -> pd.DataFrame:
+    """Beta- and sector-neutral weights for a signal (the investable book)."""
+    return neutralize(raw_weights(signal), _rolling_beta(rets, _loo_market(rets)), SECTORS)
+
+
+def book_beta(weights: pd.DataFrame, rets: pd.DataFrame) -> pd.Series:
+    """The portfolio's net market beta each day = Σ_i w_i · β_i (held one day, no look-ahead)."""
+    beta = _rolling_beta(rets, _loo_market(rets)).reindex_like(weights)
+    return (weights.shift(1) * beta).sum(axis=1, skipna=True)
+
+
+def backtest(signal: pd.DataFrame, rets: pd.DataFrame, cost_bps: float = 5.0, *,
+             weights: pd.DataFrame | None = None, impact_coef: float = 0.0,
+             borrow_bps: float = 0.0, dollar_vol: pd.DataFrame | None = None,
+             gross_capital: float = 1e7) -> dict:
+    """Backtest a cross-sectional signal as a dollar-neutral, unit-gross portfolio.
+
+    Costs: a flat `cost_bps` per unit turnover (half-spread + fee); optionally a square-root
+    **market-impact** term (`impact_coef`·√participation, participation = trade$/ADV$) and a
+    **short-borrow/financing** charge (`borrow_bps` annual on the short leg). Pass pre-built
+    `weights` (e.g. beta/sector-neutralized) to bypass the raw z-score construction."""
+    if weights is None:
+        weights = _xs_zscore(signal)
+        gross_exposure = weights.abs().sum(axis=1).replace(0, np.nan)
+        weights = weights.div(gross_exposure, axis=0).fillna(0.0)  # dollar-neutral, unit gross
 
     # Held one day: weights decided at t earn the t→t+1 return (no look-ahead).
     held = weights.shift(1)
     gross = (held * rets).sum(axis=1, skipna=True)
-    turnover = (weights - weights.shift(1)).abs().sum(axis=1)
+    dtrade = (weights - weights.shift(1)).abs()
+    turnover = dtrade.sum(axis=1)
     costs = turnover * (cost_bps / 1e4)
+
+    # Market impact (√-law) and short borrow — off by default (impact_coef=0, borrow_bps=0).
+    if impact_coef > 0 and dollar_vol is not None:
+        adv = dollar_vol.reindex_like(weights)
+        participation = (dtrade * gross_capital / adv).clip(lower=0).fillna(0.0)
+        costs = costs + (impact_coef * np.sqrt(participation) * dtrade).sum(axis=1)
+    if borrow_bps > 0:
+        short_gross = held.clip(upper=0).abs().sum(axis=1)         # ~0.5 of unit gross
+        costs = costs + short_gross * (borrow_bps / 1e4) / TRADING_DAYS
     net = gross - costs
 
     # Active period only: during a signal's warm-up (e.g. 252-day momentum) every weight is 0,

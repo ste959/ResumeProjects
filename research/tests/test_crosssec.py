@@ -79,3 +79,35 @@ def test_signals_returns_expected_keys_and_shape():
     assert set(sigs) == {"momentum", "reversal", "low_vol", "bab", "idio_vol", "risk_adj_mom"}
     for s in sigs.values():
         assert s.shape == px.shape
+
+
+def test_neutralize_is_sector_neutral_and_cuts_net_beta():
+    idx = pd.date_range("2020-01-01", periods=400)
+    rng = np.random.default_rng(0)
+    syms = list("ABCDEF")
+    rets = pd.DataFrame(rng.normal(0, 0.01, (400, 6)), index=idx, columns=syms)
+    sig = pd.DataFrame(rng.normal(size=(400, 6)), index=idx, columns=syms)
+    sectors = {"A": "X", "B": "X", "C": "X", "D": "Y", "E": "Y", "F": "Y"}
+    rw = xs.raw_weights(sig)
+    beta = xs._rolling_beta(rets, xs._loo_market(rets))
+    nw = xs.neutralize(rw, beta, sectors)
+    # Residual is orthogonal to each sector dummy → per-sector weights sum to ~0.
+    last = nw.iloc[-1]
+    for s in ("X", "Y"):
+        members = [k for k, v in sectors.items() if v == s]
+        assert abs(last[members].sum()) < 1e-9
+    # And the book's net market beta is smaller than the dollar-neutral-only book's.
+    assert xs.book_beta(nw, rets).abs().mean() < xs.book_beta(rw, rets).abs().mean()
+
+
+def test_backtest_impact_scales_with_book_size():
+    idx = pd.date_range("2020-01-01", periods=300)
+    rng = np.random.default_rng(2)
+    syms = list("ABCDE")
+    rets = pd.DataFrame(rng.normal(0, 0.01, (300, 5)), index=idx, columns=syms)
+    sig = pd.DataFrame(rng.normal(size=(300, 5)), index=idx, columns=syms)
+    adv = pd.DataFrame(1e7, index=idx, columns=syms)          # small ADV → impact is visible
+    base = xs.backtest(sig, rets, cost_bps=5.0)
+    small = xs.backtest(sig, rets, cost_bps=5.0, impact_coef=0.02, dollar_vol=adv, gross_capital=1e7)
+    big = xs.backtest(sig, rets, cost_bps=5.0, impact_coef=0.02, dollar_vol=adv, gross_capital=1e9)
+    assert big["net"].sum() < small["net"].sum() < base["net"].sum()   # more capital → more impact
