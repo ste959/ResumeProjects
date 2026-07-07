@@ -44,16 +44,17 @@ def main() -> None:
         {name: xs.backtest(sig, rets, cost_bps=5.0)["net"] for name, sig in sigs.items()}
     ).dropna()
 
-    print(f"Signals: {list(net.columns)}   ({len(net)} days)\n")
+    zbar = val.bonferroni_z(len(net.columns))        # family-corrected bar, consistent with run_crosssec
+    print(f"Signals: {list(net.columns)}   ({len(net)} days, aligned)\n")
     print("Individual signals (after-cost Sharpe, HAC significance + bootstrap CI):")
-    print(f"  {'signal':<10} {'Sharpe':>7} {'HAC t':>7} {'boot 95% CI':>16} {'sig?':>5}")
+    print(f"  {'signal':<14} {'Sharpe':>7} {'HAC t':>7} {'boot 95% CI':>16} {'sig?':>5}")
     best_single_name, best_single = None, -1e9
     for col in net.columns:
         s = pf.sharpe(net[col])
         t = val.newey_west_sharpe_tstat(net[col].to_numpy())
         lo, hi = val.block_bootstrap_sharpe_ci(net[col].to_numpy())
-        print(f"  {col:<10} {s:>+7.2f} {t:>+7.2f} [{lo:>+5.2f},{hi:>+5.2f}] "
-              f"{'yes' if abs(t) >= 1.96 else 'no':>5}")
+        print(f"  {col:<14} {s:>+7.2f} {t:>+7.2f} [{lo:>+5.2f},{hi:>+5.2f}] "
+              f"{'yes' if abs(t) >= zbar else 'no':>5}")
         if s > best_single:
             best_single_name, best_single = col, s
 
@@ -66,12 +67,12 @@ def main() -> None:
         t = val.newey_west_sharpe_tstat(combined.to_numpy())
         lo, hi = val.block_bootstrap_sharpe_ci(combined.to_numpy())
         print(f"  {method:<12} {m['sharpe']:>+7.2f} {t:>+7.2f} [{lo:>+5.2f},{hi:>+5.2f}] "
-              f"{'yes' if abs(t) >= 1.96 else 'no':>5} {m['ann_return']:>+9.1%} {m['max_drawdown']:>+8.1%}")
+              f"{'yes' if abs(t) >= zbar else 'no':>5} {m['ann_return']:>+9.1%} {m['max_drawdown']:>+8.1%}")
         if m["sharpe"] > best_alloc:
             best_alloc_name, best_alloc = method, m["sharpe"]
 
-    print("  (HAC t: Newey–West autocorrelation-consistent; CI: moving-block bootstrap. "
-          "Selection-aware DSR/PBO across the signal set are in run_crosssec.py.)")
+    print(f"  (HAC t: Newey–West; CI: moving-block bootstrap. 'sig?' uses the Bonferroni bar "
+          f"|t|>{zbar:.2f} for {len(net.columns)} signals. Selection-aware DSR/PBO are in run_crosssec.py.)")
     print(f"\nBest single signal: {best_single_name} ({best_single:+.2f}).  "
           f"Best allocation: {best_alloc_name} ({best_alloc:+.2f}).")
     if best_alloc > best_single + 0.05:
@@ -80,9 +81,10 @@ def main() -> None:
         print("Allocation does NOT beat the best single signal — honest, and expected when most of "
               "the signals are weak: an optimizer cannot manufacture alpha from bad inputs "
               "(garbage in, garbage out). Its value shows up with a richer set of GOOD signals.")
-    print("Significance note: none of these Sharpes clears |t|>~2, so none is statistically "
-          "distinguishable from zero at this sample size — the allocation study is machinery, "
-          "not a claimed edge.")
+    print("Significance note: on this aligned window only a high-turnover LOSER (sector_rel_rev) "
+          "clears the corrected bar, and it is not significant on its own full sample (run_crosssec) — "
+          "window-dependent, and a costed loser regardless. No positive edge is distinguishable from "
+          "zero; the allocation study is machinery, not a claimed edge.")
 
 
 if __name__ == "__main__":

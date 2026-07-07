@@ -110,6 +110,16 @@ def deflated_sharpe(sharpe_ppp: float, n_obs: int, skew: float, kurt: float,
     return float(norm.cdf((sharpe_ppp - sr0) / np.sqrt(var_sr)))
 
 
+def bonferroni_z(n_tests: int, alpha: float = 0.05) -> float:
+    """Two-sided Bonferroni-adjusted |t| bar for `n_tests` simultaneous tests: Φ⁻¹(1 − α/(2·N)).
+    Applied SYMMETRICALLY — a 'significant loser' must clear the same corrected bar as a winner, or
+    it is just as much a multiple-testing artefact. With N=11 signals this is ≈ 2.9, not 1.96."""
+    from scipy.stats import norm
+
+    n = max(int(n_tests), 1)
+    return float(norm.ppf(1.0 - alpha / (2.0 * n)))
+
+
 def min_detectable_sharpe(n_obs: int, ppy: int = TRADING_DAYS, alpha: float = 0.05,
                           power: float = 0.80) -> float:
     """The smallest ANNUALIZED Sharpe this sample could reliably detect: (z_α/2 + z_power)·√(ppy/n).

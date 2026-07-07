@@ -57,3 +57,9 @@ def test_pbo_high_for_noise_lower_for_a_dominant_strategy():
 
 def test_min_detectable_sharpe_decreases_with_more_data():
     assert val.min_detectable_sharpe(250) > val.min_detectable_sharpe(2500) > 0
+
+
+def test_bonferroni_z_tightens_with_more_tests():
+    assert abs(val.bonferroni_z(1) - 1.959964) < 1e-3          # single test = the usual 1.96
+    assert val.bonferroni_z(1) < val.bonferroni_z(11) < val.bonferroni_z(100)
+    assert abs(val.bonferroni_z(11) - 2.84) < 0.05             # 11 tests → ~2.84

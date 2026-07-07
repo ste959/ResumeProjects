@@ -94,9 +94,14 @@ def signal_split(res: dict, signal) -> dict:
     entangle the answer with inventory management the way one-sided quoting would."""
     if res["n_fills"] == 0:
         return {"aligned_net_bps": 0.0, "contra_net_bps": 0.0, "aligned_fills": 0, "contra_fills": 0}
-    sig = np.nan_to_num(np.asarray(signal, dtype=float))[res["idx"]]
-    aligned = np.sign(sig) == res["side"]
-    a, c = res["net"][aligned], res["net"][~aligned]
+    sig = np.asarray(signal, dtype=float)[res["idx"]]
+    # Only fills the model actually SCORED are eligible: drop unpredicted (NaN, e.g. walk-forward
+    # warm-up) and zero-sign fills from BOTH buckets — dumping them into "contra" would contaminate
+    # it and understate the signal's discrimination.
+    scored = np.isfinite(sig) & (sig != 0)
+    s = np.sign(sig[scored])
+    side, net = res["side"][scored], res["net"][scored]
+    a, c = net[s == side], net[s != side]
     return {
         "aligned_net_bps": float(a.mean()) if len(a) else float("nan"),
         "contra_net_bps": float(c.mean()) if len(c) else float("nan"),

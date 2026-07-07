@@ -26,23 +26,26 @@ def _daily_sharpe(net: pd.Series) -> float:
 
 
 def verdict(results: dict[str, dict], hac_t: dict[str, float], dsr: float, pbo: float) -> str:
-    # A signal is an edge only if it clears autocorrelation-consistent significance AND survives
-    # deflation for the number tried. DSR > 0.95 and PBO well below 0.5 are the bars.
-    sig = {n: t for n, t in hac_t.items() if abs(t) >= 1.96 and results[n]["net_sharpe"] > 0}
-    if sig and dsr > 0.95 and pbo < 0.3:
-        best = max(sig, key=lambda n: results[n]["net_sharpe"])
-        return (f"'{best}' clears HAC significance (t={hac_t[best]:+.2f}), a Deflated Sharpe of "
-                f"{dsr:.2f}, and PBO {pbo:.2f}. A defensible candidate — still validate on a broader "
-                "universe and live.")
-    losers = [n for n, t in hac_t.items() if t <= -1.96 and results[n]["net_sharpe"] < 0]
-    lnote = ""
-    if losers:
-        lw = min(losers, key=lambda n: results[n]["net_sharpe"])
-        lnote = (f" The only HAC-significant result is a LOSER: '{lw}' (net Sharpe "
-                 f"{results[lw]['net_sharpe']:+.2f}, HAC t={hac_t[lw]:+.2f}).")
-    return (f"NO edge survives honest statistics. Best Deflated Sharpe {dsr:.2f} (needs >0.95) and "
-            f"PBO {pbo:.2f} (a {pbo:.0%} chance the best backtest is overfit).{lnote} The rigorous "
-            "read: a clean harness that finds no edge distinguishable from noise or from selection.")
+    # Significance is judged against the SAME multiple-testing-corrected bar for winners AND losers
+    # (a 'significant loser' is just as much a selection artefact). Bonferroni over all N signals.
+    n = len(results)
+    zbar = val.bonferroni_z(n)                       # ≈2.9 for N=11
+    passers = {nm: hac_t[nm] for nm in results if abs(hac_t[nm]) >= zbar}
+    winners = {nm: t for nm, t in passers.items() if results[nm]["net_sharpe"] > 0}
+    if winners and dsr > 0.95 and pbo < 0.3:
+        best = max(winners, key=lambda nm: results[nm]["net_sharpe"])
+        return (f"'{best}' clears the Bonferroni bar (|t|>{zbar:.2f} for {n} tests, t={hac_t[best]:+.2f}), "
+                f"Deflated Sharpe {dsr:.2f}, PBO {pbo:.2f} — a defensible candidate; validate live.")
+    if passers:
+        nm = max(passers, key=lambda k: abs(hac_t[k]))
+        role = "LOSER" if results[nm]["net_sharpe"] < 0 else "winner"
+        tail = (f" Only '{nm}' (t={hac_t[nm]:+.2f}, a {role}) clears the corrected bar |t|>{zbar:.2f}.")
+    else:
+        tail = (f" Applied symmetrically, NO signal — winner OR loser — clears the multiple-testing-"
+                f"corrected bar (|t|>{zbar:.2f} for {n} tests): even the naively 'significant' reversal "
+                "is a selection artefact, not a real effect.")
+    return (f"NO edge survives honest statistics. Deflated Sharpe of best {dsr:.2f} (needs >0.95), "
+            f"PBO {pbo:.2f}.{tail} A clean harness that finds nothing distinguishable from noise or selection.")
 
 
 def _realism_and_power(sigs: dict, rets, results: dict, best: str) -> None:
@@ -105,15 +108,17 @@ def main() -> None:
     hac_t = {n: val.newey_west_sharpe_tstat(r["net"].dropna().to_numpy()) for n, r in results.items()}
     boot = {n: val.block_bootstrap_sharpe_ci(r["net"].dropna().to_numpy()) for n, r in results.items()}
 
-    print(f"  {'signal':<10} {'net Shrp':>9} {'HAC t':>7} {'boot 95% CI':>16} {'sig?':>5} "
+    zbar = val.bonferroni_z(len(results))            # family-corrected |t| bar (same for all signals)
+    print(f"  {'signal':<14} {'net Shrp':>9} {'HAC t':>7} {'boot 95% CI':>16} {'sig?':>5} "
           f"{'turnover':>9} {'days':>6}")
     for name, r in results.items():
         lo, hi = boot[name]
-        s = "yes" if abs(hac_t[name]) >= 1.96 else "no"
-        print(f"  {name:<10} {r['net_sharpe']:>+9.2f} {hac_t[name]:>+7.2f} "
+        s = "yes" if abs(hac_t[name]) >= zbar else "no"
+        print(f"  {name:<14} {r['net_sharpe']:>+9.2f} {hac_t[name]:>+7.2f} "
               f"[{lo:>+5.2f},{hi:>+5.2f}] {s:>5} {r['avg_turnover']:>9.2f} {r['days']:>6}")
-    print("  (HAC t: Newey–West, autocorrelation-consistent — deflates the naive IID t on "
-          "overlapping-window signals. CI: moving-block bootstrap, distribution-free.)")
+    print(f"  (HAC t: Newey–West, autocorrelation-consistent. 'sig?' uses the BONFERRONI bar "
+          f"|t|>{zbar:.2f} for {len(results)} simultaneous tests — applied to winners and losers alike. "
+          "CI: moving-block bootstrap.)")
 
     # Selection-aware statistics across the whole signal set: Deflated Sharpe + PBO.
     from scipy.stats import kurtosis, skew
@@ -140,7 +145,9 @@ def main() -> None:
     print(f"\n(All signals are price/volume-only — no fundamentals in the free feed. Caveats: free "
           f"IEX ~4.5y history, {px.shape[1]} survivorship-selected large caps across 11 GICS sectors; "
           "a real study needs longer, point-in-time membership with delistings. Underpowered by "
-          "construction — see the power line above.)")
+          "construction — see the power line. Note: signal lookbacks are conventional and were NOT "
+          "swept, so the true researcher degrees-of-freedom exceed the "
+          f"{len(results)}-signal family the DSR/Bonferroni already correct for.)")
 
 
 if __name__ == "__main__":

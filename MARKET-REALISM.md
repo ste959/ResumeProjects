@@ -286,9 +286,11 @@ Validated on the ground truth above, the pipeline behaves correctly and the hone
 | SYNTH signal (α=2.5) | +0.922 (t≈90) | recovers the planted signal — hugely significant — but **dies after spread** at tick frequency |
 | REAL BTC-USD microstructure | +0.289 (t≈91) | a real, *strongly significant* predictive signal, yet **untradable** as a taker (fees) *and* as a maker (locked book) — see the maker study below |
 | REAL equity momentum (cross-sectional, 123 names) | — | net +0.34 at low turnover (0.11) — **HAC t ≈ +0.66: not significant** |
-| REAL equity risk-adjusted momentum | — | net +0.47, a cleaner momentum but correlated to it — **HAC t ≈ +0.88: also not significant** |
-| REAL equity reversal | — | net −1.01, **HAC t ≈ −2.34: the ONLY statistically significant result — and it's a loser** |
-| REAL equity low-vol / betting-against-beta / idio-vol | — | all negative (net −0.23 to −0.65), none significant — the low-risk family |
+| REAL equity risk-adjusted momentum | — | net +0.47 (best), correlated to momentum — **HAC t ≈ +0.88: not significant** |
+| REAL equity reversal | — | net −1.01, HAC t ≈ −2.34 — high-turnover loser, **fails the Bonferroni bar |t|>2.84** |
+| REAL equity low-vol / BAB / idio-vol | — | all negative (net −0.23 to −0.65), none significant — the low-risk family |
+| REAL equity **sector-relative momentum** (new) | — | net −0.13, **HAC t ≈ −0.25: ≈0 — confirms raw momentum's edge was sector exposure** |
+| REAL equity overnight / VWAP-pressure / MAX (new) | — | all losers, none significant; the short-horizon ones are the biggest |t| but at ~0.63 turnover |
 
 Two lessons the whole layer is built to teach. First, **what survives is low turnover, not high IC** — a
 +0.29 IC that trades every tick is worthless; IC is not tradability. Note the discipline in the IC column:
@@ -311,22 +313,30 @@ died to fees, the maker dies to a locked book: a real signal with no microstruct
 truer conclusion than the taker test alone could reach. Second, and more important once we
 report **t-stats and confidence intervals** (see `run_crosssec.py`): **no signal clears statistical
 significance.** Momentum's +0.34 Sharpe sounds like an edge but its 95% CI straddles zero (HAC t ≈ 0.66) on a
-survivorship-selected **123-name**, 4.4-year sample; the *only* significant result is reversal, and it loses.
-The honest headline is therefore **a rigorous harness that finds no edge distinguishable from noise** —
-not a momentum finding, and it *holds on a 3× broader universe* (40→123 names did not rescue it). This is
-now *computed, not asserted* (`run_crosssec.py`, via `mds/validation.py`):
-significance uses an **autocorrelation-consistent Newey–West** t-stat (not a naive IID one) with a
-**block-bootstrap** CI; and across the six signals the **Deflated Sharpe** of the best is **≈0.31** —
-far below the 0.95 bar — meaning after correcting for the six tries there is only a ~30% chance its true
-Sharpe is even positive, while the **Probability of Backtest Overfitting** (CPCV) is ≈0.10. The
-walk-forward itself is now **purged and embargoed** (gap ≥ the label horizon) so the label can't leak
-across the train/test boundary. Reporting these — rather than presenting the positive point estimate as
-alpha — is the discipline.
+survivorship-selected **123-name**, 4.4-year sample. This is now *computed, not asserted*
+(`mds/validation.py`): significance uses an **autocorrelation-consistent Newey–West** t-stat (not a naive
+IID one) with a **block-bootstrap** CI, and the multiple-testing bar is applied **symmetrically** — a
+Bonferroni-corrected **|t| > 2.84 for 11 tests**, to winners *and* losers alike. Under that bar **NO signal
+— winner or loser — is significant**; even the naively "significant" reversal (HAC t ≈ −2.34) is a
+selection artefact, not a real effect. Across the eleven signals the **Deflated Sharpe** of the best is
+**≈0.21** (bar 0.95 — after correcting for the tries, ~21% chance its true Sharpe is even positive) and the
+**PBO** (CPCV) is **≈0.25**. The walk-forward is **purged and embargoed** so the label can't leak across the
+train/test boundary. Reporting these — rather than the positive point estimate — is the discipline.
 
-(The expansion still teaches a portfolio lesson: the low-risk family is beautifully *orthogonal* to
-momentum, P&L correlation ≈ 0 — but loses money on this 2020–2024 high-beta-growth regime. Orthogonal-
-but-unprofitable is not a diversifier, so even with six signals there is effectively *one* bet, which is
-why the Phase 6 optimizer can't beat it.)
+The set was **expanded to eleven** signals to test hypotheses the results raised, tapping the previously-
+unused OHLC/vwap fields (§ signal design): sector-relative momentum, an overnight-return factor, sector-
+relative reversal, close-vs-VWAP pressure, MAX/lottery. None found alpha (the null held), but two added
+*insight*: (1) **sector-relative momentum nets ≈0 (HAC t −0.25)** — the name-specific, sector-neutral part
+of momentum has no edge, empirically confirming that raw momentum's apparent edge was **uncompensated
+sector exposure** (the same thing neutralization showed: +0.47 → +0.09). (2) The three short-horizon
+signals (reversal, sector-relative reversal, VWAP-pressure) are the largest |t| **losers** at high turnover
+(~0.63) — a real short-term *continuation/microstructure* effect exists but is un-monetizable at that
+turnover. Adding five signals also correctly **raised the Deflated-Sharpe bar** (0.31 → 0.21), the honest
+cost of more tries.
+
+(The low-risk family is beautifully *orthogonal* to momentum, P&L correlation ≈ 0 — but loses money on this
+2020–2024 high-beta-growth regime. Orthogonal-but-unprofitable is not a diversifier, so there is still
+effectively *one* weak bet, which is why the Phase 6 optimizer can't beat it.)
 
 **Realism, power, and regime — four checks that finish the honest picture** (`run_crosssec.py`):
 

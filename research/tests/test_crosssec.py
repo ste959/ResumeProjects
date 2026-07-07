@@ -70,13 +70,20 @@ def test_idio_vol_zero_for_pure_market_positive_for_noise():
 
 
 def test_signals_returns_expected_keys_and_shape():
-    idx = pd.date_range("2020-01-01", periods=400)
+    idx = pd.date_range("2020-01-01", periods=400, freq="B")
     rng = np.random.default_rng(2)
+    syms = list("ABCDE")
     px = pd.DataFrame(100 * np.exp(np.cumsum(rng.normal(0, 0.01, (400, 5)), axis=0)),
-                      index=idx, columns=list("ABCDE"))
+                      index=idx, columns=syms)
     rets = np.log(px).diff()
-    sigs = xs.signals(px, rets)
-    assert set(sigs) == {"momentum", "reversal", "low_vol", "bab", "idio_vol", "risk_adj_mom"}
+    # Inject a synthetic OHLCV+vwap bars frame so the OHLC-based signals compute without the cache.
+    bars = pd.concat([
+        pd.DataFrame({"symbol": s, "ts": idx, "open": px[s].shift(1).bfill(), "high": px[s] * 1.01,
+                      "low": px[s] * 0.99, "close": px[s], "volume": 1e6, "vwap": px[s], "trades": 100})
+        for s in syms], ignore_index=True)
+    sigs = xs.signals(px, rets, bars=bars)
+    assert set(sigs) == {"momentum", "reversal", "low_vol", "bab", "idio_vol", "risk_adj_mom",
+                         "sector_rel_mom", "overnight", "sector_rel_rev", "vwap_pressure", "max_lottery"}
     for s in sigs.values():
         assert s.shape == px.shape
 
@@ -111,3 +118,14 @@ def test_backtest_impact_scales_with_book_size():
     small = xs.backtest(sig, rets, cost_bps=5.0, impact_coef=0.02, dollar_vol=adv, gross_capital=1e7)
     big = xs.backtest(sig, rets, cost_bps=5.0, impact_coef=0.02, dollar_vol=adv, gross_capital=1e9)
     assert big["net"].sum() < small["net"].sum() < base["net"].sum()   # more capital → more impact
+
+
+def test_sector_relative_removes_sector_mean():
+    idx = pd.date_range("2020-01-01", periods=5)
+    frame = pd.DataFrame({"A": 1.0, "B": 3.0, "C": 10.0, "D": 20.0}, index=idx)
+    sectors = {"A": "X", "B": "X", "C": "Y", "D": "Y"}
+    out = xs._sector_relative(frame, sectors)
+    # Within each sector the demeaned weights sum to ~0 (sector-neutral by construction).
+    assert abs(out[["A", "B"]].iloc[0].sum()) < 1e-9
+    assert abs(out[["C", "D"]].iloc[0].sum()) < 1e-9
+    assert out["A"].iloc[0] < 0 < out["B"].iloc[0]     # A below its sector mean, B above

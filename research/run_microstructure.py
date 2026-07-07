@@ -68,11 +68,13 @@ def study_one(label: str, product: str) -> None:
               f"[{r['ic_ci_low']:>+5.3f},{r['ic_ci_high']:>+5.3f}] "
               f"{r['gross_ret_bps']:>+10.0f} {r['net_ret_bps']:>+9.0f} "
               f"{r['cost_bps']:>9.0f} {r['avg_turnover']:>9.2f}")
-    print("  (IC t/CI: Fisher-z on the overlap-adjusted effective sample; a real IC can be hugely "
-          "significant yet still untradable after costs — significance is not tradability.)")
+    print("  (IC t/CI: Fisher-z on the overlap-adjusted effective sample. Two caveats keep this "
+          "honest: the t is an UPPER bound — adjacent book events are serially dependent — AND it "
+          "is the max over 3 models with NO selection correction (unlike the DSR/PBO on the equity")
+    print("   side). So the verdict rests on the gross-vs-net gap, not on IC significance.)")
     print(f"\nVerdict: {verdict(results)}")
-    print("\n(Sharpe on event-spaced samples is a proxy; the gross-vs-net gap in bps is the "
-          "unambiguous result. Costs = half-spread + 1bp fee per trade.)")
+    print("\n(Sharpe on event-spaced samples is a proxy; the gross-vs-net gap in bps — and the maker "
+          "study (--maker) — are the unambiguous results. Costs = half-spread + 1bp fee per trade.)")
 
 
 def validate(real_label: str = "2026-07-06", real_product: str = "BTC-USD") -> None:

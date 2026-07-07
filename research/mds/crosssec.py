@@ -78,18 +78,37 @@ def _idio_vol(rets: pd.DataFrame, mkt, window: int = 126) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
-def signals(px: pd.DataFrame, rets: pd.DataFrame) -> dict[str, pd.DataFrame]:
+def _sector_relative(frame: pd.DataFrame, sectors: dict) -> pd.DataFrame:
+    """Subtract each day's sector mean from every name — the intra-industry (sector-neutral) part of
+    a signal. Built neutral BY CONSTRUCTION, so its edge cannot be uncompensated sector exposure
+    (the thing that turned out to explain most of raw momentum's apparent edge)."""
+    sec = pd.Series(sectors).reindex(frame.columns)
+    sector_mean = frame.T.groupby(sec.to_numpy()).transform("mean").T
+    return frame - sector_mean
+
+
+def signals(px: pd.DataFrame, rets: pd.DataFrame, bars: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
     """Cross-sectional signals, each a dates × symbols score (higher = long).
 
-    All are price/volume-only — the free IEX feed has no fundamentals, so true value/quality/
-    profitability factors are honestly off the table. These are technical/risk factors chosen to
-    DIVERSIFY momentum (the best raw performer, though NOT statistically significant at this
-    sample size — see the t-stat/CI reporting in run_crosssec.py), not just pile on more trend."""
+    Price/volume-only — the free IEX feed has no fundamentals. The first six are the classic
+    close-only factors; the last five are new, motivated by the results (raw edge was mostly
+    sector/factor exposure; the OHLC/vwap fields were unused) and by tapping open/high/low/vwap.
+    Adding them grows the multiple-testing family to 11, so the Deflated-Sharpe bar deflates
+    harder — the value is a disciplined test, not fishing (see run_crosssec.py)."""
     logpx = np.log(px)
     mom = logpx.diff(252) - logpx.diff(21)
     loo = _loo_market(rets)          # each name's benchmark excludes itself (no self-inclusion bias)
     beta = _rolling_beta(rets, loo)
     idio = _idio_vol(rets, loo)
+
+    # New signals draw on the previously-unused OHLC/vwap fields (injectable for testing).
+    if bars is None:
+        bars = ad.load_bars()
+    open_p = ad.close_panel(bars, "open").reindex(index=px.index, columns=px.columns)
+    vwap_p = ad.close_panel(bars, "vwap").reindex(index=px.index, columns=px.columns)
+    overnight = np.log(open_p) - np.log(px.shift(1))           # open_t vs prior close: the overnight leg
+    resid_ret = _sector_relative(rets, SECTORS)               # daily return net of its sector
+
     return {
         # 12–1 month momentum: last ~12m return skipping the most recent month.
         "momentum": mom,
@@ -103,6 +122,22 @@ def signals(px: pd.DataFrame, rets: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "idio_vol": -idio,
         # risk-adjusted momentum: scale 12–1 momentum by idio-vol — a cleaner momentum.
         "risk_adj_mom": mom / idio.replace(0, np.nan),
+        # ── new ──────────────────────────────────────────────────────────────────────────────
+        # ① sector-relative (intra-industry) momentum — the name-specific part, sector-neutral by
+        #    construction (motivated by neutralization killing most of raw momentum's edge).
+        "sector_rel_mom": _sector_relative(mom, SECTORS),
+        # ② overnight-return factor (Lou–Polk–Skouras): trailing mean overnight leg; the overnight
+        #    and intraday premia differ — a genuinely orthogonal axis from the unused `open`.
+        "overnight": overnight.rolling(21).mean(),
+        # ③ sector-relative short-term reversal — reversal on the residual return; lower-turnover,
+        #    tests whether removing the sector component salvages the (significant) reversal effect.
+        "sector_rel_rev": -resid_ret.rolling(5).sum(),
+        # ④ close-vs-VWAP pressure — persistent closing above the day's volume-weighted average as
+        #    a buying-pressure signal (from the unused `vwap`), smoothed to keep turnover down.
+        "vwap_pressure": ((px - vwap_p) / vwap_p).rolling(5).mean(),
+        # ⑤ MAX / lottery-demand (Bali–Cakici–Whitelaw): short names with extreme recent up-days;
+        #    a skewness/attention effect distinct from the second-moment vol signals.
+        "max_lottery": -rets.rolling(21).apply(lambda x: np.mean(np.sort(x)[-5:]), raw=True),
     }
 
 
