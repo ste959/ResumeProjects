@@ -357,6 +357,46 @@ export interface QpHistory {
   timeframe?: string;
   points: QpHistoryPoint[];
 }
+export interface QpStratPosition {
+  symbol: string;
+  qty: number;
+  avg_cost: number;
+  realized: number;
+  unrealized: number;
+  market_value: number;
+  n_fills: number;
+}
+export interface QpStrategy {
+  id: string;
+  name: string;
+  desc: string;
+  asset_class: string;
+  kind: string;
+  symbols: string[];
+  realized: number;
+  unrealized: number;
+  total_pnl: number;
+  gross_exposure: number;
+  positions: QpStratPosition[];
+  n_fills: number;
+}
+export interface QpAction {
+  ts: number;
+  kind: string;
+  msg: string;
+}
+export interface QpEngine {
+  configured: boolean;
+  running: boolean;
+  kill: boolean;
+  armed: string[];
+  last_run: number | null;
+  last_error: string | null;
+  interval: number;
+  strategies: QpStrategy[];
+  marks: Record<string, number>;
+  actions: QpAction[];
+}
 
 // ── Microstructure study (order-flow alpha on an event-driven backtester) ──
 export interface MicroDecayPoint {

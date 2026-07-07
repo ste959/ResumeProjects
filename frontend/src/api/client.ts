@@ -21,6 +21,7 @@ import type {
   QpPosition,
   QpOrder,
   QpHistory,
+  QpEngine,
   Order,
   PaperOrder,
   PaperOrderRequest,
@@ -198,4 +199,12 @@ export const api = {
   qpOrders: () => request<QpOrder[]>('/live/orders', undefined, RESEARCH_BASE),
   qpHistory: (period = '1M', timeframe = '1D') =>
     request<QpHistory>(`/live/history?period=${period}&timeframe=${timeframe}`, undefined, RESEARCH_BASE),
+
+  // Live strategy engine.
+  qpStrategies: () => request<QpEngine>('/strategies', undefined, RESEARCH_BASE),
+  qpArm: (id: string) => request<QpEngine>(`/strategies/${id}/arm`, { method: 'POST' }, RESEARCH_BASE),
+  qpDisarm: (id: string) => request<QpEngine>(`/strategies/${id}/disarm`, { method: 'POST' }, RESEARCH_BASE),
+  qpFlatten: (id: string) => request<QpEngine>(`/strategies/${id}/flatten`, { method: 'POST' }, RESEARCH_BASE),
+  qpKill: () => request<QpEngine>('/strategies/kill', { method: 'POST' }, RESEARCH_BASE),
+  qpResume: () => request<QpEngine>('/strategies/resume', { method: 'POST' }, RESEARCH_BASE),
 };

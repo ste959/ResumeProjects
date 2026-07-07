@@ -1938,3 +1938,69 @@ code {
 @media (max-width: 900px) {
   .live-head, .roadmap-grid, .live-kpis { grid-template-columns: 1fr; }
 }
+
+/* ── Strategy engine (Live tab) ──────────────────────────────────────────── */
+.se-head { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.se-title { display: flex; flex-direction: column; gap: 3px; }
+.se-title h3 { margin: 0; font-family: var(--sans); font-size: 15px; font-weight: 700; color: var(--ink); }
+.se-status { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.se-status .dot { width: 7px; height: 7px; }
+.se-status.on .dot { background: var(--buy); box-shadow: 0 0 0 3px color-mix(in srgb, var(--buy) 20%, transparent); }
+.se-status.off .dot { background: var(--muted); }
+.se-total { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.se-total span { font-family: var(--sans); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+.se-total b { font-family: var(--mono); font-size: 17px; }
+.se-total b.pos, .se-metric b.pos, .se-pos b.pos { color: var(--buy); }
+.se-total b.neg, .se-metric b.neg { color: var(--sell); }
+
+.se-btn { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 7px 12px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--ink); cursor: pointer; white-space: nowrap; }
+.se-btn:disabled { opacity: 0.5; cursor: default; }
+.se-btn.kill { color: #fff; background: var(--sell); border-color: var(--sell); }
+.se-btn.resume { color: var(--warn); border-color: var(--warn); }
+.se-btn.arm { color: #fff; background: var(--buy); border-color: var(--buy); }
+.se-btn.disarm { color: var(--dim); }
+.se-btn.flat { color: var(--sell); border-color: color-mix(in srgb, var(--sell) 35%, var(--border)); }
+
+.se-killbar { padding: 8px 12px; border-radius: 5px; background: color-mix(in srgb, var(--sell) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--sell) 35%, var(--border)); color: var(--sell); font-family: var(--mono); font-size: 11px; font-weight: 600; margin-bottom: 12px; }
+.se-errbar { padding: 6px 12px; border-radius: 5px; background: var(--panel-2); color: var(--warn); font-family: var(--mono); font-size: 11px; margin-bottom: 12px; }
+
+.se-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.se-card { border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); padding: 14px 15px; display: flex; flex-direction: column; gap: 10px; }
+.se-card.live { border-color: color-mix(in srgb, var(--buy) 45%, var(--border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--buy) 25%, transparent); }
+.se-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.se-card-name { font-family: var(--sans); font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.se-card-tags { display: flex; gap: 6px; margin-top: 3px; }
+.se-kind { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 2px 6px; }
+.se-sym { font-family: var(--mono); font-size: 10px; color: var(--muted); padding: 2px 0; }
+.se-live { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.se-live.on { color: var(--buy); }
+.se-desc { margin: 0; font-family: var(--sans); font-size: 11.5px; color: var(--dim); line-height: 1.45; }
+
+.se-metrics { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.se-metric { display: flex; flex-direction: column; gap: 2px; }
+.se-metric span { font-family: var(--sans); font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+.se-metric b { font-family: var(--mono); font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.se-metric.big b { font-size: 16px; }
+
+.se-pos { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.se-pos b { color: var(--ink); }
+.se-pos-mv { color: var(--muted); }
+.se-pos-mark { color: var(--muted); }
+
+.se-actions { display: flex; gap: 8px; margin-top: 2px; }
+.se-actions .se-btn { flex: 1; text-align: center; }
+
+.se-log { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+.se-log-head { font-family: var(--sans); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 8px; }
+.se-log-empty { font-family: var(--sans); font-size: 12px; color: var(--dim); }
+.se-log ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.se-log li { display: flex; align-items: baseline; gap: 10px; font-family: var(--mono); font-size: 11px; }
+.se-log-t { color: var(--muted); white-space: nowrap; }
+.se-log-k { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 1px 6px; border-radius: 3px; white-space: nowrap; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); }
+.se-log-k.k-order { color: var(--accent); }
+.se-log-k.k-arm, .se-log-k.k-flatten { color: var(--buy); }
+.se-log-k.k-kill, .se-log-k.k-error { color: var(--sell); }
+.se-log-k.k-disarm, .se-log-k.k-resume { color: var(--warn); }
+.se-log-m { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 640px) { .se-head { flex-wrap: wrap; } .se-grid { grid-template-columns: 1fr; } }

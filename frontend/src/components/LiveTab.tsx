@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { api } from '../api/client';
 import type { QpHistory, QpHistoryPoint, QpPosition, QpStatus } from '../api/types';
 import { usePolling } from '../hooks/usePolling';
+import { StrategyEngine } from './StrategyEngine';
 
 // Live Strategies — the crown jewel: a real Alpaca paper account. Phase 1 shows the raw account
 // (equity curve, positions, orders) so the pipe is proven end-to-end. Per-strategy attribution and
@@ -61,6 +62,9 @@ export function LiveTab() {
         </div>
       </div>
 
+      {/* the live strategy engine — per-strategy attribution + controls */}
+      <StrategyEngine />
+
       {/* equity curve */}
       <section className="live-card">
         <div className="live-card-head">
@@ -77,8 +81,8 @@ export function LiveTab() {
           <span>marked to the live price · unrealized P&L</span>
         </div>
         {pos.length === 0 ? (
-          <div className="live-empty">No open positions. The strategy engine (Phase 2) will populate this;
-            for now you can place a paper order from the Alpaca dashboard and watch it appear here live.</div>
+          <div className="live-empty">No open positions. Arm a strategy above (or place a paper order from the
+            Alpaca dashboard) and it appears here live.</div>
         ) : (
           <div className="tablewrap">
             <table className="data-table live-table">
@@ -146,8 +150,9 @@ export function LiveTab() {
       </section>
 
       <p className="live-foot">
-        Next (Phase 2): a strategy engine that submits orders tagged by strategy, so this account breaks
-        down into <b>per-strategy P&L</b> — which strategy is buying what, and how each is performing.
+        Every strategy order is tagged, so this account decomposes into <b>per-strategy P&L</b> above —
+        which sleeve is buying what, and how each is performing. Holdings reconcile to the real position
+        (fee-exact); the engine is disarmed until you arm it.
       </p>
     </main>
   );
