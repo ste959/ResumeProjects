@@ -23,17 +23,29 @@ impact + neutralization + regime + power. New data doesn't get a lower bar — i
 
 | # | Upgrade | Unlocks | Cost | Effort | Priority |
 |---|---|---|---|---|---|
-| 1 | **Fundamentals (SEC EDGAR)** | value / quality / profitability / accruals — the factors that *actually* survive | **free** | med-high | **highest** |
-| 2 | **Cross-asset macro overlays (FRED, VIX term)** | risk-on/off timing — fixes the regime dependence we found | **free** | low | **high (quick win)** |
-| 3 | **Breadth (survivorship-free small/mid)** | statistical power + where anomalies actually live | free→$ | med (data-gated) | high |
+| 1 | **Fundamentals (SEC EDGAR)** | value / quality / profitability / accruals — the factors that *actually* survive | **free** | med-high | ✅ **BUILT** — null on mega-caps (breadth-limited) |
+| 2 | **Cross-asset macro overlays (FRED, VIX term)** | risk-on/off timing — fixes the regime dependence we found | **free** | low | ✅ **BUILT** — **halves market drawdown** (beta mgmt) |
+| 3 | **Breadth (survivorship-free small/mid)** | statistical power + where anomalies actually live | free→$ | med (data-gated) | high — the fix for #1's null |
 | 4 | **Crypto L2, wider-spread + cross-venue** | genuine microstructure inefficiency (OFI/VPIN/lead-lag) | **free** | med | high (different game) |
-| 5 | **Options-implied (VRP, skew)** | forward-looking vol/sentiment | mostly $ | med | medium (data-gated) |
+| 5 | **Options-implied (VRP, skew)** | forward-looking vol/sentiment | free live / $ hist | med | ✅ **BUILT (live)** — backtest OPRA-gated |
 
-The order I'd actually execute: **2 (this week) → 1 (the big one) → 4 (reuses our infra) → 3 → 5.**
+**Built so far (this batch):** #1 fundamentals (real, point-in-time — still null, the mega-cap/short-sample
+ceiling), #2 the macro risk-off overlay (the one thing that materially helps: halves the long-book
+drawdown), and #5 the live options surface (skew / IV−RV; historical backtest gated by OPRA). **The two
+that remain — and matter most — are #3 breadth and #4 crypto-L2**, because #1's null is a *breadth* problem
+(value/quality live in small/mid, not mega-caps) and #4 is where genuine inefficiency is freely observable.
 
 ---
 
 ## 1. Fundamentals — SEC EDGAR (free, biggest gap)
+
+> **Status — BUILT** (`mds/edgar.py`, `run_fundamentals.py`). Point-in-time via **filing date** (not
+> period-end), TTM flows, 123/123 names covered. Factors: earnings-yield, gross-profitability, ROE,
+> accruals, asset-growth — all low-turnover (0.003–0.03). **Result: still null on this sample** —
+> best is a beta+sector-neutral earnings-yield tilt (net +0.64, HAC t≈1.6), Deflated Sharpe 0.34,
+> PBO 0.43; nothing clears the corrected bar. The factors are real in the literature; 123 efficiently-
+> priced **mega-caps** over ~6y (≈23 quarterly filings/name) is simply too short and too selected to
+> resolve value/quality. This is the honest ceiling — the fix is *breadth* (#3), not the factor.
 
 **Why.** The factors that survive out-of-sample in real research are *fundamental* — value (Fama–
 French HML), profitability/quality (Novy-Marx gross profitability, Fama–French RMW), accruals
@@ -66,6 +78,14 @@ budget time for the point-in-time join. Expected payoff is the highest of anythi
 ---
 
 ## 2. Cross-asset macro overlays — FRED + VIX term (free, quick win)
+
+> **Status — BUILT** (`mds/macro.py`, `run_macro.py`). Keyless FRED fetch of HY/IG credit OAS + VIX →
+> a causal (shifted) risk-appetite score. **Result: the one thing that materially changes a book's
+> risk profile** — timing a long-only equity book on the credit/VIX regime **roughly halves its max
+> drawdown (−22.8% → −10.1%)** by cutting exposure in blowouts (April-2025 selloff flagged at score 0).
+> Honest caveat: it is **beta/risk management, not alpha** — the Sharpe is ~flat (+0.92 → +0.96,
+> running at ~0.54 avg exposure), and the timed book's significance is mostly the *equity risk premium*
+> of a bull market, not the overlay. It does not help the beta-neutral book (nothing to de-risk).
 
 **Why.** Our single most robust *negative* finding was **regime dependence** — momentum's sign
 flipped across years, and vol-management didn't help because realized vol alone is a weak timer.
@@ -144,6 +164,14 @@ there.
 ---
 
 ## 5. Options-implied — VRP, skew, positioning (mostly data-gated)
+
+> **Status — BUILT (live signal)** (`mds/options.py`, `run_options.py`). Alpaca *does* serve options
+> data: live snapshots (greeks + IV) fetched for **123/123** names → a cross-section of ATM IV, 25Δ
+> put-call **skew**, and **IV−RV** (variance-risk-premium proxy; 63% of names show IV > RV). Highest
+> fear (skew): SPGI/GIS/VZ; highest ATM IV: the semis (MU/KLAC/LRCX). The **backtest is the gap** — it's
+> a point-in-time surface, and Alpaca's historical `/options/bars` is **OPRA-gated** (403 "OPRA agreement
+> not signed") on the free tier. The free path to history is **accruing daily snapshots** (a scheduled
+> capture, like the L2 tape) or signing the OPRA agreement. Live signal works today; backtest pending data.
 
 **Why.** Options are *forward-looking* — the one dataset that isn't a lagged function of price.
 Implied vol, skew, and the variance risk premium carry information prices don't.

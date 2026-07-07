@@ -80,7 +80,7 @@ the same numbers).
 | **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions, transaction cost analysis |
 | **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → separate `risk-service` consumer |
 | **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
-| **Test automation (unit/integration/UI)** | 129 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + 55 Python research + **Vitest/RTL** component tests + **Playwright** E2E |
+| **Test automation (unit/integration/UI)** | 129 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + 70 Python research + **Vitest/RTL** component tests + **Playwright** E2E |
 | **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
 | **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
 | **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |

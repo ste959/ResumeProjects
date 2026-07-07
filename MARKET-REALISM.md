@@ -335,6 +335,20 @@ does not rescue momentum (+0.56 → +0.49) or create significance: these signals
 structure on this universe/period. Both are the disciplined, documented negatives a QR delivers — real tests,
 honest results.
 
+**Beyond price/volume — the first data upgrades** (`ALPHA-DATA-ROADMAP.md`), because on efficient mega-caps
+the *data*, not the technique, is the ceiling. Three are now built and run through the same gauntlet:
+(a) **SEC-EDGAR fundamentals** (`mds/edgar.py`, point-in-time by *filing date*, TTM flows, 123/123 names) —
+value/quality/accruals/investment factors, all low-turnover; **still null** here (best neutral earnings-yield
+HAC t≈1.6, DSR 0.34) — value/quality live in small/mid, not in 123 efficiently-priced mega-caps over ~6y, so
+the fix is breadth, not the factor. (b) A **FRED credit/VIX risk-off overlay** (`mds/macro.py`) — the one
+thing that *materially* changes a book's risk: timing a long-only equity book on the credit regime **halves
+its drawdown (−22.8% → −10.1%)**; but honestly it's *beta management, not alpha* (Sharpe ~flat at half
+exposure, the significance is the equity premium), and it doesn't help the beta-neutral book. (c) A **live
+Alpaca options surface** (`mds/options.py`) — ATM IV / 25Δ skew / IV−RV across 123/123 names (63% show a
+variance premium); the cross-sectional backtest is gated by OPRA (historical `/options/bars` → 403), so the
+free path is to accrue daily snapshots. The pattern holds: better *data* moves the needle (credit-regime risk
+management did); more *signals on the same weak data* do not.
+
 **A finding that flipped — the most honest lesson of all.** The set was expanded (tapping
 the previously-unused OHLC/vwap fields): sector-relative momentum, overnight, sector-relative reversal,
 close-vs-VWAP pressure, MAX/lottery. On the shorter 4.4-year window, **sector-relative momentum netted ≈0**,

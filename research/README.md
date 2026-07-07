@@ -31,6 +31,9 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/maker.py` | **maker-execution study** — passive fills, markout-based **adverse selection**, spread-vs-adverse decomposition (does a taker-dead signal survive as a maker?) |
 | `mds/crosssec.py`, `mds/portfolio.py`, `mds/capacity.py` | **cross-sectional factors** (momentum/reversal/low-vol/BAB/idio-vol), beta+sector neutralization, a **walk-forward allocator**, and a **capacity/crowding** sizing model |
 | `mds/validation.py` | **overfitting stats** — Newey–West Sharpe t-stat, block-bootstrap CI, **Deflated Sharpe**, **PBO** (CPCV), min-detectable-Sharpe power |
+| `mds/edgar.py` | **SEC-EDGAR fundamentals** — point-in-time (filing-date) value/quality/accruals/investment factors |
+| `mds/macro.py` | **FRED credit/VIX risk-off overlay** — a causal macro-timing score (halves the long-book drawdown) |
+| `mds/options.py` | **Alpaca options surface** — live ATM-IV / 25Δ-skew / IV−RV cross-section |
 
 The stat-arb study below is the entry point; the microstructure-ML, cross-sectional, portfolio
 and capacity layers (Phases 5–6) are documented in [`../MARKET-REALISM.md`](../MARKET-REALISM.md).
@@ -45,7 +48,10 @@ cd research
 pip install -r requirements.txt         # pinned versions (numpy/pandas/sklearn/…)
 python run_statarb.py           # fetches ~75 days of BTC/ETH, caches to Parquet, runs the study
 python run_crosssec.py          # cross-sectional equity signals, with t-stats / 95% CIs
-python -m pytest                # 55 tests on synthetic data (no network)
+python run_fundamentals.py      # SEC-EDGAR value/quality/accruals factors (point-in-time)
+python run_macro.py             # FRED credit/VIX risk-off overlay (halves the long-book drawdown)
+python run_options.py           # live Alpaca options surface: ATM-IV / skew / IV−RV
+python -m pytest                # 70 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests
