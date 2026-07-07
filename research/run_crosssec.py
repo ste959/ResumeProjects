@@ -50,11 +50,16 @@ def _realism_and_power(sigs: dict, rets, results: dict, best: str) -> None:
     import numpy as np
 
     n_best = results[best]["days"]
+    n_names = rets.shape[1]
     mds = val.min_detectable_sharpe(n_best)
     print("\nRealism & power:")
     print(f"  Power: with {n_best} active days this sample can only reliably detect (80% power) an "
-          f"annualized Sharpe ≳ {mds:.2f}. Every observed |Sharpe| is below that — UNDERPOWERED by")
-    print("    construction (40 survivorship-selected mega-caps, ~4.4y); a null is 'too little data'.")
+          f"annualized Sharpe ≳ {mds:.2f} — a function of the return-series LENGTH, not breadth. "
+          f"Every observed")
+    print(f"    |Sharpe| is below that. Broadening the universe to {n_names} names did not rescue the "
+          "signal (Sharpe/DSR ~unchanged), which points to a genuine null rather than mere low breadth;")
+    print("    still survivorship-selected with no point-in-time membership, so a real study needs longer,")
+    print("    point-in-time history with delistings.")
 
     sig = sigs[best]
     rw, nw = xs.raw_weights(sig), xs.neutralized_weights(sig, rets)
@@ -132,9 +137,10 @@ def main() -> None:
     _realism_and_power(sigs, rets, results, best)
 
     print(f"\nVerdict: {verdict(results, hac_t, dsr, pbo_res['pbo'])}")
-    print("\n(All signals are price/volume-only — no fundamentals in the free feed. Caveats: free "
-          "IEX ~4.5y history, 40 survivorship-selected mega-caps; a real study needs a far broader, "
-          "point-in-time universe with delistings. This universe is underpowered by construction.)")
+    print(f"\n(All signals are price/volume-only — no fundamentals in the free feed. Caveats: free "
+          f"IEX ~4.5y history, {px.shape[1]} survivorship-selected large caps across 11 GICS sectors; "
+          "a real study needs longer, point-in-time membership with delistings. Underpowered by "
+          "construction — see the power line above.)")
 
 
 if __name__ == "__main__":

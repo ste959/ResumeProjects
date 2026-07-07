@@ -285,10 +285,10 @@ Validated on the ground truth above, the pipeline behaves correctly and the hone
 | SYNTH noise (α=0) | +0.005 (t≈0.2) | finds nothing — the false-positive check passes, and the IC is *insignificant* as it should be |
 | SYNTH signal (α=2.5) | +0.922 (t≈90) | recovers the planted signal — hugely significant — but **dies after spread** at tick frequency |
 | REAL BTC-USD microstructure | +0.289 (t≈91) | a real, *strongly significant* predictive signal, yet still **dies after spread** — bid-ask bounce, not tradable |
-| REAL equity momentum (cross-sectional) | — | best raw performer, net +0.41 at low turnover (0.10) — but **t ≈ +0.76, 95% CI [−0.65, +1.47]: not significant** |
-| REAL equity risk-adjusted momentum | — | net +0.45, a cleaner momentum but 0.83-correlated to it — **t ≈ +0.84: also not significant** |
-| REAL equity reversal | — | net −1.07, **t ≈ −2.24: the ONLY statistically significant result — and it's a loser** |
-| REAL equity low-vol / betting-against-beta / idio-vol | — | all negative (net −0.20 to −0.39), none significant; the low-risk family, all 0.85+ correlated (one bet in three costumes) |
+| REAL equity momentum (cross-sectional, 123 names) | — | net +0.34 at low turnover (0.11) — **HAC t ≈ +0.66: not significant** |
+| REAL equity risk-adjusted momentum | — | net +0.47, a cleaner momentum but correlated to it — **HAC t ≈ +0.88: also not significant** |
+| REAL equity reversal | — | net −1.01, **HAC t ≈ −2.34: the ONLY statistically significant result — and it's a loser** |
+| REAL equity low-vol / betting-against-beta / idio-vol | — | all negative (net −0.23 to −0.65), none significant — the low-risk family |
 
 Two lessons the whole layer is built to teach. First, **what survives is low turnover, not high IC** — a
 +0.29 IC that trades every tick is worthless; IC is not tradability. Note the discipline in the IC column:
@@ -298,14 +298,15 @@ horizon-H label can't fake significance by counting overlapping samples), and th
 is *strongly* significant (t≈91) — and still dies after costs: significance confirms the signal is real, it
 says nothing about whether you can trade it. Second, and more important once we
 report **t-stats and confidence intervals** (see `run_crosssec.py`): **no signal clears statistical
-significance.** Momentum's +0.41 Sharpe sounds like an edge but its 95% CI straddles zero (t ≈ 0.76) on a
-survivorship-selected 40-name, 4.4-year sample; the *only* significant result is reversal, and it loses.
+significance.** Momentum's +0.34 Sharpe sounds like an edge but its 95% CI straddles zero (HAC t ≈ 0.66) on a
+survivorship-selected **123-name**, 4.4-year sample; the *only* significant result is reversal, and it loses.
 The honest headline is therefore **a rigorous harness that finds no edge distinguishable from noise** —
-not a momentum finding. And this is now *computed, not asserted* (`run_crosssec.py`, via `mds/validation.py`):
+not a momentum finding, and it *holds on a 3× broader universe* (40→123 names did not rescue it). This is
+now *computed, not asserted* (`run_crosssec.py`, via `mds/validation.py`):
 significance uses an **autocorrelation-consistent Newey–West** t-stat (not a naive IID one) with a
-**block-bootstrap** CI; and across the six signals the **Deflated Sharpe** of the best is **≈0.30** —
+**block-bootstrap** CI; and across the six signals the **Deflated Sharpe** of the best is **≈0.31** —
 far below the 0.95 bar — meaning after correcting for the six tries there is only a ~30% chance its true
-Sharpe is even positive, while the **Probability of Backtest Overfitting** (CPCV) is ≈0.14. The
+Sharpe is even positive, while the **Probability of Backtest Overfitting** (CPCV) is ≈0.10. The
 walk-forward itself is now **purged and embargoed** (gap ≥ the label horizon) so the label can't leak
 across the train/test boundary. Reporting these — rather than presenting the positive point estimate as
 alpha — is the discipline.
@@ -318,17 +319,18 @@ why the Phase 6 optimizer can't beat it.)
 **Realism, power, and regime — four checks that finish the honest picture** (`run_crosssec.py`):
 
 - **Statistical power.** With ~863 active days this sample can only detect (80% power) an annualized
-  Sharpe **≳ 1.5**. Every signal is far below that, so the null is *"too little data to tell"* — a
-  survivorship-selected 40-name, 4.4-year universe is **underpowered by construction**, and the honest
-  fix is a broader point-in-time universe (the one genuine data dependency), not more signals.
+  Sharpe **≳ 1.5** — a function of the return-series *length*, not breadth. Every signal is far below
+  that. Broadening the universe **40 → 123 names** (all 11 GICS sectors) did *not* rescue the signal
+  (Sharpe/DSR ~unchanged), which points to a genuine null rather than mere low breadth; the remaining
+  data dependency is longer, *point-in-time* history with delistings (survivorship is still uncorrected).
 - **Beta + sector neutralization.** Dollar-neutral alone is a toy; the book is now residualized against
-  market β and GICS sector, dropping mean |net β| from **0.14 → 0.00**. The neutral book's net Sharpe
-  falls (**+0.45 → +0.23**), i.e. part of the raw "edge" was uncompensated factor/sector exposure.
+  market β and GICS sector, dropping mean |net β| from **0.10 → 0.00**. The neutral book's net Sharpe
+  falls (**+0.47 → +0.09**), i.e. most of the raw "edge" was uncompensated factor/sector exposure.
 - **Cost realism (capacity).** Adding a √-law market-impact term (participation vs ADV) and short
-  borrow, the best signal's net Sharpe goes **+0.45 (frictionless) → −0.24 ($100M book) → −1.62 ($1B)**.
+  borrow, the best signal's net Sharpe goes **+0.47 (frictionless) → −0.37 ($100M book) → −2.01 ($1B)**.
   The edge is not robust to impact, and impact scales with size — the capacity wall, quantified on the
   equity book rather than only in the crypto engine.
-- **Regime dependence.** Per-year net Sharpe **flips sign** (2021 −1.5, 2022 +1.7, 2023 −1.0, 2024 +0.9);
+- **Regime dependence.** Per-year net Sharpe swings widely (2021 +0.5, 2022 +1.3, 2023 −0.6, 2024 +0.7);
   one blended number hides that the "signal" is really a few regime bets.
 
 Together these turn "no significant edge" from a p-value into a fully-argued conclusion: underpowered
@@ -350,7 +352,7 @@ Two honest results, deliberately shown side by side:
   allocation lifts the Sharpe from ~0.8 (avg single) to ~1.6 — the ~√N diversification benefit, pinned by
   a test.
 - **Machinery can't rescue bad inputs (real):** allocating across the six equity signals **fails to beat
-  the best single one** (best allocation, inverse-vol, −0.38 vs risk-adj-momentum +0.45), because most of
+  the best single one** (best allocation, inverse-vol, −0.40 vs risk-adj-momentum +0.47), because most of
   the signals lose money — and, printed with t-stats, *none* of the allocations is statistically
   distinguishable from zero either. Garbage in, garbage out — the optimizer's value appears only with a
   richer set of *good* signals.
@@ -406,7 +408,7 @@ they can't drift silently.
 | Capacity model uses **linear** (Kyle-λ) impact; real impact is concave (√-law) | Over-penalises small size, under-penalises very large — capacity `C*` is indicative, not a number to trade on | `capacity.py` |
 | Crowding λ proxied from **turnover**, not measured; crowd assumed **identical** players | The read-across capacities are illustrative; real crowds are heterogeneous and λ needs real ADV/impact data | `capacity.py`, `run_capacity.py` |
 | Equity √-law impact coefficient (σ·Y ≈ 2%) is **assumed**, and free-IEX volume **understates** ADV | The cost-sensitivity capacity numbers are directional, not calibrated; understated ADV makes impact *conservative* (over-charged) | `crosssec.py` impact model |
-| Sectors are a **static hardcoded** GICS map for the 40 names | Fine for neutralization here, but not point-in-time (a name's sector can change); a real book uses a maintained classification | `crosssec.SECTORS` |
+| Sectors are a **static hardcoded** GICS map for the 123 names | Fine for neutralization here, but not point-in-time (a name's sector can change); a real book uses a maintained classification | `alpaca_data.SECTORS` |
 
 ### Bugs found by adversarial review and fixed (with regression tests)
 

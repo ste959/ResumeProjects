@@ -113,18 +113,9 @@ def _xs_zscore(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.sub(mean, axis=0).div(std, axis=0)
 
 
-# GICS-style sector map for the demo universe — used to build a genuinely sector-neutral book
-# (dollar-neutral alone is a toy; a real cross-sectional book neutralizes factor and sector risk).
-SECTORS = {
-    **dict.fromkeys(["AAPL", "MSFT", "NVDA", "AVGO", "AMD", "INTC", "CRM", "ORCL", "CSCO",
-                     "QCOM", "TXN", "IBM"], "InfoTech"),
-    **dict.fromkeys(["GOOGL", "META", "NFLX", "DIS"], "CommSvcs"),
-    **dict.fromkeys(["AMZN", "TSLA", "HD"], "ConsDisc"),
-    **dict.fromkeys(["JPM", "BAC", "WFC", "GS", "MS", "C", "V", "MA"], "Financials"),
-    **dict.fromkeys(["XOM", "CVX", "COP"], "Energy"),
-    **dict.fromkeys(["JNJ", "UNH", "PFE", "MRK", "ABBV"], "HealthCare"),
-    **dict.fromkeys(["PG", "KO", "PEP", "WMT", "COST"], "Staples"),
-}
+# GICS sector map (single source of truth in alpaca_data, alongside the universe it classifies) —
+# used to build a genuinely sector-neutral book, not merely dollar-neutral.
+SECTORS = ad.SECTORS
 
 
 def dollar_adv_panel(window: int = 20) -> pd.DataFrame:

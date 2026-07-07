@@ -23,15 +23,31 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_URL = "https://data.alpaca.markets/v2/stocks/bars"
 EQUITIES_DIR = store.DATA_DIR / "equities"
 
-# A liquid, sector-diverse demo universe — enough breadth for cross-sectional studies.
-UNIVERSE = [
-    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "AMD", "INTC",
-    "JPM", "BAC", "WFC", "GS", "MS", "C",
-    "XOM", "CVX", "COP",
-    "JNJ", "UNH", "PFE", "MRK", "ABBV",
-    "PG", "KO", "PEP", "WMT", "COST", "HD",
-    "V", "MA", "DIS", "NFLX", "CRM", "ORCL", "CSCO", "QCOM", "TXN", "IBM",
-]
+# A liquid, sector-diverse universe across all 11 GICS sectors — broader than the original 40 so
+# the cross-section has some statistical power. Still SURVIVORSHIP-BIASED (today's large caps, no
+# delistings / no point-in-time membership): expanding N improves power but does NOT fix selection.
+# The sector map doubles as the neutralization classification; UNIVERSE is derived from its keys.
+SECTORS = {
+    **dict.fromkeys(["AAPL", "MSFT", "NVDA", "AVGO", "AMD", "INTC", "CRM", "ORCL", "CSCO", "QCOM",
+                     "TXN", "IBM", "ADBE", "ACN", "NOW", "AMAT", "MU", "LRCX", "ADI", "KLAC",
+                     "SNPS", "CDNS", "INTU"], "InfoTech"),
+    **dict.fromkeys(["GOOGL", "META", "NFLX", "DIS", "CMCSA", "VZ", "T", "TMUS", "CHTR"], "CommSvcs"),
+    **dict.fromkeys(["AMZN", "TSLA", "HD", "MCD", "NKE", "LOW", "SBUX", "BKNG", "TJX", "GM", "F",
+                     "MAR"], "ConsDisc"),
+    **dict.fromkeys(["JPM", "BAC", "WFC", "GS", "MS", "C", "V", "MA", "AXP", "BLK", "SCHW", "SPGI",
+                     "CB", "PGR", "USB", "PNC"], "Financials"),
+    **dict.fromkeys(["XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "OXY"], "Energy"),
+    **dict.fromkeys(["JNJ", "UNH", "PFE", "MRK", "ABBV", "LLY", "TMO", "ABT", "DHR", "BMY", "AMGN",
+                     "MDT", "GILD", "CVS", "CI"], "HealthCare"),
+    **dict.fromkeys(["PG", "KO", "PEP", "WMT", "COST", "MDLZ", "CL", "MO", "PM", "TGT", "KMB",
+                     "GIS"], "Staples"),
+    **dict.fromkeys(["BA", "CAT", "HON", "UPS", "GE", "RTX", "UNP", "LMT", "DE", "MMM", "EMR",
+                     "ADP"], "Industrials"),
+    **dict.fromkeys(["NEE", "DUK", "SO", "D", "AEP"], "Utilities"),
+    **dict.fromkeys(["AMT", "PLD", "EQIX", "SPG", "O"], "RealEstate"),
+    **dict.fromkeys(["LIN", "APD", "SHW", "FCX", "NEM", "ECL"], "Materials"),
+}
+UNIVERSE = list(SECTORS)
 
 
 def _credentials() -> tuple[str, str]:
