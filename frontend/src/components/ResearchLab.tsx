@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '../api/client';
-import type { BacktestResult, Construction, Findings, SignalMeta } from '../api/types';
+import type {
+  BacktestResult, Construction, Findings, MicroDecayPoint, MicroStudy, MicroSweepPoint, SignalMeta,
+} from '../api/types';
 import { Callout, Chapter, EquityChart, MetricCtx } from './ui';
 
 // The Research Lab — the project's focal point, told as a guided story a reviewer can follow in two
@@ -149,9 +151,12 @@ export function ResearchLab() {
       {/* ---- chapter 2: construction is the edge ---- */}
       {construction && <ConstructionChapter c={construction} />}
 
-      {/* ---- chapter 3: run it yourself ---- */}
+      {/* ---- chapter 3: microstructure — where the signal actually is ---- */}
+      <MicrostructureChapter />
+
+      {/* ---- chapter 4: run it yourself ---- */}
       <Chapter
-        num="03 — Run It Yourself"
+        num="04 — Run It Yourself"
         title="The same pipeline, on demand"
         lede={<>Pick any factor (or the composite), set the cost assumption, and it runs through the exact
           honest backtest above — the equity curve and the statistics update live. Nothing is pre-baked.</>}
@@ -281,5 +286,212 @@ function ConstructionChapter({ c }: { c: Construction }) {
         standalone signal. <b>When alpha is scarce, construction and risk control are the edge.</b>
       </Callout>
     </Chapter>
+  );
+}
+
+// ── Chapter 3: microstructure — the daily cross-section is null, but zoom in to order flow and the
+// signal is genuinely there. The whole question becomes whether it survives execution cost. This is
+// the interactive heart of the story and the bridge to the sibling Exchange product (same OFI). ──
+
+const SIG_BLURB: Record<string, string> = {
+  ofi: 'Net signed order flow — the single best short-horizon predictor (Cont–Kukanov–Stoikov).',
+  ofi_smooth: 'A 5-tick average of OFI: less noise, but the averaging adds lag and dilutes the edge.',
+  queue_imb: 'Top-of-book size imbalance — a weaker, noisier shadow of true order flow.',
+};
+
+/** Linear-interpolate net Sharpe at an arbitrary cost from the discrete sweep. */
+function interpNet(sweep: MicroSweepPoint[], cost: number): number {
+  if (!sweep.length) return 0;
+  if (cost <= sweep[0].cost_bps) return sweep[0].net_sharpe;
+  for (let i = 1; i < sweep.length; i++) {
+    if (cost <= sweep[i].cost_bps) {
+      const a = sweep[i - 1], b = sweep[i];
+      const w = (cost - a.cost_bps) / (b.cost_bps - a.cost_bps || 1);
+      return a.net_sharpe + w * (b.net_sharpe - a.net_sharpe);
+    }
+  }
+  return sweep[sweep.length - 1].net_sharpe;
+}
+
+function MicrostructureChapter() {
+  const [study, setStudy] = useState<MicroStudy | null>(null);
+  const [signal, setSignal] = useState('ofi');
+  const [ic, setIc] = useState(0.1);
+  const [cost, setCost] = useState(0.5); // the cost cursor, in bps round-trip
+  const [down, setDown] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const t = setTimeout(() => {
+      api.researchMicrostructure(ic, signal)
+        .then((s) => { if (alive) { setStudy(s); setDown(false); } })
+        .catch(() => { if (alive) setDown(true); });
+    }, 160);
+    return () => { alive = false; clearTimeout(t); };
+  }, [ic, signal]);
+
+  const menu = study?.menu ?? [];
+  const netAtCursor = useMemo(() => interpNet(study?.cost_sweep ?? [], cost), [study, cost]);
+  const be = study?.breakeven_cost_bps ?? null;
+  const tradable = be != null && cost < be;
+
+  return (
+    <Chapter
+      num="03 — Where The Signal Actually Is"
+      title="Order flow predicts the next move — cost decides if it's an edge"
+      lede={<>The daily cross-section came back null. So <b>go faster.</b> At the microstructure horizon,
+        order-flow imbalance genuinely forecasts the next tick — but you pay the spread on every decision.
+        This runs an <b>event-driven backtest</b> on an order-flow tape with a <i>known</i> ground-truth IC,
+        so you can watch a real signal turn tradable or not as the only thing that changes is execution cost.
+        It's the same order-flow imbalance the <b>Exchange</b> book shows — here measured as alpha.</>}
+    >
+      {down && (
+        <div className="banner err" style={{ marginBottom: 16 }}>
+          Microstructure endpoint unreachable at <code>/research-api/microstructure</code>.
+        </div>
+      )}
+
+      <div className="micro-controls">
+        <label className="lab2-field">
+          <span>Signal</span>
+          <select value={signal} onChange={(e) => setSignal(e.target.value)}>
+            {(menu.length ? menu : [{ name: 'ofi', label: 'Order-Flow Imbalance' }]).map((s) => (
+              <option key={s.name} value={s.name}>{s.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="lab2-field">
+          <span>Signal strength — true 1-step IC: {ic.toFixed(2)}</span>
+          <input type="range" min={0} max={0.3} step={0.01} value={ic} onChange={(e) => setIc(Number(e.target.value))} />
+        </label>
+        <label className="lab2-field">
+          <span>Execution cost — round-trip: {cost.toFixed(2)} bps</span>
+          <input type="range" min={0} max={1} step={0.01} value={cost} onChange={(e) => setCost(Number(e.target.value))} />
+        </label>
+      </div>
+      <p className="mctx-ctx" style={{ marginTop: -4 }}>{SIG_BLURB[signal] ?? ''}</p>
+
+      <div className="micro-grid">
+        <div className="micro-chart">
+          <div className="micro-chart-head">
+            <h4>Signal decay — information coefficient by horizon</h4>
+            <span>strongest one step out, fades like IC/√h (dashed)</span>
+          </div>
+          <IcDecayChart points={study?.ic_decay ?? []} />
+          <p className="micro-cap">Rank correlation of the signal with the forward return over h ticks.
+            A microstructure edge lives in the first few ticks — act late and it's gone.</p>
+        </div>
+
+        <div className="micro-chart">
+          <div className="micro-chart-head">
+            <h4>Does it survive costs? — Sharpe vs round-trip cost</h4>
+            <span>gross is predictive; the gap to net is the cost drag</span>
+          </div>
+          <CostSweepChart sweep={study?.cost_sweep ?? []} breakeven={be} cursor={cost} gross={study?.gross_sharpe ?? 0} />
+          <p className="micro-cap">At tick frequency you flip position almost every step, so turnover — and
+            cost — is enormous. The break-even is where a genuinely predictive signal stops paying.</p>
+        </div>
+      </div>
+
+      <div className="micro-readout">
+        <MetricCtx label="Gross Sharpe" value={sh(study?.gross_sharpe)} tone="good"
+          ctx="costless — the signal is genuinely predictive" />
+        <MetricCtx label="Break-even cost" value={be == null ? '> grid' : `${be.toFixed(2)} bps`} tone="warn"
+          ctx="round-trip cost above which net Sharpe ≤ 0" />
+        <MetricCtx label={`Net Sharpe @ ${cost.toFixed(2)}bps`} value={sh(netAtCursor)}
+          tone={netAtCursor >= 0 ? 'good' : 'bad'} ctx={tradable ? 'below break-even — an edge' : 'above break-even — dies to cost'} />
+        <MetricCtx label="Net @ 0.5bps (HAC t)" value={sh(study?.representative.hac_t)}
+          ctx="significance of the net edge at a realistic taker cost" />
+      </div>
+
+      <Callout figure={be == null ? '—' : `${be.toFixed(2)} bps`} tone="warn">
+        {study?.verdict ?? 'Running the order-flow study…'}
+      </Callout>
+    </Chapter>
+  );
+}
+
+/** IC-by-horizon decay, plotted on a log-horizon axis with the theoretical IC/√h reference dashed. */
+function IcDecayChart({ points }: { points: MicroDecayPoint[] }) {
+  if (points.length < 2) return <div className="empty" style={{ padding: 40 }}>loading…</div>;
+  const W = 600, H = 220, m = { l: 42, r: 14, t: 14, b: 32 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const maxLogH = Math.log(Math.max(...points.map((p) => p.horizon)));
+  const ymax = Math.max(...points.map((p) => p.ic), 0.02) * 1.15;
+  const x = (h: number) => m.l + (Math.log(h) / (maxLogH || 1)) * pw;
+  const y = (v: number) => m.t + (1 - v / ymax) * ph;
+  const ic1 = points[0].ic;
+  const line = points.map((p) => `${x(p.horizon).toFixed(1)},${y(p.ic).toFixed(1)}`).join(' ');
+  const ref = points.map((p) => `${x(p.horizon).toFixed(1)},${y(ic1 / Math.sqrt(p.horizon)).toFixed(1)}`).join(' ');
+  const yTicks = [0, ymax / 2, ymax];
+  return (
+    <svg className="eqchart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="information coefficient by horizon">
+      {yTicks.map((v, k) => (
+        <g key={k}>
+          <line className="eqc-grid" x1={m.l} x2={W - m.r} y1={y(v)} y2={y(v)} />
+          <text className="eqc-tick" x={m.l - 6} y={y(v) + 3} textAnchor="end">{v.toFixed(2)}</text>
+        </g>
+      ))}
+      <polyline points={ref} fill="none" stroke="var(--muted)" strokeWidth={1.3} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+      <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      {points.map((p, i) => <circle key={i} cx={x(p.horizon)} cy={y(p.ic)} r={2.6} fill="var(--accent)" />)}
+      {points.map((p, i) => (
+        <text key={`t${i}`} className="eqc-tick" x={x(p.horizon)} y={H - 8}
+          textAnchor={i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'}>{p.horizon}</text>
+      ))}
+      <text className="eqc-tick" x={(m.l + W - m.r) / 2} y={H - 8 - 12} textAnchor="middle" style={{ fill: 'var(--muted)', opacity: 0 }}>h</text>
+    </svg>
+  );
+}
+
+/** Gross vs net Sharpe as round-trip cost rises, with the break-even and a movable cost cursor. */
+function CostSweepChart({ sweep, breakeven, cursor, gross }: {
+  sweep: MicroSweepPoint[]; breakeven: number | null; cursor: number; gross: number;
+}) {
+  if (sweep.length < 2) return <div className="empty" style={{ padding: 40 }}>loading…</div>;
+  const W = 600, H = 220, m = { l: 42, r: 14, t: 14, b: 32 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const maxCost = Math.max(...sweep.map((s) => s.cost_bps));
+  const yTop = Math.max(gross, 4) * 1.1;
+  const yBot = -Math.max(gross, 4) * 1.1;              // symmetric window around zero; deep-negative tail clips
+  const x = (c: number) => m.l + (c / (maxCost || 1)) * pw;
+  const y = (v: number) => m.t + (1 - (v - yBot) / (yTop - yBot)) * ph;
+  const clip = (v: number) => Math.max(yBot, Math.min(yTop, v));
+  const netLine = sweep.map((s) => `${x(s.cost_bps).toFixed(1)},${y(clip(s.net_sharpe)).toFixed(1)}`).join(' ');
+  const grossLine = `${x(0).toFixed(1)},${y(clip(gross)).toFixed(1)} ${x(maxCost).toFixed(1)},${y(clip(gross)).toFixed(1)}`;
+  const cursorNet = clip(interpNet(sweep, cursor));
+  const y0 = y(0);
+  return (
+    <svg className="eqchart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="gross and net Sharpe versus cost">
+      {/* untradable zone: cost beyond break-even */}
+      {breakeven != null && breakeven < maxCost && (
+        <rect x={x(breakeven)} y={m.t} width={x(maxCost) - x(breakeven)} height={ph} fill="var(--sell)" fillOpacity={0.05} />
+      )}
+      {/* zero baseline */}
+      <line x1={m.l} x2={W - m.r} y1={y0} y2={y0} stroke="var(--muted)" strokeWidth={1} />
+      <text className="eqc-tick" x={m.l - 6} y={y0 + 3} textAnchor="end">0</text>
+      <text className="eqc-tick" x={m.l - 6} y={y(clip(gross)) + 3} textAnchor="end">{gross.toFixed(0)}</text>
+      {/* gross (flat, costless) */}
+      <polyline points={grossLine} fill="none" stroke="var(--buy)" strokeWidth={1.6} strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />
+      <text className="eqc-tick" x={x(0) + 4} y={y(clip(gross)) - 5} style={{ fill: 'var(--buy)' }}>gross (costless)</text>
+      {/* net */}
+      <polyline points={netLine} fill="none" stroke="var(--accent)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      {/* break-even marker */}
+      {breakeven != null && breakeven <= maxCost && (
+        <g>
+          <line x1={x(breakeven)} x2={x(breakeven)} y1={m.t} y2={m.t + ph} stroke="var(--warn)" strokeWidth={1.2} strokeDasharray="3 3" />
+          <text className="eqc-tick" x={x(breakeven)} y={m.t + 10} textAnchor="middle" style={{ fill: 'var(--warn)' }}>
+            break-even {breakeven.toFixed(2)}
+          </text>
+        </g>
+      )}
+      {/* cost cursor */}
+      <line x1={x(cursor)} x2={x(cursor)} y1={m.t} y2={m.t + ph} stroke="var(--ink)" strokeWidth={1} strokeOpacity={0.5} />
+      <circle cx={x(cursor)} cy={y(cursorNet)} r={3.5} fill={cursorNet >= 0 ? 'var(--buy)' : 'var(--sell)'} />
+      {/* x ticks */}
+      {[0, maxCost / 2, maxCost].map((c, k) => (
+        <text key={k} className="eqc-tick" x={x(c)} y={H - 8} textAnchor={k === 0 ? 'start' : k === 2 ? 'end' : 'middle'}>{c.toFixed(2)} bps</text>
+      ))}
+    </svg>
   );
 }

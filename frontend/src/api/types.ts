@@ -289,6 +289,36 @@ export interface BacktestResult {
   verdict: string;
 }
 
+// ── Microstructure study (order-flow alpha on an event-driven backtester) ──
+export interface MicroDecayPoint {
+  horizon: number;
+  ic: number;
+}
+export interface MicroSweepPoint {
+  cost_bps: number;
+  gross_sharpe: number;
+  net_sharpe: number;
+  net_bps: number;
+  turnover: number;
+}
+export interface MicroStudy {
+  menu: SignalMeta[];
+  params: { n: number; ic: number; ret_vol_bps: number; signal: string };
+  ic_decay: MicroDecayPoint[];
+  cost_sweep: MicroSweepPoint[];
+  breakeven_cost_bps: number | null;
+  gross_sharpe: number;
+  representative: {
+    cost_bps: number;
+    net_sharpe: number;
+    hac_t: number;
+    net_bps: number;
+    turnover: number;
+    hit_rate: number;
+  };
+  verdict: string;
+}
+
 export interface FindingRow {
   name: string;
   label: string;

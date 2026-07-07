@@ -53,6 +53,17 @@ def backtest(signal: str = Query(..., description="signal name or 'composite'"),
         raise HTTPException(status_code=404, detail=f"unknown signal: {signal}")
 
 
+@app.get("/api/research/microstructure")
+def microstructure(ic: float = Query(0.10, ge=0.0, le=0.30, description="ground-truth 1-step OFI IC"),
+                   signal: str = Query("ofi", description="ofi | ofi_smooth | queue_imb")) -> dict:
+    """Microstructure alpha: a known-IC order-flow tape, the signal-decay curve, and the cost sweep
+    that finds the break-even between a predictive signal and a tradable one."""
+    try:
+        return compute.microstructure_study(ic=ic, signal=signal)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown signal: {signal}")
+
+
 @app.get("/api/research/findings")
 def findings() -> dict:
     """The 'honest null' single-factor table + selection-aware stats (snapshot, else computed)."""

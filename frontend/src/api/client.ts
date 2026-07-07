@@ -16,6 +16,7 @@ import type {
   Findings,
   ModifyStrategyRequest,
   MicroSnapshot,
+  MicroStudy,
   Order,
   PaperOrder,
   PaperOrderRequest,
@@ -180,4 +181,10 @@ export const api = {
     ),
   researchFindings: () => request<Findings>('/findings', undefined, RESEARCH_BASE),
   researchConstruction: () => request<Construction>('/construction', undefined, RESEARCH_BASE),
+  researchMicrostructure: (ic: number, signal: string) =>
+    request<MicroStudy>(
+      `/microstructure?ic=${ic}&signal=${encodeURIComponent(signal)}`,
+      undefined,
+      RESEARCH_BASE,
+    ),
 };

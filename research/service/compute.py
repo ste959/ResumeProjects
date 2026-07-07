@@ -37,6 +37,7 @@ from mds import structuring as st            # noqa: E402
 from mds import taxaware as tx               # noqa: E402
 from mds import validation as val            # noqa: E402
 from mds import options as opt               # noqa: E402
+from mds import microstructure as micro      # noqa: E402
 
 SNAPSHOT_PATH = pathlib.Path(__file__).resolve().parent / "snapshot.json"
 TRADING_DAYS = 252
@@ -159,6 +160,26 @@ def backtest_signal(signal: str, cost_bps: float = 5.0, neutralize: bool = True)
         "bonferroni_z": _f(zbar), "significant": bool(significant),
         "equity_curve": _curve(net), "verdict": verdict,
     }
+
+
+MICRO_SIGNALS = [
+    {"name": "ofi", "label": "Order-Flow Imbalance", "desc": "Net signed order flow (Cont–Kukanov–Stoikov) — the best short-horizon predictor."},
+    {"name": "ofi_smooth", "label": "Smoothed OFI", "desc": "5-tick moving average of OFI — trades noise for lag."},
+    {"name": "queue_imb", "label": "Queue Imbalance", "desc": "Top-of-book size imbalance — a weaker, noisier correlate of OFI."},
+]
+
+
+def microstructure_study(ic: float = 0.10, signal: str = "ofi", n: int = 60_000) -> dict:
+    """The microstructure story for the Lab: a known-IC order-flow tape, its signal-decay curve, and
+    a round-trip-cost sweep that finds the break-even where a genuinely predictive signal stops being
+    tradable. Deterministic (fixed seed) so the reviewer can reason about the numbers."""
+    if signal not in {s["name"] for s in MICRO_SIGNALS}:
+        raise KeyError(signal)
+    ic = float(min(0.30, max(0.0, ic)))
+    # A grid refined near the break-even so the reviewer can actually read where net Sharpe crosses zero.
+    grid = (0.0, 0.03, 0.06, 0.1, 0.13, 0.16, 0.2, 0.25, 0.3, 0.4, 0.5, 0.7, 1.0)
+    return {"menu": MICRO_SIGNALS,
+            **micro.study(n=int(n), ic=ic, signal_name=signal, cost_grid=grid, seed=0)}
 
 
 def _neut_sharpe(sig: pd.DataFrame, rets: pd.DataFrame) -> float:

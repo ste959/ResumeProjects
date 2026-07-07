@@ -1538,8 +1538,19 @@ code {
 .lab2-verdict.warn .lab2-chip { color: var(--warn); }
 .lab2-verdict.neutral .lab2-chip { color: var(--muted); }
 
+/* microstructure chapter — interactive order-flow study */
+.micro-controls { display: grid; grid-template-columns: 220px 1fr 1fr; gap: 18px; align-items: end; padding: 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); box-shadow: var(--shadow); }
+.micro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.micro-chart { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); box-shadow: var(--shadow); padding: 14px 16px; }
+.micro-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.micro-chart-head h4 { font-family: var(--sans); font-size: 13px; font-weight: 700; color: var(--ink); margin: 0; }
+.micro-chart-head span { font-family: var(--sans); font-size: 11px; color: var(--dim); text-align: right; }
+.micro-cap { font-family: var(--sans); font-size: 11.5px; line-height: 1.5; color: var(--dim); margin: 8px 2px 0; }
+.micro-readout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; }
+
 @media (max-width: 860px) {
   .gauntlet, .lab2, .lab2-stats { grid-template-columns: 1fr; }
+  .micro-controls, .micro-grid, .micro-readout { grid-template-columns: 1fr; }
   .layer-card { grid-template-columns: 1fr; gap: 8px; }
   .lc-result { text-align: left; }
 }
