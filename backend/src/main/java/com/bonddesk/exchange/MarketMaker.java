@@ -22,6 +22,7 @@ public final class MarketMaker implements ExchangeListener {
     private long inventory;              // net lots (long > 0, short < 0)
     private long cash;                   // in tick·lots; +ve = received
     private long bidId, askId;
+    private long bidPx, askPx;           // current quote prices (ticks), 0 if not quoting that side
     private long fills;
 
     public MarketMaker(long baseHalfSpread, long invSkew, long quoteSize, long maxInventory) {
@@ -35,21 +36,24 @@ public final class MarketMaker implements ExchangeListener {
     public void requote(OrderBook book, long fairTicks) {
         if (bidId > 0) book.cancel(bidId);
         if (askId > 0) book.cancel(askId);
-        bidId = askId = 0;
+        bidId = askId = bidPx = askPx = 0;
 
         long reservation = fairTicks - inventory * invSkew;   // lean against inventory
-        long bidPx = reservation - baseHalfSpread;
-        long askPx = reservation + baseHalfSpread;
+        long wantBid = reservation - baseHalfSpread;
+        long wantAsk = reservation + baseHalfSpread;
 
-        if (inventory < maxInventory && bidPx > 0) {
-            SubmitResult r = book.submit(ID, Side.BUY, OrderType.LIMIT, TimeInForce.GTC, true, bidPx, quoteSize);
-            if (r.accepted()) bidId = r.orderId();            // rejected only if it would cross (post-only)
+        if (inventory < maxInventory && wantBid > 0) {
+            SubmitResult r = book.submit(ID, Side.BUY, OrderType.LIMIT, TimeInForce.GTC, true, wantBid, quoteSize);
+            if (r.accepted()) { bidId = r.orderId(); bidPx = wantBid; }   // rejected only if it would cross
         }
         if (inventory > -maxInventory) {
-            SubmitResult r = book.submit(ID, Side.SELL, OrderType.LIMIT, TimeInForce.GTC, true, askPx, quoteSize);
-            if (r.accepted()) askId = r.orderId();
+            SubmitResult r = book.submit(ID, Side.SELL, OrderType.LIMIT, TimeInForce.GTC, true, wantAsk, quoteSize);
+            if (r.accepted()) { askId = r.orderId(); askPx = wantAsk; }
         }
     }
+
+    public long quoteBidTicks() { return bidPx; }
+    public long quoteAskTicks() { return askPx; }
 
     @Override
     public void onTrade(Trade t) {
