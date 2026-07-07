@@ -1,8 +1,11 @@
 import type {
+  AssetClass,
   BacktestResult,
+  BondAnalytics,
   BookView,
   Construction,
   CreateOrderRequest,
+  CreateRfqRequest,
   CreateStrategyRequest,
   CryptoPosition,
   DeskRiskSummary,
@@ -15,11 +18,16 @@ import type {
   PaperOrderRequest,
   Position,
   ProductQuote,
+  Rfq,
+  RfqExecution,
   Security,
   SecurityVolume,
   SignalMeta,
   StrategyView,
+  TaxReport,
+  TaxRequest,
   TradePrint,
+  YieldCurve,
   ApiError,
 } from './types';
 
@@ -60,7 +68,26 @@ async function request<T>(path: string, init?: RequestInit, base: string = BASE)
 }
 
 export const api = {
-  securities: () => request<Security[]>('/securities'),
+  securities: (assetClass?: AssetClass) =>
+    request<Security[]>(`/securities${assetClass ? `?assetClass=${assetClass}` : ''}`),
+
+  // Fixed-income OTC desk (dealer RFQ), the benchmark curve, and bond analytics.
+  rfqCreate: (req: CreateRfqRequest) =>
+    request<Rfq>('/rfq', { method: 'POST', body: JSON.stringify(req) }),
+  rfqList: () => request<Rfq[]>('/rfq'),
+  rfqGet: (id: string) => request<Rfq>(`/rfq/${encodeURIComponent(id)}`),
+  rfqAccept: (id: string, dealer?: string) =>
+    request<RfqExecution>(
+      `/rfq/${encodeURIComponent(id)}/accept${dealer ? `?dealer=${encodeURIComponent(dealer)}` : ''}`,
+      { method: 'POST' },
+    ),
+  yieldCurve: () => request<YieldCurve>('/rfq/curve'),
+  bondAnalytics: (cusip: string) =>
+    request<BondAnalytics>(`/securities/${encodeURIComponent(cusip)}/analytics`),
+
+  // Tax engine (lot accounting, wash sales, §475(f) MTM).
+  taxCompute: (req: TaxRequest) =>
+    request<TaxReport>('/tax', { method: 'POST', body: JSON.stringify(req) }),
 
   orders: () => request<Order[]>('/orders'),
 

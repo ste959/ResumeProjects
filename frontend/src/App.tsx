@@ -4,13 +4,12 @@ import { api } from './api/client';
 import type { Security } from './api/types';
 import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { Architecture } from './components/Architecture';
-import { Blotter } from './components/Blotter';
+import { FixedIncomeDesk } from './components/FixedIncomeDesk';
 import { MarketStream } from './components/MarketStream';
-import { OrderTicket } from './components/OrderTicket';
-import { Positions } from './components/Positions';
 import { ResearchLab } from './components/ResearchLab';
 import { RiskDashboard } from './components/RiskDashboard';
 import { Strategies } from './components/Strategies';
+import { TaxPanel } from './components/TaxPanel';
 import { usePolling } from './hooks/usePolling';
 
 const PORTFOLIO = 'PORT-DEMO';
@@ -112,15 +111,13 @@ function Shell() {
         <Route
           path="/fixed-income"
           element={
-            <main className="layout">
-              <aside className="sidebar">
-                <OrderTicket securities={securities} portfolio={PORTFOLIO} onSubmitted={refresh} />
-              </aside>
-              <section className="content">
-                <Blotter orders={orders.data ?? []} onChanged={refresh} />
-                <Positions positions={positions.data ?? []} />
-              </section>
-            </main>
+            <FixedIncomeDesk
+              securities={securities}
+              orders={orders.data ?? []}
+              positions={positions.data ?? []}
+              onChanged={refresh}
+              portfolio={PORTFOLIO}
+            />
           }
         />
 
@@ -143,6 +140,12 @@ function Shell() {
                 execQuality={execQuality.data ?? []}
                 topSecurities={topSecurities.data ?? []}
               />
+              <div className="risk-intro">
+                <span className="dot live" />
+                After-tax P&amp;L from the <b>tax engine</b> — lot accounting, wash sales &amp; §475(f)
+                mark-to-market
+              </div>
+              <TaxPanel />
             </main>
           }
         />

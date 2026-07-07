@@ -13,8 +13,12 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'REJECTED';
 
+export type AssetClass = 'FIXED_INCOME' | 'EQUITY';
+
 export interface Security {
   cusip: string;
+  assetClass?: AssetClass;
+  ticker?: string;
   isin: string;
   description: string;
   issuer: string;
@@ -383,3 +387,121 @@ export type StreamFrame =
   | { type: 'book'; product: string; quote: ProductQuote; bids: DepthLevel[]; asks: DepthLevel[] }
   | { type: 'trade'; product: string; trades: TradePrint[] }
   | { type: 'metrics'; product: string; metrics: StreamMetrics };
+
+// ---- Fixed-income OTC desk (RFQ), yield curve, bond analytics, tax ----
+
+export interface DealerQuote {
+  dealer: string;
+  price: number;
+  yieldPct: number;
+  spreadBps: number;
+  size: number;
+  best: boolean;
+}
+
+export interface Rfq {
+  id: string;
+  cusip: string;
+  description: string;
+  side: OrderSide;
+  quantity: number;
+  tenorYears: number | null;
+  curveYieldPct: number | null;
+  creditSpreadBps: number | null;
+  fairYieldPct: number | null;
+  fairClean: number | null;
+  quotes: DealerQuote[];
+  status: string;
+  acceptedDealer: string | null;
+  executedOrderRef: string | null;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface CreateRfqRequest {
+  cusip: string;
+  portfolio: string;
+  trader: string;
+  side: OrderSide;
+  quantity: number;
+}
+
+export interface RfqExecution {
+  rfqId: string;
+  orderRef: string;
+  dealer: string | null;
+  side: OrderSide;
+  quantity: number | null;
+  price: number | null;
+  status: string;
+}
+
+export interface YieldCurve {
+  asOf: string;
+  tenors: number[];
+  yields: number[];
+  source: string;
+}
+
+export interface BondAnalytics {
+  cusip: string;
+  description: string;
+  settlementDate: string;
+  cleanPrice: number;
+  yieldToMaturityPct: number;
+  accruedInterest: number;
+  dirtyPrice: number;
+  macaulayDuration: number;
+  modifiedDuration: number;
+  convexity: number;
+  dv01: number;
+}
+
+export interface TaxTrade {
+  time: string;
+  side: string;
+  quantity: number;
+  price: number;
+}
+
+export interface TaxRequest {
+  assetClass: string;
+  lotMethod: string;
+  regime: string;
+  ordinaryRate?: number;
+  longTermRate?: number;
+  markPrice?: number;
+  trades: TaxTrade[];
+}
+
+export interface Disposition {
+  acquired: string;
+  sold: string;
+  quantity: number;
+  proceeds: number;
+  costBasis: number;
+  gain: number;
+  holdingDays: number;
+  longTerm: boolean;
+  washDisallowed: number;
+}
+
+export interface TaxReport {
+  assetClass: string;
+  regime: string;
+  lotMethod: string;
+  proceeds: number;
+  realizedGain: number;
+  shortTermGain: number;
+  longTermGain: number;
+  washSaleDisallowed: number;
+  unrealizedMtm: number;
+  taxableGain: number;
+  taxOwed: number;
+  preTaxPnl: number;
+  afterTaxPnl: number;
+  effectiveTaxRate: number;
+  openPosition: number;
+  openAvgBasis: number;
+  dispositions: Disposition[];
+}
