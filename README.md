@@ -80,7 +80,7 @@ the same numbers).
 | **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions, transaction cost analysis |
 | **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → separate `risk-service` consumer |
 | **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
-| **Test automation (unit/integration/UI)** | 116 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + 54 Python research + **Vitest/RTL** component tests + **Playwright** E2E |
+| **Test automation (unit/integration/UI)** | 129 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + 54 Python research + **Vitest/RTL** component tests + **Playwright** E2E |
 | **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
 | **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
 | **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
@@ -134,10 +134,26 @@ registered), **dry-run by default**, and gated on the **tighter** of the desk ca
 rebalance-book cap. A dry-run on the 123-name book plans ~110 dollar-neutral delta orders (~57 long /
 ~53 short, ~$100k gross); an oversized request returns `BLOCKED_RISK_LIMIT` and routes nothing.
 
+**Turnkey operational loop** (so research can iterate and the plumbing "just works") — four pieces, all
+verified live against the paper account:
+
+- **Live pricing** (`AlpacaMarketDataClient`) — batched IEX snapshots mark the book and size the
+  rebalance at real prices, not stale reference marks.
+- **Broker position reconciliation** (`PositionReconciler`) — snaps the OMS positions to Alpaca truth
+  (`GET /v2/positions`) on startup and before each auto-run, so restarts/drift/missed fills self-heal.
+- **Market-hours auto-rebalancer** (`RebalanceScheduler`) — runs the rebalance *at most once per
+  New-York trading day, only while the Alpaca clock reports the market open*; **off by default**
+  (`auto-enabled=false`), and a scheduler throw can't cancel the recurring task.
+- **Ops status** (`GET /api/equity/status`) — read-only glance at broker reachability, market hours,
+  target-book date, live-marked positions (long/short/net), risk caps, and the last run. Never 500s.
+
+The workflow: edit signals → `python export_target_book.py` → the loop trades toward the new book,
+reconciles fills, and reports health — all paper, all gated.
+
 > **This is execution-infrastructure validation, not an alpha deployment.** The research found *no*
-> statistically significant edge (Deflated Sharpe ≈0.11); the bridge exists to prove the
-> signal → order → fill → reconcile plumbing works end-to-end, and it is labeled as such in the code
-> and the target-book file itself.
+> statistically significant edge (Deflated Sharpe ≈0.11); the bridge and its ops loop exist to prove the
+> signal → order → fill → reconcile plumbing works end-to-end, and every layer is off/dry-run by default
+> and labeled as such in the code, the config, and the target-book file itself.
 
 ---
 
@@ -314,6 +330,7 @@ kubectl -n bonddesk get pods
 | `POST` | `/api/orders/{ref}/fills` | Report a fill |
 | `POST` | `/api/orders/{ref}/cancel` | Cancel a working order |
 | `POST` | `/api/equity/rebalance` | Rebalance the equity book toward the research target (dry-run by default; disabled by default) |
+| `GET` | `/api/equity/status` | Ops status of the paper-trading loop: broker/market/positions (live-marked)/last run |
 | `GET` | `/api/portfolios/{portfolio}/positions` | Positions with mark-to-market |
 | `GET` | `/api/analytics/desk-summary` | Order counts, fill rate, filled notional (aggregate SQL) |
 | `GET` | `/api/analytics/execution-quality` | TCA: avg fill vs. benchmark, slippage (bps) by security/side |

@@ -17,6 +17,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Thin REST client for the Alpaca (paper) trading API. Submits equity orders to the
@@ -53,6 +55,14 @@ public class AlpacaBrokerClient {
 
     /** Broker's tradability metadata for a symbol. */
     public record AlpacaAsset(String symbol, boolean tradable, boolean shortable) {
+    }
+
+    /** Broker's view of an open position. {@code qty} is SIGNED — negative for shorts. */
+    public record BrokerPosition(String symbol, BigDecimal qty, BigDecimal avgEntryPrice) {
+    }
+
+    /** Broker's market clock: whether the exchange is open plus the surrounding session bounds. */
+    public record MarketClock(boolean open, String timestamp, String nextOpen, String nextClose) {
     }
 
     /** True when broker credentials are present, so the venue can be called. */
@@ -157,6 +167,71 @@ public class AlpacaBrokerClient {
         } catch (RuntimeException e) {
             log.debug("Alpaca account fetch failed: {}", e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * The broker's open positions (signed quantity, negative for shorts). Returns an empty list
+     * (never throws) when credentials are absent or the call fails, so the reconciler can no-op
+     * safely rather than corrupting the OMS book on a transient broker outage.
+     */
+    public List<BrokerPosition> positions() {
+        if (!props.hasCredentials()) {
+            log.debug("Broker positions fetch skipped — no Alpaca credentials");
+            return List.of();
+        }
+        try {
+            HttpResponse<String> res = send(HttpRequest.newBuilder()
+                    .uri(URI.create(props.getTradingBaseUrl() + "/v2/positions"))
+                    .GET());
+            if (res.statusCode() / 100 != 2) {
+                log.debug("Alpaca positions fetch returned {}", res.statusCode());
+                return List.of();
+            }
+            JsonNode arr = readTree(res.body());
+            List<BrokerPosition> out = new ArrayList<>();
+            if (arr.isArray()) {
+                for (JsonNode n : arr) {
+                    String symbol = n.path("symbol").asText(null);
+                    if (symbol == null || symbol.isBlank()) {
+                        continue;
+                    }
+                    out.add(new BrokerPosition(symbol, decimal(n, "qty"), decimal(n, "avg_entry_price")));
+                }
+            }
+            return out;
+        } catch (RuntimeException e) {
+            log.debug("Alpaca positions fetch failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * The broker's market clock. Returns a closed clock (never throws) when credentials are absent
+     * or the call fails, so the auto-rebalancer treats an unreachable broker as "market closed" and
+     * does nothing rather than trading blind.
+     */
+    public MarketClock clock() {
+        if (!props.hasCredentials()) {
+            return new MarketClock(false, null, null, null);
+        }
+        try {
+            HttpResponse<String> res = send(HttpRequest.newBuilder()
+                    .uri(URI.create(props.getTradingBaseUrl() + "/v2/clock"))
+                    .GET());
+            if (res.statusCode() / 100 != 2) {
+                log.debug("Alpaca clock fetch returned {}", res.statusCode());
+                return new MarketClock(false, null, null, null);
+            }
+            JsonNode n = readTree(res.body());
+            return new MarketClock(
+                    n.path("is_open").asBoolean(false),
+                    n.path("timestamp").asText(null),
+                    n.path("next_open").asText(null),
+                    n.path("next_close").asText(null));
+        } catch (RuntimeException e) {
+            log.debug("Alpaca clock fetch failed: {}", e.getMessage());
+            return new MarketClock(false, null, null, null);
         }
     }
 

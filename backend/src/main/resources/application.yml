@@ -78,6 +78,7 @@ oms:
     key-id: ${ALPACA_KEY_ID:}
     secret-key: ${ALPACA_SECRET_KEY:}
     symbols: [AAPL, MSFT, NVDA, AMZN, JPM, TSLA]
+    data-base-url: https://data.alpaca.markets   # REST snapshots host (distinct from the trading API)
   fixedincome:
     live-curve: true         # fetch the real daily US Treasury par-yield curve (keyless)
     dealer-count: 5          # dealers responding to each RFQ
@@ -92,6 +93,12 @@ oms:
     target-book-path: target-book/target-book.json
     max-gross-notional: 250000     # tight cap on the paper equity book (rebalance uses the tighter
                                    # of this and the desk-wide oms.risk.max-gross-notional)
+    # Market-hours auto-rebalancer. ALL SAFE-OFF by default: the scheduler is inert unless BOTH the
+    # module (enabled) and auto-enabled are true, only runs while the broker reports the market open,
+    # and at most once per America/New_York trading day. Position reconcile is likewise opt-in.
+    auto-enabled: false            # market-hours auto-rebalancer (off — never auto-trades until set true)
+    reconcile-positions: false     # snap OMS positions to broker truth on startup / before each auto run
+    check-interval-ms: 300000      # how often the scheduler wakes to check market hours + the daily guard
   risk:
     # Aggregate pre-trade breaker on the live order path: reject an order that would push a
     # portfolio's total gross notional (open positions + this order) over this limit. A

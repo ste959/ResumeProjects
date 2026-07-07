@@ -79,27 +79,41 @@ public class RebalanceService {
      * {@code grossCapital}. Pure arithmetic — no orders are created and nothing is persisted.
      */
     public RebalancePlan plan(BigDecimal grossCapital, String portfolio) {
-        return buildPlan(targetBookLoader.load(), grossCapital, portfolio);
+        return buildPlan(targetBookLoader.load(), grossCapital, portfolio, Map.of());
     }
 
-    private RebalancePlan buildPlan(TargetBook book, BigDecimal grossCapital, String portfolio) {
+    /**
+     * The effective sizing price for a name: a live override when present and positive, otherwise
+     * the target-book reference price. Overrides let the scheduler size against current marks.
+     */
+    private BigDecimal priceFor(TargetWeight name, Map<String, BigDecimal> priceOverrides) {
+        BigDecimal override = priceOverrides == null ? null : priceOverrides.get(name.symbol());
+        if (override != null && override.signum() > 0) {
+            return override;
+        }
+        return name.price();
+    }
+
+    private RebalancePlan buildPlan(TargetBook book, BigDecimal grossCapital, String portfolio,
+                                    Map<String, BigDecimal> priceOverrides) {
         Map<String, BigDecimal> currentByTicker = currentSharesByTicker(portfolio);
 
         List<PlannedTrade> trades = new ArrayList<>();
         BigDecimal projectedGross = BigDecimal.ZERO;
 
         for (TargetWeight name : book.names()) {
-            if (name.symbol() == null || name.price() == null || name.weight() == null
-                    || name.price().signum() <= 0) {
+            BigDecimal price = priceFor(name, priceOverrides);
+            if (name.symbol() == null || price == null || name.weight() == null
+                    || price.signum() <= 0) {
                 log.debug("Skipping malformed target name: {}", name);
                 continue;
             }
 
             // targetShares = round-half-up(weight * grossCapital / price) as whole shares (signed).
             BigDecimal targetShares = name.weight().multiply(grossCapital)
-                    .divide(name.price(), 0, RoundingMode.HALF_UP);
+                    .divide(price, 0, RoundingMode.HALF_UP);
 
-            projectedGross = projectedGross.add(targetShares.multiply(name.price()).abs());
+            projectedGross = projectedGross.add(targetShares.multiply(price).abs());
 
             BigDecimal currentShares = currentByTicker.getOrDefault(name.symbol(), BigDecimal.ZERO);
             BigDecimal delta = targetShares.subtract(currentShares);
@@ -111,7 +125,7 @@ public class RebalanceService {
             boolean shortSale = targetShares.signum() < 0
                     || (delta.signum() < 0 && currentShares.signum() <= 0);
             trades.add(new PlannedTrade(name.symbol(), name.symbol(), side, delta.abs(),
-                    name.price(), targetShares, currentShares, shortSale));
+                    price, targetShares, currentShares, shortSale));
         }
 
         BigDecimal max = effectiveGrossCap();
@@ -125,8 +139,18 @@ public class RebalanceService {
      * the venue through the standard create → stage → route lifecycle.
      */
     public RebalanceResult execute(BigDecimal grossCapital, String portfolio, boolean dryRun) {
+        return execute(grossCapital, portfolio, dryRun, Map.of());
+    }
+
+    /**
+     * As {@link #execute(BigDecimal, String, boolean)}, but a live price override (symbol -> mark)
+     * replaces the target-book price for sizing AND the {@code Security.cleanPrice} refresh. An
+     * empty map reproduces the pure target-book path exactly.
+     */
+    public RebalanceResult execute(BigDecimal grossCapital, String portfolio, boolean dryRun,
+                                   Map<String, BigDecimal> priceOverrides) {
         TargetBook book = targetBookLoader.load();
-        RebalancePlan plan = buildPlan(book, grossCapital, portfolio);
+        RebalancePlan plan = buildPlan(book, grossCapital, portfolio, priceOverrides);
 
         if (!plan.withinRiskLimit()) {
             log.warn("Rebalance for {} BLOCKED: projected gross notional {} exceeds the cap {}",
@@ -140,9 +164,10 @@ public class RebalanceService {
             return RebalanceResult.planOnly(plan, "DRY_RUN");
         }
 
-        // Live path: refresh each named security's reference price from the target book so the
-        // downstream pre-trade risk guard and position marks size against current prices.
-        refreshPrices(book);
+        // Live path: refresh each named security's reference price (live override when present,
+        // else the target-book price) so the downstream pre-trade risk guard and position marks
+        // size against current prices.
+        refreshPrices(book, priceOverrides);
 
         boolean reachable = broker.brokerReachable();
         List<TradeOutcome> outcomes = new ArrayList<>();
@@ -188,15 +213,17 @@ public class RebalanceService {
         return byTicker;
     }
 
-    /** Overwrite each named security's reference price with the target-book price. Guarded per name. */
-    private void refreshPrices(TargetBook book) {
+    /** Overwrite each named security's reference price with its effective mark (live override when
+     * present, else the target-book price). Guarded per name. */
+    private void refreshPrices(TargetBook book, Map<String, BigDecimal> priceOverrides) {
         for (TargetWeight name : book.names()) {
-            if (name.symbol() == null || name.price() == null || name.price().signum() <= 0) {
+            BigDecimal price = priceFor(name, priceOverrides);
+            if (name.symbol() == null || price == null || price.signum() <= 0) {
                 continue;
             }
             try {
                 securities.findByTicker(name.symbol()).ifPresent(sec -> {
-                    sec.setCleanPrice(name.price());
+                    sec.setCleanPrice(price);
                     securities.save(sec);
                 });
             } catch (RuntimeException e) {

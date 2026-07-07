@@ -32,6 +32,46 @@ public class RebalanceProperties {
      * compliance. The rebalance is gated on the TIGHTER of the two. */
     private BigDecimal maxGrossNotional = new BigDecimal("250000");
 
+    /** Master switch for the market-hours auto-rebalancer scheduler. DISABLED by default:
+     * even with the module enabled, the scheduler is inert until this is explicitly turned on. */
+    private boolean autoEnabled = false;
+
+    /** When true, snap OMS positions to the broker's truth on startup (and before each auto run).
+     * DISABLED by default so the reconciler never mutates positions unless explicitly requested. */
+    private boolean reconcilePositions = false;
+
+    /** How often the auto-rebalancer wakes to check market hours / once-per-day guard, in ms. */
+    private long checkIntervalMs = 300000;
+
+    /** True only when BOTH the module is enabled and the auto-rebalancer is switched on. */
+    public boolean isAutoEnabled() {
+        return enabled && autoEnabled;
+    }
+
+    public boolean getAutoEnabled() {
+        return autoEnabled;
+    }
+
+    public void setAutoEnabled(boolean autoEnabled) {
+        this.autoEnabled = autoEnabled;
+    }
+
+    public boolean isReconcilePositions() {
+        return reconcilePositions;
+    }
+
+    public void setReconcilePositions(boolean reconcilePositions) {
+        this.reconcilePositions = reconcilePositions;
+    }
+
+    public long getCheckIntervalMs() {
+        return checkIntervalMs;
+    }
+
+    public void setCheckIntervalMs(long checkIntervalMs) {
+        this.checkIntervalMs = checkIntervalMs;
+    }
+
     public BigDecimal getMaxGrossNotional() {
         return maxGrossNotional;
     }

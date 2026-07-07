@@ -30,6 +30,9 @@ public class AlpacaProperties {
     /** Paper trading REST base. Live trading would be https://api.alpaca.markets. */
     private String tradingBaseUrl = "https://paper-api.alpaca.markets";
 
+    /** Market-data REST base (snapshots/latest quotes). Distinct host from the trading API. */
+    private String dataBaseUrl = "https://data.alpaca.markets";
+
     /** Symbols to stream and trade. */
     private List<String> symbols = List.of("AAPL", "MSFT", "NVDA", "AMZN", "JPM", "TSLA");
 
@@ -82,6 +85,14 @@ public class AlpacaProperties {
 
     public void setTradingBaseUrl(String tradingBaseUrl) {
         this.tradingBaseUrl = tradingBaseUrl;
+    }
+
+    public String getDataBaseUrl() {
+        return dataBaseUrl;
+    }
+
+    public void setDataBaseUrl(String dataBaseUrl) {
+        this.dataBaseUrl = dataBaseUrl;
     }
 
     public List<String> getSymbols() {

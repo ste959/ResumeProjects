@@ -58,6 +58,21 @@ public class PositionService {
     }
 
     /**
+     * Snap the (portfolio, security) holding to an ABSOLUTE net quantity and average cost,
+     * creating the position on first sight. This is the reconcile primitive — it overwrites the
+     * book with the broker's truth, distinct from {@link #applyFill} which applies a signed delta.
+     */
+    @Transactional
+    public Position setPosition(String portfolio, Security security, BigDecimal netQty, BigDecimal avgCost) {
+        Position pos = positions.findByPortfolioAndSecurity_Cusip(portfolio, security.getCusip())
+                .orElseGet(() -> new Position(portfolio, security));
+        pos.setNetQuantity(netQty == null ? BigDecimal.ZERO : netQty);
+        pos.setAvgCost(avgCost == null ? BigDecimal.ZERO : avgCost);
+        pos.setUpdatedAt(clock.instant());
+        return positions.save(pos);
+    }
+
+    /**
      * Weighted-average cost after a fill.
      * <ul>
      *   <li>Opening from flat, or adding in the same direction → blend old and new.</li>
