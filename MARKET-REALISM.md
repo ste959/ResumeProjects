@@ -434,6 +434,50 @@ It confirms the same honest conclusion one layer up: two 0.83-correlated winners
 
 ---
 
+## Portfolio construction & structuring (Phase 7 — the medium-to-long-horizon book)
+
+**Naive:** if no single signal is significant, there's no strategy.
+**Reality:** the single-factor null (best Deflated Sharpe ≈ 0.09) is a *breadth* verdict — Grinold–Kahn's
+`IR ≈ IC·√breadth` says 123 mega-caps can't resolve a small IC — not a verdict on portfolio *management*.
+When alpha is scarce, the medium-to-long-horizon edge shifts to **construction**: combine weak signals,
+risk-model them, time the mix/exposure, structure the payoff with options, and manage the tax. Five
+composable layers (`run_construction.py`), each measured against a naive baseline, each honest about what
+it does and doesn't buy:
+
+- **Multi-factor composite (`mds/factors.py`).** Signals grouped into economic *families* (value, quality,
+  momentum, reversal, low-risk, flow), winsorized-z-scored, and blended — the medium-term book blends the
+  return-premium families (value/quality/momentum) chosen *a priori by horizon*, not by peeking at Sharpes
+  (reversal/flow are short-horizon microstructure — costed losers on mega-caps, shown transparently; low-risk
+  is a defensive premium expressed via vol-scaling in the timing layer). The composite has a **positive,
+  significant information coefficient** (IC t ≈ 3.4) but its neutral net Sharpe (+0.31) still doesn't beat the
+  best single factor (value +0.64): diversifying weak signals lowers forecast *noise*, it can't manufacture
+  an edge that isn't there. A blind all-family blend is worse (net −0.98) — an honest lesson in specification.
+- **Factor risk model + constrained optimizer (`mds/riskmodel.py`).** A Barra-style `Σ = BFBᵀ + D` (market
+  beta + GICS sectors + style factors; factor returns from causal cross-sectional regressions, EWMA covariance
+  and specific risk), and an **analytic** factor-neutral mean-variance solve (KKT characteristic portfolio,
+  robust to redundant constraints via a pseudo-inverse) with a hard position cap and a turnover budget. On the
+  *same* composite alpha it lifts net Sharpe **+0.31 → +0.54** while cutting turnover **0.09 → 0.01** and max
+  drawdown **−7.7% → −3.9%** at |net β| ≈ 0.01 — the investable form of the alpha: same bet, controlled risk.
+- **Regime-conditional factor timing (`mds/factortiming.py`).** Rotate the family mix and scale exposure on
+  the causal FRED credit/VIX risk-appetite score. Mix timing is fragile (≈ flat — ~6y is few macro cycles,
+  as the literature warns), but **exposure timing** on the directional book cuts max drawdown **−22.8% →
+  −10.1%** (HAC t 2.4): the reliable half is risk control, not new cross-sectional alpha.
+- **Options structuring overlay (`mds/structuring.py`).** A Black–Scholes toolkit — tail hedge, covered-call
+  overwrite, collar, VRP — sized off the **live** IV surface (`options.py`). The surface *times* structure:
+  a 90% protective-put sleeve costs ~3.7%/yr at current IV but ~0.6%/yr at a low-IV entry; overwriting is
+  ranked by weak-momentum × high-IV, and reported by the honest metric — the **variance risk premium (IV−RV)**,
+  not the eye-popping annualized gross premium (which merely compensates the capped upside). Live surface only
+  (Alpaca history is OPRA-gated), so this is structuring/sizing on today's snapshot, clearly labelled.
+- **Tax-aware rebalancing (`mds/taxaware.py`).** Tax-lot accounting over the long book: **HIFO vs FIFO** lot
+  selection, wash-sale disallowance (forward-window, documented), and long/short holding-period classification.
+  On the same pre-tax trades, HIFO saves ~$17k of tax per $1M (deferral + long-term-rate conversion) — a real
+  after-tax edge that needs *no* significant signal. The research-side analog of the Java §475(f) tax engine.
+
+The through-line, stated plainly in the driver's verdict: **when standalone alpha is breadth-limited,
+construction and risk control ARE the edge** — and every layer is measured, not asserted, against a baseline.
+
+---
+
 ## Bias register — every known simplification and which way it cuts
 
 Naming the *direction* of a bias is the actual skill — a simplification that flatters the

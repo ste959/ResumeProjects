@@ -34,9 +34,18 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/edgar.py` | **SEC-EDGAR fundamentals** — point-in-time (filing-date) value/quality/accruals/investment factors |
 | `mds/macro.py` | **FRED credit/VIX risk-off overlay** — a causal macro-timing score (halves the long-book drawdown) |
 | `mds/options.py` | **Alpaca options surface** — live ATM-IV / 25Δ-skew / IV−RV cross-section |
+| `mds/factors.py` | **multi-factor composite** — value/quality/momentum families → one standardized score (Grinold–Kahn: lift effective breadth) |
+| `mds/riskmodel.py` | **factor risk model + constrained optimizer** — Σ=BFBᵀ+D and an analytic factor-neutral mean-variance solve with box + turnover caps |
+| `mds/factortiming.py` | **regime-conditional factor timing** — rotate the family mix & time exposure on the FRED credit/VIX state, then vol-budget the book |
+| `mds/structuring.py` | **options structuring overlay** — Black–Scholes tail hedge / covered-call / collar sized off the live IV surface |
+| `mds/taxaware.py` | **tax-aware rebalancing** — tax-lot accounting, HIFO vs FIFO, wash sales, long/short holding periods (after-tax edge) |
 
-The stat-arb study below is the entry point; the microstructure-ML, cross-sectional, portfolio
-and capacity layers (Phases 5–6) are documented in [`../MARKET-REALISM.md`](../MARKET-REALISM.md).
+The stat-arb study below is the entry point; the microstructure-ML, cross-sectional, portfolio,
+capacity and **portfolio-construction** layers (Phases 5–7) are documented in
+[`../MARKET-REALISM.md`](../MARKET-REALISM.md). The construction stack (`factors` → `riskmodel` →
+`factortiming` → `structuring` → `taxaware`, driven by `run_construction.py`) is the QR's answer to
+the null single-factor results: when standalone alpha is breadth-limited, *combining, risk-modelling,
+timing, hedging and tax-managing* is where the medium-to-long-horizon value lives.
 The technique is built and honest but the price-only data is exhausted (no significant edge) —
 [`ALPHA-DATA-ROADMAP.md`](ALPHA-DATA-ROADMAP.md) is the QR plan for the data that would actually move
 the needle (SEC-EDGAR fundamentals, macro/credit overlays, survivorship-free breadth, crypto L2).
@@ -51,7 +60,8 @@ python run_crosssec.py          # cross-sectional equity signals, with t-stats /
 python run_fundamentals.py      # SEC-EDGAR value/quality/accruals factors (point-in-time)
 python run_macro.py             # FRED credit/VIX risk-off overlay (halves the long-book drawdown)
 python run_options.py           # live Alpaca options surface: ATM-IV / skew / IV−RV
-python -m pytest                # 70 tests (offline; data modules fetch lazily)
+python run_construction.py      # 5-layer portfolio construction: composite → risk model → timing → options → tax
+python -m pytest                # 103 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests

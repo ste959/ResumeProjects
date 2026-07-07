@@ -200,3 +200,13 @@ credit overlays for timing (this week), then the crypto microstructure that reus
 Each plugs into the existing warehouse and faces the same DSR/PBO/HAC/purge gauntlet — so when
 something finally clears that bar, it'll be believable, and `export_target_book.py` will hand it
 straight to the (already-built, already-verified) paper-trading loop.
+
+**Complement — make the most of the data you already have.** Alongside the data upgrades, the
+**portfolio-construction stack** (`run_construction.py`: `factors` → `riskmodel` → `factortiming` →
+`structuring` → `taxaware`, documented in `MARKET-REALISM.md` Phase 7) is the QR's other lever: when
+standalone alpha is breadth-limited, the medium-to-long-horizon value is in *combining, risk-modelling,
+timing, hedging, and tax-managing*. On the current mega-cap data it already earns its keep — the
+risk-model optimizer delivers the same composite alpha at a third the drawdown and a tenth the turnover,
+exposure-timing halves the directional drawdown, and HIFO tax management is worth real basis points —
+none of which needs a significant standalone signal. Better data (#1–#5) raises the alpha; construction
+converts whatever alpha exists into an investable, risk-controlled, after-tax book.
