@@ -2,3 +2,4 @@
 # framework. Install both:  pip install -r ../requirements.txt -r requirements.txt
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
+httpx==0.28.1

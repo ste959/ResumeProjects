@@ -16,9 +16,13 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import compute
+from .desk import router as desk_router
 
 app = FastAPI(title="BondDesk Research Service", version="1.0.0",
               summary="Live backtests + the honest-null / construction snapshot for the Research Lab.")
+
+# The fresh Quant Desk surface (Alpaca-backed research → backtest → live).
+app.include_router(desk_router)
 
 # Same localhost-friendly CORS as the OMS backend (direct access in dev; the proxy is same-origin).
 app.add_middleware(

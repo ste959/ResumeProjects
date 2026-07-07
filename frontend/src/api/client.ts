@@ -17,6 +17,10 @@ import type {
   ModifyStrategyRequest,
   MicroSnapshot,
   MicroStudy,
+  QpStatus,
+  QpPosition,
+  QpOrder,
+  QpHistory,
   Order,
   PaperOrder,
   PaperOrderRequest,
@@ -187,4 +191,11 @@ export const api = {
       undefined,
       RESEARCH_BASE,
     ),
+
+  // Quant Desk — Alpaca-backed live paper trading (research → backtest → live).
+  qpStatus: () => request<QpStatus>('/status', undefined, RESEARCH_BASE),
+  qpPositions: () => request<QpPosition[]>('/live/positions', undefined, RESEARCH_BASE),
+  qpOrders: () => request<QpOrder[]>('/live/orders', undefined, RESEARCH_BASE),
+  qpHistory: (period = '1M', timeframe = '1D') =>
+    request<QpHistory>(`/live/history?period=${period}&timeframe=${timeframe}`, undefined, RESEARCH_BASE),
 };

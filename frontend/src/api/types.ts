@@ -289,6 +289,75 @@ export interface BacktestResult {
   verdict: string;
 }
 
+// ── Quant Desk (Alpaca-backed research → backtest → live) ──
+export interface QpAccount {
+  status: string | null;
+  currency: string;
+  equity: number | null;
+  last_equity: number | null;
+  cash: number | null;
+  buying_power: number | null;
+  portfolio_value: number | null;
+  long_mv: number | null;
+  short_mv: number | null;
+  pl_today: number | null;
+  pl_today_pct: number | null;
+  daytrade_count: number | string | null;
+  pattern_day_trader: boolean | null;
+}
+export interface QpClock {
+  is_open: boolean;
+  next_open: string;
+  next_close: string;
+  timestamp: string;
+}
+export interface QpStatus {
+  configured: boolean;
+  connected: boolean;
+  error?: string;
+  hint?: string;
+  account?: QpAccount;
+  clock?: QpClock;
+}
+export interface QpPosition {
+  symbol: string;
+  asset_class: string | null;
+  side: string;
+  qty: number | null;
+  avg_entry: number | null;
+  current_price: number | null;
+  market_value: number | null;
+  cost_basis: number | null;
+  unrealized_pl: number | null;
+  unrealized_plpc: number | null;
+  change_today: number | null;
+}
+export interface QpOrder {
+  id: string;
+  symbol: string;
+  side: string;
+  qty: number | null;
+  filled_qty: number | null;
+  type: string;
+  status: string;
+  submitted_at: string | null;
+  filled_at: string | null;
+  filled_avg_price: number | null;
+  client_order_id: string | null;
+}
+export interface QpHistoryPoint {
+  t: number;
+  equity: number | null;
+  pl: number | null;
+}
+export interface QpHistory {
+  configured: boolean;
+  error?: string;
+  base_value: number | null;
+  timeframe?: string;
+  points: QpHistoryPoint[];
+}
+
 // ── Microstructure study (order-flow alpha on an event-driven backtester) ──
 export interface MicroDecayPoint {
   horizon: number;

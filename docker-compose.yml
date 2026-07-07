@@ -87,6 +87,11 @@ services:
     volumes:
       # The columnar warehouse (bars/fundamentals/macro/options), read-only, so live backtests work.
       - ./research/data:/app/data:ro
+    environment:
+      # Alpaca paper-trading credentials — supplied via the repo-root .env (never committed).
+      - ALPACA_API_KEY=${ALPACA_API_KEY:-}
+      - ALPACA_API_SECRET=${ALPACA_API_SECRET:-}
+      - ALPACA_PAPER=${ALPACA_PAPER:-true}
     ports:
       - "8082:8082"
 

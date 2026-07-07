@@ -36,11 +36,11 @@ const PROJECTS: Project[] = [
   },
   {
     to: '/research',
-    eyebrow: 'Quant research · alpha',
-    title: 'Quant Research',
-    pitch: 'A leakage-free cross-sectional factor pipeline that is built to catch itself out — every signal faces the same overfitting gauntlet (Newey–West HAC, Deflated Sharpe, PBO, purge/embargo). Run any factor through it live and read the honest verdict.',
-    stat: '18 factors · honest, overfitting-adjusted stats',
-    tags: ['Python', 'FastAPI', 'pandas', 'econometrics'],
+    eyebrow: 'Quant desk · research → live',
+    title: 'Quant Desk',
+    pitch: 'A full research pipeline wired to a real Alpaca paper account: explore the market, backtest a signal, then promote it to a live strategy trading paper money — with per-strategy P&L you can watch. One signal, traced from idea to fill.',
+    stat: 'live paper trading · Alpaca',
+    tags: ['Python', 'FastAPI', 'Alpaca', 'React'],
     accent: 'var(--a-research)',
   },
 ];

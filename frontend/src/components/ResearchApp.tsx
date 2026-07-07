@@ -1,20 +1,33 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResearchLab } from './ResearchLab';
+import { BacktestTab } from './BacktestTab';
+import { ExplorationTab } from './ExplorationTab';
+import { LiveTab } from './LiveTab';
 
-// The quant-research pipeline as its own self-contained app, under its own identity header. The
-// Research Lab itself is backed by the FastAPI research service (/research-api).
+// Quant Desk — a fresh research→backtest→live pipeline as three tabs, backed end-to-end by a real
+// Alpaca paper account. Same light desk design language as the Fixed-Income product; its own identity.
+type Tab = 'explore' | 'backtest' | 'live';
+
 export function ResearchApp() {
+  const [tab, setTab] = useState<Tab>('live');
   return (
     <div className="app-shell research-shell">
       <header className="shell-head">
         <Link to="/" className="shell-back">← Projects</Link>
         <div className="shell-brand">
           <span className="shell-mark">∿</span>
-          <div><h1>Quant Research</h1><p>leakage-free factor pipeline · honest overfitting stats</p></div>
+          <div><h1>Quant Desk</h1><p>research → backtest → live · Alpaca paper</p></div>
         </div>
-        <span className="shell-note">full write-up: research/RESEARCH-NOTE.md</span>
+        <nav className="shell-nav">
+          <button className={tab === 'explore' ? 'active' : ''} onClick={() => setTab('explore')}>Exploration</button>
+          <button className={tab === 'backtest' ? 'active' : ''} onClick={() => setTab('backtest')}>Backtest</button>
+          <button className={tab === 'live' ? 'active' : ''} onClick={() => setTab('live')}>Live Strategies</button>
+        </nav>
       </header>
-      <ResearchLab />
+
+      {tab === 'explore' && <ExplorationTab />}
+      {tab === 'backtest' && <BacktestTab />}
+      {tab === 'live' && <LiveTab />}
     </div>
   );
 }
