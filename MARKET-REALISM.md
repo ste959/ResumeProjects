@@ -245,18 +245,22 @@ surface that; the scenario sweep makes it explicit. That is the overfitting defe
 **Reality:** on real data you cannot separate a genuine edge from a lucky fit — the ground truth is
 unknown. **Simulated data with a *planted* signal has known ground truth**, so you can measure whether
 a model actually recovers it, and — just as important — whether it hallucinates one where there is none.
-**What we do:** a generator produces a replayable L2 session from a model whose book imbalance is skewed
-toward the next mid move with a configurable strength (`imbalanceAlpha`), plus idiosyncratic noise.
-Output uses the exact capture format, so a synthetic market is a first-class session. Verified by
-recovering the imbalance→forward-return information coefficient from the raw generated book:
+**What we do — and an honest caveat about what it proves.** A generator produces a replayable L2 session
+whose book imbalance is skewed toward the next mid move (`imbalanceAlpha`) plus idiosyncratic noise, in the
+exact capture format. But note the circularity: the feature the model then reads, `imbalance =
+(bid−ask)/(bid+ask)`, *is* the planted skew — so "recovering" the signal on the `signal` session is
+**tautological**. That test is therefore a **plumbing + false-positive check**, not a modeling result:
 
-| session | injected alpha | recovered IC |
-|---|---|---|
-| signal | 2.5 | **+0.86** (recoverable) |
-| noise | 0 | **−0.02** (varies but predicts nothing — the false-positive check) |
+| session | injected alpha | measured IC | what it actually proves |
+|---|---|---|---|
+| noise | 0 | ≈ **0** | the pipeline does NOT hallucinate signal in noise (genuinely valuable) |
+| signal | 2.5 | ≈ **+0.9** | the pipeline is leakage-free and wired correctly — *not* that a model finds hidden alpha |
 
-This is precisely how JS validates ML on simulated data, and it is the substrate the ML phase trains
-on: fit where the answer is known, *then* turn the model loose on the real feed.
+To test **modeling** honestly, `lob.synthetic_latent_panel` provides a **non-circular** ground truth: a
+latent AR(1) fair value drives the forward return, and the features are noisy, *indirect* proxies of that
+hidden state (never the label). There the model must denoise several weak views, and it earns a **modest IC
+(~0.10) below the theoretical ceiling (~0.15)** — real extraction, honestly bounded. The contrast between
+the two synthetic modes is the point: the first validates the harness, the second validates the model.
 
 ---
 
@@ -297,9 +301,14 @@ report **t-stats and confidence intervals** (see `run_crosssec.py`): **no signal
 significance.** Momentum's +0.41 Sharpe sounds like an edge but its 95% CI straddles zero (t ≈ 0.76) on a
 survivorship-selected 40-name, 4.4-year sample; the *only* significant result is reversal, and it loses.
 The honest headline is therefore **a rigorous harness that finds no edge distinguishable from noise** —
-not a momentum finding. Testing six signals only makes it worse: the best-of-six in-sample Sharpe is
-upward-biased, and a deflated/Bonferroni bar (α/6 ⇒ ~|t| > 2.6) raises the threshold further. Reporting
-that plainly — rather than presenting the positive point estimate as alpha — is the discipline.
+not a momentum finding. And this is now *computed, not asserted* (`run_crosssec.py`, via `mds/validation.py`):
+significance uses an **autocorrelation-consistent Newey–West** t-stat (not a naive IID one) with a
+**block-bootstrap** CI; and across the six signals the **Deflated Sharpe** of the best is **≈0.30** —
+far below the 0.95 bar — meaning after correcting for the six tries there is only a ~30% chance its true
+Sharpe is even positive, while the **Probability of Backtest Overfitting** (CPCV) is ≈0.14. The
+walk-forward itself is now **purged and embargoed** (gap ≥ the label horizon) so the label can't leak
+across the train/test boundary. Reporting these — rather than presenting the positive point estimate as
+alpha — is the discipline.
 
 (The expansion still teaches a portfolio lesson: the low-risk family is beautifully *orthogonal* to
 momentum, P&L correlation ≈ 0 — but loses money on this 2020–2024 high-beta-growth regime. Orthogonal-
@@ -372,7 +381,7 @@ they can't drift silently.
 | §475(f) MTM allowed on **crypto** | Legally contested (crypto is property, not a security) — modelled, not endorsed | `TaxEngine` |
 | Oversell (short beyond holdings) drops the excess | Under-reports proceeds; shorts aren't lot-matched | `TaxEngine` |
 | Bond pricing: **par yield as discount yield**, 30/360 for Treasuries (should be ACT/ACT) | Small indicative-pricing inaccuracy that grows with curve steepness | `DealerQuoteEngine`, `BondMath` |
-| Synthetic imbalance IC ≈ **+0.86** | Idealised — real order-book imbalance predicts with IC ~0.01–0.05; a model getting 0.03 on real data is a *win*, not a failure | `SyntheticMarketGenerator` |
+| Synthetic imbalance IC ≈ **+0.9** is **tautological** (the feature IS the planted skew) | It validates the *plumbing*, not modeling — a real imbalance IC is ~0.01–0.05. The honest modeling test is the non-circular `synthetic_latent_panel` (model earns ~0.10 vs a ~0.15 ceiling) | `SyntheticMarketGenerator`, `lob.synthetic_latent_panel` |
 | Markout horizon drifts long on **sparse** tapes | Biases the adverse-selection metric (not P&L) on thin/synthetic sessions | `BacktestService` markouts |
 | Capacity model uses **linear** (Kyle-λ) impact; real impact is concave (√-law) | Over-penalises small size, under-penalises very large — capacity `C*` is indicative, not a number to trade on | `capacity.py` |
 | Crowding λ proxied from **turnover**, not measured; crowd assumed **identical** players | The read-across capacities are illustrative; real crowds are heterogeneous and λ needs real ADV/impact data | `capacity.py`, `run_capacity.py` |

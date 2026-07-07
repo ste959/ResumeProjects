@@ -31,15 +31,17 @@ def _model_factories():
     }
 
 
-def walk_forward_predict(df, features, factory, folds: int = 5) -> np.ndarray:
+def walk_forward_predict(df, features, factory, folds: int = 5, embargo: int = 0) -> np.ndarray:
     """Out-of-sample predictions via expanding-window walk-forward. The scaler is fit on the
-    training fold ONLY (fitting it on all data would leak test-set statistics into training)."""
+    training fold ONLY (fitting it on all data would leak test-set statistics into training). An
+    `embargo` (≥ the label horizon) purges the overlapping train tail and gaps the test block, so
+    the horizon-H label can't leak across the train/test boundary."""
     from sklearn.preprocessing import StandardScaler
 
     X = df[features].to_numpy(dtype=float)
     y = df["fwd_ret"].to_numpy(dtype=float)
     pred = np.full(len(df), np.nan)
-    for train, test in lob.walk_forward_splits(len(df), folds=folds):
+    for train, test in lob.walk_forward_splits(len(df), folds=folds, embargo=embargo):
         scaler = StandardScaler().fit(X[train])
         model = factory()
         model.fit(scaler.transform(X[train]), y[train])
@@ -101,7 +103,8 @@ def evaluate(df, features=None, folds: int = 5, fee_bps: float = 1.0, horizon: i
 
     results = {}
     for name, factory in _model_factories().items():
-        pred = walk_forward_predict(df, features, factory, folds=folds)
+        # Embargo ≥ label horizon purges the overlapping train tail and gaps the test block.
+        pred = walk_forward_predict(df, features, factory, folds=folds, embargo=horizon)
         mask = np.isfinite(pred) & np.isfinite(fwd)
         ic = lob.information_coefficient(pred[mask], fwd[mask])
         # Effective sample size discounts the horizon overlap so the IC error bar isn't overstated.

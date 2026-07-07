@@ -39,10 +39,14 @@ def main() -> None:
     hl = r["half_life_periods"]
     print(f"  half-life (periods)  : {hl:.1f}" if hl != float("inf") else "  half-life          : inf (no reversion)")
     print("  " + "-" * 62)
+    bis = r["backtest_in_sample"]
+    print(f"  IN-SAMPLE (leaky: full-sample beta, same window) net Sharpe : {bis['sharpe']:.2f}")
+    print("    ^ the flattering number a naive study would report — shown only for contrast.")
+    print("  " + "-" * 62)
     wf = r["walk_forward"]
     print(f"  OUT-OF-SAMPLE walk-forward backtest (beta re-fit on trailing {wf['lookback']} bars,")
     print(f"    rolled every {wf['step']}; {bt['oos_observations']} OOS bars scored):")
-    print(f"  net Sharpe (ann.)    : {bt['sharpe']:.2f}")
+    print(f"  net Sharpe (ann.)    : {bt['sharpe']:.2f}   (in-sample {bis['sharpe']:.2f} → OOS collapse)")
     print(f"  total return         : {bt['total_return'] * 100:.2f}%")
     print(f"  max drawdown         : {bt['max_drawdown'] * 100:.2f}%")
     print(f"  hit rate             : {bt['hit_rate'] * 100:.1f}%")

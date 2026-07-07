@@ -87,6 +87,23 @@ def walk_forward_backtest(y: np.ndarray, x: np.ndarray, window: int, entry: floa
     return bt
 
 
+def in_sample_backtest(y: np.ndarray, x: np.ndarray, window: int, entry: float, exit: float,
+                       cost_bps: float, ppy: float) -> dict:
+    """The LEAKY comparison, computed explicitly so the in-sample→OOS collapse is reproducible from
+    the repo rather than asserted in prose. Fits (α, β) on the FULL sample, forms the spread and
+    z-score over that same window, and backtests over it — using the hedge ratio a trader would not
+    have known in advance. Its flattering Sharpe is exactly what the walk-forward version removes."""
+    y = np.asarray(y, dtype=float)
+    x = np.asarray(x, dtype=float)
+    eg = engle_granger(y, x)
+    z = rolling_zscore(eg["spread"], window)
+    position = hysteresis_signal(z, entry, exit)
+    ret_y = np.diff(y, prepend=y[0])
+    ret_x = np.diff(x, prepend=x[0])
+    spread_ret = ret_y - eg["beta"] * ret_x
+    return backtest.run(spread_ret, position, cost_bps=cost_bps, periods_per_year=ppy)
+
+
 def run(products=("BTC-USD", "ETH-USD"), granularity: int = 3600, pages: int = 6,
         window: int = 48, entry: float = 2.0, exit: float = 0.5, cost_bps: float = 2.0,
         lookback: int = 480, step: int = 48, refresh: bool = False) -> dict:
@@ -105,6 +122,7 @@ def run(products=("BTC-USD", "ETH-USD"), granularity: int = 3600, pages: int = 6
 
     ppy = (365 * 24 * 3600) / granularity
     bt = walk_forward_backtest(y, x, window, entry, exit, cost_bps, ppy, lookback, step)
+    bt_is = in_sample_backtest(y, x, window, entry, exit, cost_bps, ppy)  # the leaky comparison
 
     return {
         "products": list(products),
@@ -117,6 +135,7 @@ def run(products=("BTC-USD", "ETH-USD"), granularity: int = 3600, pages: int = 6
         "cointegrated_5pct": eg["cointegrated_5pct"],
         "half_life_periods": hl,
         "walk_forward": {"lookback": lookback, "step": step},
+        "backtest_in_sample": bt_is,          # LEAKY (full-sample β, same-window) — for contrast
         "backtest": bt,                       # OUT-OF-SAMPLE, walk-forward
         "verdict": _verdict(eg, bt),
     }

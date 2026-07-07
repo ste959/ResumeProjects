@@ -10,7 +10,7 @@
 ![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-event--driven-231F20)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
-![Tests](https://img.shields.io/badge/tests-50%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-150%2B%20passing-brightgreen)
 ![Matching engine](https://img.shields.io/badge/matching%20engine-3.3M%20ord%2Fs-blueviolet)
 
 A full-stack, event-driven **Order & Execution Management System (OEMS)** for trading
@@ -80,7 +80,7 @@ the same numbers).
 | **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions, transaction cost analysis |
 | **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → separate `risk-service` consumer |
 | **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
-| **Test automation (unit/integration/UI)** | 50 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + **Vitest/RTL** component tests + **Playwright** E2E |
+| **Test automation (unit/integration/UI)** | 105 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + 46 Python research + **Vitest/RTL** component tests + **Playwright** E2E |
 | **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
 | **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
 | **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
@@ -212,7 +212,7 @@ research** over a columnar data warehouse. (Polyglot *for the right reason*.)
   cointegration **diagnostic** from a **walk-forward out-of-sample** backtest (β re-fit on a
   trailing window, traded on the next block). On real data the pair is **not cointegrated**, and
   the shiny in-sample Sharpe of **3.56 collapses to −0.62 out-of-sample** — the "edge" was the
-  leakage. Reported as an honest negative result, not alpha. 38 tests on synthetic data. See
+  leakage. Reported as an honest negative result, not alpha. 46 tests on synthetic data. See
   [`research/README.md`](research/README.md).
 
 ---

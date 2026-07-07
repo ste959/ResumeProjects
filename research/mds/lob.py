@@ -196,17 +196,54 @@ def ic_significance(r: float, n_eff: int) -> dict:
             "ci_high": float(np.tanh(z + 1.96 * se)), "n_eff": int(n_eff)}
 
 
-def walk_forward_splits(n: int, folds: int = 4, min_train: float = 0.4):
+def synthetic_latent_panel(n: int = 6000, feat_noise: float = 3.0, seed: int = 0):
+    """A NON-circular ground-truth panel for testing the model + validation layer honestly.
+
+    The L2 synthetic generator plants the signal *as the feature* (book imbalance == the planted
+    skew == a transform of the next return), so a model 'recovering' it proves only the plumbing —
+    recovery is tautological. Here instead a latent AR(1) fair-value signal `z` drives the forward
+    return, and the observable features are noisy, INDIRECT proxies of `z` (never the label). A
+    model must actually denoise several weak views to estimate `z`, so the achievable IC is modest
+    and honestly earned — and bounded by the irreducible noise, exactly like real data.
+
+    With fwd = c·z + noise, the ceiling IC (perfect recovery of z) is c/√(c²+1); the model gets
+    less. This is the test that distinguishes 'the harness works' from 'the model finds signal it
+    wasn't handed'."""
+    rng = np.random.default_rng(seed)
+    phi, c = 0.9, 0.15
+    z = np.zeros(n)
+    eps = rng.standard_normal(n)
+    for t in range(1, n):
+        z[t] = phi * z[t - 1] + eps[t]
+    z = (z - z.mean()) / z.std()
+    fwd = c * z + rng.standard_normal(n)                     # future return: latent + unpredictable noise
+    df = pd.DataFrame({name: z + feat_noise * rng.standard_normal(n) for name in FEATURES})
+    df["fwd_ret"] = fwd * 5e-4                                # ~5bp vol so bps accounting is sensible
+    # spread_bps doubles as the cost column, so make it a strictly-positive noisy magnitude proxy
+    # rather than a constant (a constant would be a dead feature that breaks correlation checks).
+    df["spread_bps"] = 1.0 + 0.5 * np.abs(df["spread_bps"])
+    df["ceiling_ic"] = c / np.sqrt(c * c + 1.0)              # best possible IC if z were observed
+    return df
+
+
+def walk_forward_splits(n: int, folds: int = 4, min_train: float = 0.4, embargo: int = 0):
     """Expanding-window walk-forward splits (train always precedes test in time).
 
     Yields (train_idx, test_idx) pairs. Never shuffles — shuffling a time series leaks the
     future into the past and is the classic way to fake a great backtest.
+
+    `embargo` inserts a gap of that many samples between the end of train and the start of test
+    AND purges the last `embargo` training rows. With a horizon-H forward-return label the last H
+    training labels overlap the first test features, so setting `embargo ≥ H` removes that
+    boundary leakage (purging + embargo, per López de Prado).
     """
     start = int(n * min_train)
     step = max(1, (n - start) // folds)
     for k in range(folds):
         tr_end = start + k * step
-        te_end = min(n, tr_end + step)
-        if tr_end <= 0 or te_end <= tr_end:
+        te_start = tr_end + embargo          # embargo gap before the test block
+        te_end = min(n, te_start + step)
+        tr_purge_end = tr_end - embargo      # purge overlapping-label rows off the train tail
+        if tr_purge_end <= 0 or te_end <= te_start:
             continue
-        yield np.arange(0, tr_end), np.arange(tr_end, te_end)
+        yield np.arange(0, tr_purge_end), np.arange(te_start, te_end)

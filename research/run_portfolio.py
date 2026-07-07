@@ -15,7 +15,7 @@ import pandas as pd
 
 from mds import crosssec as xs
 from mds import portfolio as pf
-from mds.stats import sharpe_ci, sharpe_tstat
+from mds import validation as val
 
 
 def demo_diversification() -> None:
@@ -45,33 +45,33 @@ def main() -> None:
     ).dropna()
 
     print(f"Signals: {list(net.columns)}   ({len(net)} days)\n")
-    print("Individual signals (after-cost Sharpe, with significance):")
-    print(f"  {'signal':<10} {'Sharpe':>7} {'t-stat':>7} {'95% CI':>16} {'sig?':>5}")
+    print("Individual signals (after-cost Sharpe, HAC significance + bootstrap CI):")
+    print(f"  {'signal':<10} {'Sharpe':>7} {'HAC t':>7} {'boot 95% CI':>16} {'sig?':>5}")
     best_single_name, best_single = None, -1e9
     for col in net.columns:
         s = pf.sharpe(net[col])
-        n = int(net[col].notna().sum())
-        t = sharpe_tstat(s, n)
-        lo, hi = sharpe_ci(s, n)
+        t = val.newey_west_sharpe_tstat(net[col].to_numpy())
+        lo, hi = val.block_bootstrap_sharpe_ci(net[col].to_numpy())
         print(f"  {col:<10} {s:>+7.2f} {t:>+7.2f} [{lo:>+5.2f},{hi:>+5.2f}] "
               f"{'yes' if abs(t) >= 1.96 else 'no':>5}")
         if s > best_single:
             best_single_name, best_single = col, s
 
     print("\nAllocated portfolio (weights estimated on the past, applied to the future):")
-    print(f"  {'method':<12} {'Sharpe':>7} {'t-stat':>7} {'95% CI':>16} {'sig?':>5} {'ann ret':>9} {'max DD':>8}")
+    print(f"  {'method':<12} {'Sharpe':>7} {'HAC t':>7} {'boot 95% CI':>16} {'sig?':>5} {'ann ret':>9} {'max DD':>8}")
     best_alloc_name, best_alloc = None, -1e9
     for method in ("equal", "inverse_vol", "max_sharpe"):
         combined, _ = pf.walk_forward_allocate(net, method=method, lookback=126, rebalance=21)
         m = pf.metrics(combined)
-        t = sharpe_tstat(m["sharpe"], m["days"])
-        lo, hi = sharpe_ci(m["sharpe"], m["days"])
+        t = val.newey_west_sharpe_tstat(combined.to_numpy())
+        lo, hi = val.block_bootstrap_sharpe_ci(combined.to_numpy())
         print(f"  {method:<12} {m['sharpe']:>+7.2f} {t:>+7.2f} [{lo:>+5.2f},{hi:>+5.2f}] "
               f"{'yes' if abs(t) >= 1.96 else 'no':>5} {m['ann_return']:>+9.1%} {m['max_drawdown']:>+8.1%}")
         if m["sharpe"] > best_alloc:
             best_alloc_name, best_alloc = method, m["sharpe"]
 
-    print("  (t-stat/CI: large-sample SE for an annualized Sharpe; |t|>~2 ⇒ 95% CI excludes 0.)")
+    print("  (HAC t: Newey–West autocorrelation-consistent; CI: moving-block bootstrap. "
+          "Selection-aware DSR/PBO across the signal set are in run_crosssec.py.)")
     print(f"\nBest single signal: {best_single_name} ({best_single:+.2f}).  "
           f"Best allocation: {best_alloc_name} ({best_alloc:+.2f}).")
     if best_alloc > best_single + 0.05:

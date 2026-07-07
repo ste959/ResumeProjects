@@ -73,3 +73,22 @@ def test_ic_significance_scales_with_effective_sample():
     assert weak["ci_low"] < 0 < weak["ci_high"]
     # Degenerate inputs return NaNs, not a bogus number.
     assert not np.isfinite(lob.ic_significance(0.3, n_eff=3)["t_stat"])
+
+
+def test_walk_forward_embargo_gaps_and_purges():
+    # With an embargo, the test block starts a gap AFTER the train tail (which is also purged);
+    # with no embargo the blocks are adjacent (the old behavior).
+    for tr, te in lob.walk_forward_splits(120, folds=4, min_train=0.4, embargo=5):
+        assert te[0] - tr[-1] > 5           # gap >= embargo between train end and test start
+    for tr, te in lob.walk_forward_splits(120, folds=4, min_train=0.4, embargo=0):
+        assert te[0] == tr[-1] + 1          # adjacent when no embargo
+
+
+def test_synthetic_latent_panel_is_non_circular():
+    # The honest ground truth: no single feature IS the label — each is a noisy proxy of a latent
+    # state, so every feature's raw correlation with the return sits well below the ceiling IC.
+    df = lob.synthetic_latent_panel(n=4000, seed=1)
+    ceiling = float(df["ceiling_ic"].iloc[0])
+    assert 0.10 < ceiling < 0.20
+    for f in lob.FEATURES:
+        assert abs(np.corrcoef(df[f], df["fwd_ret"])[0, 1]) < ceiling

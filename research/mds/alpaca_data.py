@@ -93,9 +93,12 @@ def fetch_bars(symbols, start: str, end: str, timeframe: str = "1Day",
     return df
 
 
-def cache_universe(symbols=None, start: str = "2021-01-01", end: str = "2024-12-31",
+def cache_universe(symbols=None, start: str = "2020-07-27", end: str = "2024-12-31",
                    timeframe: str = "1Day") -> Path:
-    """Fetch the universe's bars and write them to the warehouse as one Parquet table."""
+    """Fetch the universe's bars and write them to the warehouse as one Parquet table.
+
+    Default window matches the cached parquet (2020-07-27 .. 2024-12-31, ~1116 trading days) so a
+    re-cache reproduces the same study window and the documented numbers."""
     symbols = symbols or UNIVERSE
     df = fetch_bars(symbols, start, end, timeframe=timeframe)
     path = EQUITIES_DIR / f"bars_{timeframe}.parquet"

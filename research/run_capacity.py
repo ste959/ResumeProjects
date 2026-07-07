@@ -50,26 +50,29 @@ def demo_crowding() -> None:
 
 
 def read_across_real() -> None:
-    """Honest read-across: our real signals' net edges with impact proxied from turnover
-    (higher turnover -> lower capacity). λ here is an ASSUMPTION, not measured — flagged as such."""
-    # Net daily Sharpe-scaled edges observed in run_crosssec (annualised mean net return proxy).
-    signals = {  # name: (annual net edge μ, turnover)
-        "risk_adj_mom": (0.032, 0.08),
-        "momentum": (0.032, 0.08),
-        "bab": (-0.037, 0.03),
-        "low_vol": (-0.061, 0.12),
-    }
+    """Honest read-across: our real signals' net edges (μ = annual net return) and turnover, read
+    LIVE from the cross-sectional backtest — not hand-transcribed. λ (impact) is still proxied from
+    turnover: an ASSUMPTION, flagged as such. Skips gracefully if the equity cache isn't present."""
+    try:
+        from mds import crosssec as xs
+        px, rets = xs.returns_panel()
+        res = {n: xs.backtest(s, rets, cost_bps=5.0) for n, s in xs.signals(px, rets).items()}
+    except Exception as e:  # noqa: BLE001 — the equity parquet may not be cached
+        print(f"Read-across skipped (equity cache unavailable: {e}).\n")
+        return
+    signals = {n: (res[n]["ann_return"], res[n]["avg_turnover"]) for n in res}
     names = list(signals)
     mu = np.array([signals[n][0] for n in names])
     lam = np.array([signals[n][1] for n in names]) * 0.5  # impact ∝ turnover (assumed scale)
     # Size each alpha to its OWN capacity C*=μ/2λ (deployment is a choice, not a forced budget):
     # negative-edge signals get C*<0 → clipped to zero, so the loser book is simply not funded.
     alloc = np.clip(cap.optimal_capacity(mu, lam), 0.0, None)
-    print("Read-across to real signals (λ proxied from turnover — an assumption, not measured):")
+    print("Read-across to real signals (μ, turnover read live from run_crosssec; λ proxied from turnover):")
     for n, c in zip(names, alloc):
         print(f"  {n:<14} edge {signals[n][0]:+.3f}  turnover {signals[n][1]:.2f}  -> capital {c:.2f}")
     print("  -> the capacity allocator funds only the positive-edge signals and refuses the")
-    print("     money-losers; with two 0.83-correlated winners it is still one bet, honestly.\n")
+    print("     money-losers — but none of those edges is statistically significant (see run_crosssec),")
+    print("     so this sizes signals that aren't established alpha. Machinery, not a trade.\n")
 
 
 def main() -> None:

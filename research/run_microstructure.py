@@ -11,6 +11,12 @@ is the gross-vs-net gap, not a headline Sharpe.
 Examples:
     python run_microstructure.py 2026-07-06 BTC-USD
     python run_microstructure.py signal SYNTH-USD
+
+Note: `study_one` samples the book every 20 events, so on the short synthetic sessions it shows
+only a weak IC. The headline synthetic numbers (noise IC≈0, signal IC≈0.9) come from `--validate`,
+which samples every event — and, importantly, the signal "recovery" there is a PLUMBING check, not
+proof of modeling (the generator writes the signal as the feature). See `--validate`'s own output,
+which contrasts it with a non-circular latent-signal test where the model earns a modest, honest IC.
 """
 
 from __future__ import annotations
@@ -76,19 +82,34 @@ def validate(real_label: str = "2026-07-06", real_product: str = "BTC-USD") -> N
         ("SYNTH signal (alpha=2.5)", "signal", "SYNTH-USD", 1),
         (f"REAL {real_product}", real_label, real_product, 20),
     ]
-    print(f"  {'session':<24} {'best IC':>8} {'IC t':>7} {'gross bps':>10} {'net bps':>10}  verdict")
+    print(f"  {'session':<26} {'best IC':>8} {'IC t':>7} {'gross bps':>10} {'net bps':>10}  verdict")
     for name, label, product, sample_every in sessions:
         _, results = _study(label, product, sample_every)
         b = _best(results)
         v = ("no signal (correct)" if b["ic_spearman"] < 0.03
              else "SURVIVES costs" if b["net_ret_bps"] > 0 else "dies after spread")
-        print(f"  {name:<24} {b['ic_spearman']:>+8.3f} {b['ic_t']:>+7.1f} {b['gross_ret_bps']:>+10.0f} "
+        print(f"  {name:<26} {b['ic_spearman']:>+8.3f} {b['ic_t']:>+7.1f} {b['gross_ret_bps']:>+10.0f} "
               f"{b['net_ret_bps']:>+10.0f}  {v}")
-    print("\nReads as: the models find NOTHING in noise (IC t≈0), RECOVER the planted signal (high,")
-    print("significant IC), and a real, statistically significant signal in real data — but at tick")
-    print("frequency none survive costs, because edge-per-trade < cost-per-trade. A large IC t-stat")
-    print("confirms the signal is real; it says nothing about tradability. What DOES survive is low")
-    print("turnover (see the cross-sectional result in run_crosssec.py).")
+
+    # Non-circular ground truth: latent signal, NOISY INDIRECT features (see docstring).
+    latent = lob.synthetic_latent_panel()
+    lat = models.evaluate(latent, folds=5, fee_bps=1.0, horizon=1)
+    lb = _best(lat)
+    ceiling = float(latent["ceiling_ic"].iloc[0])
+    print(f"  {'SYNTH latent (indirect)':<26} {lb['ic_spearman']:>+8.3f} {lb['ic_t']:>+7.1f} "
+          f"{lb['gross_ret_bps']:>+10.0f} {lb['net_ret_bps']:>+10.0f}  earns < ceiling IC {ceiling:.2f}")
+
+    print("\nReads as — two DIFFERENT kinds of synthetic check:")
+    print(" • SYNTH noise/signal are a PLUMBING + false-positive test: the generator writes the")
+    print("   signal AS the feature (imbalance ≡ the planted skew), so noise→IC≈0 is meaningful but")
+    print("   the +0.92 'recovery' is tautological — it proves no-leakage/scaler discipline, not")
+    print("   that a model finds signal it wasn't handed. IC t≈90 there is inflated by serial")
+    print("   dependence and is an UPPER bound, not a confidence statement.")
+    print(" • SYNTH latent is the honest MODELING test: the label is driven by a hidden state and")
+    print("   the features are noisy indirect proxies, so the model must denoise several weak views.")
+    print(f"   It earns a modest IC below the {ceiling:.2f} ceiling — real extraction, not a tautology.")
+    print(" • REAL BTC has a genuine signal that still DIES after the spread (edge < cost per trade).")
+    print("   Significance is not tradability; what survives is low turnover (see run_crosssec.py).")
 
 
 def main() -> None:
