@@ -27,8 +27,10 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/features.py` | log returns, realized vol, order-book **imbalance → forward-return IC** |
 | `mds/backtest.py` | vectorized backtester: transaction costs, **one-period execution lag (no look-ahead)**, Sharpe / drawdown / turnover / hit-rate |
 | `mds/statarb.py` | the **BTC/ETH stat-arb study** (cointegration diagnostic → walk-forward OOS z-score backtest → honest verdict) |
-| `mds/lob.py`, `mds/models.py` | **microstructure ML** — leakage-free L2 feature/label harness + model zoo (ridge/GBM/MLP), walk-forward, cost-aware |
-| `mds/crosssec.py`, `mds/portfolio.py`, `mds/capacity.py` | **cross-sectional factors** (momentum/reversal/low-vol/BAB/idio-vol), a **walk-forward allocator**, and a **capacity/crowding** sizing model |
+| `mds/lob.py`, `mds/models.py` | **microstructure ML** — leakage-free L2 feature/label harness + model zoo (ridge/GBM/MLP), walk-forward, purge/embargo, cost-aware |
+| `mds/maker.py` | **maker-execution study** — passive fills, markout-based **adverse selection**, spread-vs-adverse decomposition (does a taker-dead signal survive as a maker?) |
+| `mds/crosssec.py`, `mds/portfolio.py`, `mds/capacity.py` | **cross-sectional factors** (momentum/reversal/low-vol/BAB/idio-vol), beta+sector neutralization, a **walk-forward allocator**, and a **capacity/crowding** sizing model |
+| `mds/validation.py` | **overfitting stats** — Newey–West Sharpe t-stat, block-bootstrap CI, **Deflated Sharpe**, **PBO** (CPCV), min-detectable-Sharpe power |
 
 The stat-arb study below is the entry point; the microstructure-ML, cross-sectional, portfolio
 and capacity layers (Phases 5–6) are documented in [`../MARKET-REALISM.md`](../MARKET-REALISM.md).
@@ -40,7 +42,7 @@ cd research
 pip install -r requirements.txt         # pinned versions (numpy/pandas/sklearn/…)
 python run_statarb.py           # fetches ~75 days of BTC/ETH, caches to Parquet, runs the study
 python run_crosssec.py          # cross-sectional equity signals, with t-stats / 95% CIs
-python -m pytest                # 46 tests on synthetic data (no network)
+python -m pytest                # 52 tests on synthetic data (no network)
 ```
 
 ## The philosophy: honest results beat pretty backtests

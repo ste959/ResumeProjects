@@ -284,7 +284,7 @@ Validated on the ground truth above, the pipeline behaves correctly and the hone
 |---|---|---|
 | SYNTH noise (α=0) | +0.005 (t≈0.2) | finds nothing — the false-positive check passes, and the IC is *insignificant* as it should be |
 | SYNTH signal (α=2.5) | +0.922 (t≈90) | recovers the planted signal — hugely significant — but **dies after spread** at tick frequency |
-| REAL BTC-USD microstructure | +0.289 (t≈91) | a real, *strongly significant* predictive signal, yet still **dies after spread** — bid-ask bounce, not tradable |
+| REAL BTC-USD microstructure | +0.289 (t≈91) | a real, *strongly significant* predictive signal, yet **untradable** as a taker (fees) *and* as a maker (locked book) — see the maker study below |
 | REAL equity momentum (cross-sectional, 123 names) | — | net +0.34 at low turnover (0.11) — **HAC t ≈ +0.66: not significant** |
 | REAL equity risk-adjusted momentum | — | net +0.47, a cleaner momentum but correlated to it — **HAC t ≈ +0.88: also not significant** |
 | REAL equity reversal | — | net −1.01, **HAC t ≈ −2.34: the ONLY statistically significant result — and it's a loser** |
@@ -296,7 +296,19 @@ each carries a **t-stat on an overlap-adjusted effective sample** (Fisher-z, `n_
 horizon-H label can't fake significance by counting overlapping samples), and the P&L is booked on
 **non-overlapping** samples so a persistent position isn't credited the same move H times. The real BTC IC
 is *strongly* significant (t≈91) — and still dies after costs: significance confirms the signal is real, it
-says nothing about whether you can trade it. Second, and more important once we
+says nothing about whether you can trade it.
+
+The taker verdict ("dies after spread") only named the next question — *would a **maker** capture it?* —
+so the maker study (`run_microstructure.py --maker`, `mds/maker.py`) actually answers it. A passive maker
+earns the half-spread on each fill but is **adversely selected** (a resting bid fills precisely as the
+price ticks down to it); net per fill = half-spread − adverse selection, measured by markouts. On the real
+BTC session (≈3M events, crossed/locked books skipped): the maker earns only **+0.03 bps** of half-spread
+and pays **−0.36 bps** of adverse selection → **−0.34 bps/fill**. Using the model's forecast as a *fill
+filter*, the fills it endorsed net **−0.20** vs **−0.36** for the ones it warned against (**+0.17 lift**) —
+so the signal genuinely **predicts adverse selection** (consistent with its real IC); it just can't be
+monetized, because **BTC-USD is an effectively locked 1-tick market with no spread to earn**. The taker
+died to fees, the maker dies to a locked book: a real signal with no microstructure edge — a sharper,
+truer conclusion than the taker test alone could reach. Second, and more important once we
 report **t-stats and confidence intervals** (see `run_crosssec.py`): **no signal clears statistical
 significance.** Momentum's +0.34 Sharpe sounds like an edge but its 95% CI straddles zero (HAC t ≈ 0.66) on a
 survivorship-selected **123-name**, 4.4-year sample; the *only* significant result is reversal, and it loses.

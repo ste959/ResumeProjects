@@ -5,8 +5,9 @@ Runs the model zoo (linear → gradient boosting → small neural net) with walk
 out-of-sample validation over a recorded L2 session, then the cost-aware acid test. The point
 is the gross-vs-net gap, not a headline Sharpe.
 
-    python run_microstructure.py [session-label] [product]   # study one session
+    python run_microstructure.py [session-label] [product]   # taker study of one session
     python run_microstructure.py --validate                  # ground-truth vs real comparison
+    python run_microstructure.py --maker [label] [product]   # maker execution: spread vs adverse selection
 
 Examples:
     python run_microstructure.py 2026-07-06 BTC-USD
@@ -24,7 +25,7 @@ from __future__ import annotations
 import sys
 import warnings
 
-from mds import lob, models
+from mds import lob, maker, models
 
 try:
     from sklearn.exceptions import ConvergenceWarning
@@ -112,10 +113,61 @@ def validate(real_label: str = "2026-07-06", real_product: str = "BTC-USD") -> N
     print("   Significance is not tradability; what survives is low turnover (see run_crosssec.py).")
 
 
+def maker_verdict(two: dict, split: dict) -> str:
+    if two["n_fills"] == 0:
+        return "No fills — spread too wide or path too short to post passively."
+    base = (f"A two-sided maker earns only {two['spread_bps']:+.3f} bps of half-spread per fill and "
+            f"pays {two['adverse_bps']:+.3f} bps of adverse selection → net {two['net_bps']:+.3f} bps/fill. ")
+    lift = split["aligned_net_bps"] - split["contra_net_bps"]
+    if lift > 0.03:
+        discern = (f"The signal DOES have informational value — fills it endorsed net "
+                   f"{split['aligned_net_bps']:+.3f} vs {split['contra_net_bps']:+.3f} bps for fills it "
+                   f"warned against (+{lift:.3f} lift), i.e. it genuinely predicts which fills dodge "
+                   "adverse selection. ")
+    else:
+        discern = (f"The signal barely discriminates (endorsed {split['aligned_net_bps']:+.3f} vs warned "
+                   f"{split['contra_net_bps']:+.3f} bps). ")
+    if split["aligned_net_bps"] <= 0:
+        close = ("But BTC-USD is an effectively *locked* 1-tick market: there is almost no spread to "
+                 "earn, so even the good fills stay net-negative. Untradable as a maker too — not "
+                 "because the signal is empty, but because there is no spread to monetize it. The taker "
+                 "died to fees; the maker dies to a locked book. Real signal, no microstructure edge.")
+    else:
+        close = ("And the endorsed fills clear adverse selection on net — worth a capacity/robustness "
+                 "study with realistic queue and fees.")
+    return base + discern + close
+
+
+def maker_study(label: str, product: str) -> None:
+    df = lob.build_panel(lob.capture_path(label), product=product, sample_every=1, horizon=1, depth=5)
+    if df.empty:
+        print(f"No data for '{label}' [{product}].")
+        return
+    mid, spr = df["mid"].to_numpy(), df["spread_bps"].to_numpy()
+    print(f"Maker-execution study '{label}' [{product}]: {len(df)} events (every book change)\n")
+    two = maker.maker_backtest(mid, spr, inv_cap=10)
+    pred = models.walk_forward_predict(df, lob.FEATURES, models._model_factories()["ridge"],
+                                       folds=5, embargo=1)
+    split = maker.signal_split(two, pred)
+
+    print(f"  two-sided maker: {two['n_fills']} fills | half-spread earned {two['spread_bps']:+.3f} bps"
+          f" | adverse selection {two['adverse_bps']:+.3f} bps | NET {two['net_bps']:+.3f} bps/fill")
+    print("  signal as a fill filter (does it predict which fills to keep?):")
+    print(f"    fills the model ENDORSED   ({split['aligned_fills']:>7}): net {split['aligned_net_bps']:+.3f} bps")
+    print(f"    fills the model WARNED of  ({split['contra_fills']:>7}): net {split['contra_net_bps']:+.3f} bps")
+    print("  (per fill: half-spread EARNED + signed markout (adverse selection); crossed/locked books "
+          "skipped. Fills ignore queue position — optimistic on volume, per-fill economics unaffected.)")
+    print(f"\nVerdict: {maker_verdict(two, split)}")
+
+
 def main() -> None:
     args = sys.argv[1:]
     if args and args[0] == "--validate":
         validate(*args[1:3])
+        return
+    if args and args[0] == "--maker":
+        rest = args[1:]
+        maker_study(rest[0] if rest else "2026-07-06", rest[1] if len(rest) > 1 else "BTC-USD")
         return
     label = args[0] if len(args) > 0 else "2026-07-06"
     product = args[1] if len(args) > 1 else "BTC-USD"
