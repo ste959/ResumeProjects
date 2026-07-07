@@ -37,9 +37,13 @@ def verdict(results: dict[str, dict], hac_t: dict[str, float], dsr: float, pbo: 
         return (f"'{best}' clears the Bonferroni bar (|t|>{zbar:.2f} for {n} tests, t={hac_t[best]:+.2f}), "
                 f"Deflated Sharpe {dsr:.2f}, PBO {pbo:.2f} — a defensible candidate; validate live.")
     if passers:
-        nm = max(passers, key=lambda k: abs(hac_t[k]))
-        role = "LOSER" if results[nm]["net_sharpe"] < 0 else "winner"
-        tail = (f" Only '{nm}' (t={hac_t[nm]:+.2f}, a {role}) clears the corrected bar |t|>{zbar:.2f}.")
+        names = sorted(passers, key=lambda k: -abs(hac_t[k]))
+        lst = ", ".join(f"{k} (t={hac_t[k]:+.2f})" for k in names)
+        if all(results[k]["net_sharpe"] < 0 for k in names):
+            tail = (f" {len(names)} signal(s) clear the corrected bar |t|>{zbar:.2f} — {lst} — but ALL "
+                    "are high-turnover LOSERS, not edges.")
+        else:
+            tail = f" Signals clearing the corrected bar |t|>{zbar:.2f}: {lst}."
     else:
         tail = (f" Applied symmetrically, NO signal — winner OR loser — clears the multiple-testing-"
                 f"corrected bar (|t|>{zbar:.2f} for {n} tests): even the naively 'significant' reversal "
@@ -143,11 +147,12 @@ def main() -> None:
 
     print(f"\nVerdict: {verdict(results, hac_t, dsr, pbo_res['pbo'])}")
     print(f"\n(All signals are price/volume-only — no fundamentals in the free feed. Caveats: free "
-          f"IEX ~4.5y history, {px.shape[1]} survivorship-selected large caps across 11 GICS sectors; "
-          "a real study needs longer, point-in-time membership with delistings. Underpowered by "
+          f"IEX {px.shape[0]} days (~{px.shape[0] / 252:.1f}y, the max the free feed allows — earlier "
+          f"than 2020-07-27 is a hard stop), {px.shape[1]} survivorship-selected large caps across 11 "
+          "GICS sectors; a real study needs point-in-time membership with delistings. Underpowered by "
           "construction — see the power line. Note: signal lookbacks are conventional and were NOT "
-          "swept, so the true researcher degrees-of-freedom exceed the "
-          f"{len(results)}-signal family the DSR/Bonferroni already correct for.)")
+          f"swept, so researcher degrees-of-freedom exceed the {len(results)}-signal family the "
+          "DSR/Bonferroni already correct for.)")
 
 
 if __name__ == "__main__":

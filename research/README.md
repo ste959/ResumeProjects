@@ -42,7 +42,7 @@ cd research
 pip install -r requirements.txt         # pinned versions (numpy/pandas/sklearn/…)
 python run_statarb.py           # fetches ~75 days of BTC/ETH, caches to Parquet, runs the study
 python run_crosssec.py          # cross-sectional equity signals, with t-stats / 95% CIs
-python -m pytest                # 52 tests on synthetic data (no network)
+python -m pytest                # 54 tests on synthetic data (no network)
 ```
 
 ## The philosophy: honest results beat pretty backtests

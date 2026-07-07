@@ -109,12 +109,14 @@ def fetch_bars(symbols, start: str, end: str, timeframe: str = "1Day",
     return df
 
 
-def cache_universe(symbols=None, start: str = "2020-07-27", end: str = "2024-12-31",
+def cache_universe(symbols=None, start: str = "2020-07-27", end: str = "2026-07-02",
                    timeframe: str = "1Day") -> Path:
     """Fetch the universe's bars and write them to the warehouse as one Parquet table.
 
-    Default window matches the cached parquet (2020-07-27 .. 2024-12-31, ~1116 trading days) so a
-    re-cache reproduces the same study window and the documented numbers."""
+    Window is the MAX the free IEX feed allows: it hard-caps the earliest bar at 2020-07-27
+    (asking earlier returns nothing before it), and extends to ~today — 2020-07-27 .. 2026-07-02 is
+    ~1491 trading days (~5.9y). Extending the end adds data with NO extra survivorship bias (that
+    comes from the start-date name selection); going earlier needs a paid, point-in-time source."""
     symbols = symbols or UNIVERSE
     df = fetch_bars(symbols, start, end, timeframe=timeframe)
     path = EQUITIES_DIR / f"bars_{timeframe}.parquet"

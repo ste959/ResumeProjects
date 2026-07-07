@@ -285,12 +285,11 @@ Validated on the ground truth above, the pipeline behaves correctly and the hone
 | SYNTH noise (α=0) | +0.005 (t≈0.2) | finds nothing — the false-positive check passes, and the IC is *insignificant* as it should be |
 | SYNTH signal (α=2.5) | +0.922 (t≈90) | recovers the planted signal — hugely significant — but **dies after spread** at tick frequency |
 | REAL BTC-USD microstructure | +0.289 (t≈91) | a real, *strongly significant* predictive signal, yet **untradable** as a taker (fees) *and* as a maker (locked book) — see the maker study below |
-| REAL equity momentum (cross-sectional, 123 names) | — | net +0.34 at low turnover (0.11) — **HAC t ≈ +0.66: not significant** |
-| REAL equity risk-adjusted momentum | — | net +0.47 (best), correlated to momentum — **HAC t ≈ +0.88: not significant** |
-| REAL equity reversal | — | net −1.01, HAC t ≈ −2.34 — high-turnover loser, **fails the Bonferroni bar |t|>2.84** |
-| REAL equity low-vol / BAB / idio-vol | — | all negative (net −0.23 to −0.65), none significant — the low-risk family |
-| REAL equity **sector-relative momentum** (new) | — | net −0.13, **HAC t ≈ −0.25: ≈0 — confirms raw momentum's edge was sector exposure** |
-| REAL equity overnight / VWAP-pressure / MAX (new) | — | all losers, none significant; the short-horizon ones are the biggest |t| but at ~0.63 turnover |
+| REAL equity momentum (cross-sectional, 123 names, ~5.9y) | — | net +0.56 (best) at low turnover (0.10) — **HAC t ≈ +1.35: not significant** |
+| REAL equity risk-adjusted momentum | — | net +0.53, correlated to momentum — **HAC t ≈ +1.26: not significant** |
+| REAL equity reversal / sector-rel reversal / VWAP-pressure | — | high-turnover (~0.63) **losers** (net −1.0 to −1.2); two clear |t|>2.84 but are losers, not edges |
+| REAL equity low-vol / BAB / idio-vol / MAX | — | all negative, none a positive edge — the low-risk / lottery family |
+| REAL equity **sector-relative momentum** (new) | — | net **+0.41** (HAC t +0.98) — see below: this *flipped* from ≈0 on the shorter window |
 
 Two lessons the whole layer is built to teach. First, **what survives is low turnover, not high IC** — a
 +0.29 IC that trades every tick is worthless; IC is not tradability. Note the discipline in the IC column:
@@ -312,52 +311,54 @@ monetized, because **BTC-USD is an effectively locked 1-tick market with no spre
 died to fees, the maker dies to a locked book: a real signal with no microstructure edge — a sharper,
 truer conclusion than the taker test alone could reach. Second, and more important once we
 report **t-stats and confidence intervals** (see `run_crosssec.py`): **no signal clears statistical
-significance.** Momentum's +0.34 Sharpe sounds like an edge but its 95% CI straddles zero (HAC t ≈ 0.66) on a
-survivorship-selected **123-name**, 4.4-year sample. This is now *computed, not asserted*
-(`mds/validation.py`): significance uses an **autocorrelation-consistent Newey–West** t-stat (not a naive
-IID one) with a **block-bootstrap** CI, and the multiple-testing bar is applied **symmetrically** — a
-Bonferroni-corrected **|t| > 2.84 for 11 tests**, to winners *and* losers alike. Under that bar **NO signal
-— winner or loser — is significant**; even the naively "significant" reversal (HAC t ≈ −2.34) is a
-selection artefact, not a real effect. Across the eleven signals the **Deflated Sharpe** of the best is
-**≈0.21** (bar 0.95 — after correcting for the tries, ~21% chance its true Sharpe is even positive) and the
-**PBO** (CPCV) is **≈0.25**. The walk-forward is **purged and embargoed** so the label can't leak across the
-train/test boundary. Reporting these — rather than the positive point estimate — is the discipline.
+significance.** On the **full ~5.9-year window (1491 days — the max the free IEX feed allows; earlier than
+2020-07-27 is a hard stop)**, momentum's +0.56 Sharpe still straddles zero (HAC t ≈ 1.35). This is
+*computed, not asserted* (`mds/validation.py`): significance uses an **autocorrelation-consistent
+Newey–West** t-stat (not a naive IID one) with a **block-bootstrap** CI, and the multiple-testing bar is
+applied **symmetrically** — a Bonferroni-corrected **|t| > 2.84 for 11 tests**, to winners *and* losers
+alike. No positive signal clears it; two high-turnover **losers** (sector-rel reversal, VWAP-pressure) do,
+but losers are not edges. Across the eleven signals the **Deflated Sharpe** of the best is **≈0.11** (bar
+0.95 — after correcting for the tries, ~11% chance its true Sharpe is even positive) and the **PBO** (CPCV)
+is **≈0.09**. The walk-forward is **purged and embargoed** so the label can't leak across the train/test
+boundary. Reporting these — rather than the positive point estimate — is the discipline.
 
-The set was **expanded to eleven** signals to test hypotheses the results raised, tapping the previously-
-unused OHLC/vwap fields (§ signal design): sector-relative momentum, an overnight-return factor, sector-
-relative reversal, close-vs-VWAP pressure, MAX/lottery. None found alpha (the null held), but two added
-*insight*: (1) **sector-relative momentum nets ≈0 (HAC t −0.25)** — the name-specific, sector-neutral part
-of momentum has no edge, empirically confirming that raw momentum's apparent edge was **uncompensated
-sector exposure** (the same thing neutralization showed: +0.47 → +0.09). (2) The three short-horizon
-signals (reversal, sector-relative reversal, VWAP-pressure) are the largest |t| **losers** at high turnover
-(~0.63) — a real short-term *continuation/microstructure* effect exists but is un-monetizable at that
-turnover. Adding five signals also correctly **raised the Deflated-Sharpe bar** (0.31 → 0.21), the honest
-cost of more tries.
-
-(The low-risk family is beautifully *orthogonal* to momentum, P&L correlation ≈ 0 — but loses money on this
-2020–2024 high-beta-growth regime. Orthogonal-but-unprofitable is not a diversifier, so there is still
-effectively *one* weak bet, which is why the Phase 6 optimizer can't beat it.)
+**A finding that flipped — the most honest lesson of all.** The set was expanded to eleven signals (tapping
+the previously-unused OHLC/vwap fields): sector-relative momentum, overnight, sector-relative reversal,
+close-vs-VWAP pressure, MAX/lottery. On the shorter 4.4-year window, **sector-relative momentum netted ≈0**,
+which looked like clean evidence that momentum's edge was pure sector exposure (and neutralization agreed).
+Adding just **1.5 more years of data flipped it**: sector-relative momentum is now **+0.41**, and momentum's
+β+sector-**neutral** book holds **+0.44** (vs the raw +0.56) — so on the longer sample the edge is *not*
+mostly sector exposure. Neither number is significant, and that is the point: **a secondary conclusion
+reversed under a modest data change** — exactly what an underpowered, regime-driven null looks like, and the
+strongest possible evidence that none of these are durable edges. (The short-horizon signals remain the
+biggest-|t| losers at ~0.63 turnover — a real continuation/microstructure effect, un-monetizable at that
+turnover.) Adding five signals also correctly **raised the Deflated-Sharpe bar** (0.21 → 0.11 as the window
+grew and the family widened) — the honest cost of more tries.
 
 **Realism, power, and regime — four checks that finish the honest picture** (`run_crosssec.py`):
 
-- **Statistical power.** With ~863 active days this sample can only detect (80% power) an annualized
-  Sharpe **≳ 1.5** — a function of the return-series *length*, not breadth. Every signal is far below
-  that. Broadening the universe **40 → 123 names** (all 11 GICS sectors) did *not* rescue the signal
-  (Sharpe/DSR ~unchanged), which points to a genuine null rather than mere low breadth; the remaining
-  data dependency is longer, *point-in-time* history with delistings (survivorship is still uncorrected).
-- **Beta + sector neutralization.** Dollar-neutral alone is a toy; the book is now residualized against
-  market β and GICS sector, dropping mean |net β| from **0.10 → 0.00**. The neutral book's net Sharpe
-  falls (**+0.47 → +0.09**), i.e. most of the raw "edge" was uncompensated factor/sector exposure.
+- **Statistical power.** With ~1238 active days (~5.9y) this sample can only detect (80% power) an
+  annualized Sharpe **≳ 1.26** — a function of the return-series *length*, not breadth. Every signal is
+  below that. Broadening the universe **40 → 123 names** and extending to the full ~5.9y (the free-feed
+  max) did *not* rescue the signal, which points to a genuine null; the remaining data dependency is
+  *point-in-time* history with delistings (survivorship is still uncorrected — extending *forward* adds
+  none, but a decade of *earlier* history would, and is a hard stop on the free feed).
+- **Beta + sector neutralization.** Dollar-neutral alone is a toy; the book is residualized against
+  market β and GICS sector, dropping mean |net β| from **0.13 → 0.01**. On the full window momentum's
+  neutral book holds **+0.44 (vs raw +0.56)** — most of its edge *survives* neutralization here (the
+  opposite of the shorter window; see the "finding that flipped" above).
 - **Cost realism (capacity).** Adding a √-law market-impact term (participation vs ADV) and short
-  borrow, the best signal's net Sharpe goes **+0.47 (frictionless) → −0.37 ($100M book) → −2.01 ($1B)**.
+  borrow, momentum's net Sharpe goes **+0.56 (frictionless) → +0.11 ($100M book) → −0.84 ($1B)**.
   The edge is not robust to impact, and impact scales with size — the capacity wall, quantified on the
   equity book rather than only in the crypto engine.
-- **Regime dependence.** Per-year net Sharpe swings widely (2021 +0.5, 2022 +1.3, 2023 −0.6, 2024 +0.7);
+- **Regime dependence.** Per-year net Sharpe swings widely (2021 +0.7, 2022 +0.8, 2023 −0.6, 2024 +0.6,
+  2025 −0.0, 2026 +1.9);
   one blended number hides that the "signal" is really a few regime bets.
 
 Together these turn "no significant edge" from a p-value into a fully-argued conclusion: underpowered
-data, an edge that is partly factor exposure, dies to realistic impact at size, and isn't stable across
-regimes. That is what an honest research note looks like.
+data (even at the free feed's ~5.9y max), no signal significant after symmetric correction, a secondary
+finding that *flips* under 1.5 more years, an apparent edge that dies to realistic impact at size, and no
+stability across regimes. That is what an honest research note looks like — and the honesty is the product.
 
 ## Portfolio construction (Phase 6 — the quant *trader*)
 
