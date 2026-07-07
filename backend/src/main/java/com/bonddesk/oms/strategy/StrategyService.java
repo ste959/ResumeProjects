@@ -5,6 +5,7 @@ import com.bonddesk.oms.exception.NotFoundException;
 import com.bonddesk.oms.market.LiveOrderBook;
 import com.bonddesk.oms.market.MarketDataService;
 import com.bonddesk.oms.strategy.StrategyDtos.CreateStrategyRequest;
+import com.bonddesk.oms.strategy.StrategyDtos.ModifyStrategyRequest;
 import com.bonddesk.oms.strategy.StrategyDtos.StrategyView;
 import org.springframework.stereotype.Service;
 
@@ -75,12 +76,62 @@ public class StrategyService {
     }
 
     public StrategyView stop(String id) {
+        StrategyRun run = require(id);
+        run.setStatus("STOPPED");
+        return view(run);
+    }
+
+    /** Pause a running strategy — the runner skips it (only RUNNING runs are stepped) until resumed. */
+    public StrategyView pause(String id) {
+        StrategyRun run = require(id);
+        if ("RUNNING".equals(run.status())) {
+            run.setStatus("PAUSED");
+        }
+        return view(run);
+    }
+
+    /** Resume a paused strategy. */
+    public StrategyView resume(String id) {
+        StrategyRun run = require(id);
+        if ("PAUSED".equals(run.status())) {
+            run.setStatus("RUNNING");
+        }
+        return view(run);
+    }
+
+    /**
+     * Modify tunable parameters of a running strategy in place. Applies only the fields relevant to
+     * the run's type (participation for POV; gamma/quoteSize for the maker); others are ignored. The
+     * targeted fields are volatile, so the change is picked up by the runner on its next tick.
+     */
+    public StrategyView modify(String id, ModifyStrategyRequest req) {
+        StrategyRun run = require(id);
+        Strategy s = run.strategy();
+        if (s instanceof PovExecution pov && req.participation() != null) {
+            pov.setParticipation(clamp(req.participation(), 1e-4, 1.0));
+        }
+        if (s instanceof AvellanedaStoikovMaker mm) {
+            if (req.gamma() != null) {
+                mm.setGamma(clamp(req.gamma(), 1e-3, 100.0));
+            }
+            if (req.quoteSize() != null) {
+                mm.setQuoteSize(Math.max(1e-6, req.quoteSize()));
+            }
+        }
+        run.touch(clock.instant());
+        return view(run);
+    }
+
+    private StrategyRun require(String id) {
         StrategyRun run = runs.get(id);
         if (run == null) {
             throw new NotFoundException("no strategy run " + id);
         }
-        run.setStatus("STOPPED");
-        return view(run);
+        return run;
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
     }
 
     private StrategyView view(StrategyRun run) {

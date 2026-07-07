@@ -4,11 +4,11 @@ import { api } from './api/client';
 import type { Security } from './api/types';
 import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { Architecture } from './components/Architecture';
+import { ExecutionCockpit } from './components/ExecutionCockpit';
 import { FixedIncomeDesk } from './components/FixedIncomeDesk';
 import { MarketStream } from './components/MarketStream';
 import { ResearchLab } from './components/ResearchLab';
 import { RiskDashboard } from './components/RiskDashboard';
-import { Strategies } from './components/Strategies';
 import { TaxPanel } from './components/TaxPanel';
 import { usePolling } from './hooks/usePolling';
 
@@ -152,19 +152,7 @@ function Shell() {
 
         <Route path="/microstructure" element={<MarketStream />} />
 
-        <Route
-          path="/execution"
-          element={
-            <main className="risk-main">
-              <div className="risk-intro">
-                <span className="dot live" />
-                Execution algos (TWAP / POV / Almgren–Chriss) &amp; an{' '}
-                <b>Avellaneda–Stoikov market maker</b> running live on the Coinbase feed, with TCA
-              </div>
-              <Strategies />
-            </main>
-          }
-        />
+        <Route path="/execution" element={<ExecutionCockpit />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

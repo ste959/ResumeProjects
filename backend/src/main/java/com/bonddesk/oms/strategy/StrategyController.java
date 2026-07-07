@@ -1,6 +1,7 @@
 package com.bonddesk.oms.strategy;
 
 import com.bonddesk.oms.strategy.StrategyDtos.CreateStrategyRequest;
+import com.bonddesk.oms.strategy.StrategyDtos.ModifyStrategyRequest;
 import com.bonddesk.oms.strategy.StrategyDtos.StrategyView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -47,5 +48,23 @@ public class StrategyController {
     @Operation(summary = "Stop a running strategy")
     public StrategyView stop(@PathVariable String id) {
         return strategies.stop(id);
+    }
+
+    @PostMapping("/{id}/pause")
+    @Operation(summary = "Pause a running strategy (the runner skips it until resumed)")
+    public StrategyView pause(@PathVariable String id) {
+        return strategies.pause(id);
+    }
+
+    @PostMapping("/{id}/resume")
+    @Operation(summary = "Resume a paused strategy")
+    public StrategyView resume(@PathVariable String id) {
+        return strategies.resume(id);
+    }
+
+    @PostMapping("/{id}/modify")
+    @Operation(summary = "Modify a running strategy's tunable parameters (POV participation; maker gamma/quoteSize)")
+    public StrategyView modify(@PathVariable String id, @RequestBody ModifyStrategyRequest request) {
+        return strategies.modify(id, request);
     }
 }

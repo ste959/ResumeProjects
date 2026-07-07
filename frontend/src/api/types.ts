@@ -486,6 +486,22 @@ export interface Disposition {
   washDisallowed: number;
 }
 
+export interface ModifyStrategyRequest {
+  participation?: number;
+  gamma?: number;
+  quoteSize?: number;
+}
+
+export interface EquityStatus {
+  brokerReachable: boolean;
+  marketOpen: boolean;
+  autoEnabled: boolean;
+  targetBook: { asOf: string; names: number } | null;
+  positions: { count: number; grossLong: number; grossShort: number; net: number } | null;
+  riskCaps: { desk: number; rebalanceBook: number } | null;
+  lastRebalance: { time: string | null; status: string; routed: number; skipped: number; rejected: number } | null;
+}
+
 export interface TaxReport {
   assetClass: string;
   regime: string;

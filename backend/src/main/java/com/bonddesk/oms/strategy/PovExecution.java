@@ -7,11 +7,22 @@ package com.bonddesk.oms.strategy;
  */
 public final class PovExecution extends ExecutionStrategy {
 
-    private final double participation;
+    // Volatile so a live "modify participation" from an HTTP thread is visible to the runner thread
+    // that reads it each tick (see StrategyService.modify).
+    private volatile double participation;
 
     public PovExecution(boolean buy, double totalSize, int slices, double participation) {
         super(buy, totalSize, slices);
         this.participation = participation;
+    }
+
+    /** Adjust the volume-participation rate on a running POV algo. */
+    public void setParticipation(double participation) {
+        this.participation = participation;
+    }
+
+    public double participation() {
+        return participation;
     }
 
     @Override

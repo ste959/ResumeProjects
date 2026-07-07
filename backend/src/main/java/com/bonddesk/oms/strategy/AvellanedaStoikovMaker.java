@@ -19,16 +19,36 @@ package com.bonddesk.oms.strategy;
  */
 public final class AvellanedaStoikovMaker implements Strategy {
 
-    private final double gamma;   // risk aversion
-    private final double kappa;   // order-flow intensity
-    private final double tau;     // effective time-to-horizon (ticks)
-    private final double quoteSize;
+    // gamma / quoteSize are volatile so a live "modify" from an HTTP thread is visible to the runner
+    // thread that reads them each step (see StrategyService.modify). kappa/tau are fixed at launch.
+    private volatile double gamma;   // risk aversion
+    private final double kappa;      // order-flow intensity
+    private final double tau;        // effective time-to-horizon (ticks)
+    private volatile double quoteSize;
 
     public AvellanedaStoikovMaker(double gamma, double kappa, double tau, double quoteSize) {
         this.gamma = gamma;
         this.kappa = kappa;
         this.tau = tau;
         this.quoteSize = quoteSize;
+    }
+
+    /** Adjust risk aversion on the running maker (wider/tighter, more/less inventory-averse). */
+    public void setGamma(double gamma) {
+        this.gamma = gamma;
+    }
+
+    /** Adjust the per-quote size the maker posts. */
+    public void setQuoteSize(double quoteSize) {
+        this.quoteSize = quoteSize;
+    }
+
+    public double gamma() {
+        return gamma;
+    }
+
+    public double quoteSize() {
+        return quoteSize;
     }
 
     @Override

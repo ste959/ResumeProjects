@@ -28,6 +28,17 @@ public final class StrategyDtos {
             Double quoteSize
     ) {}
 
+    /**
+     * Modify a running strategy in place. Only the fields relevant to the strategy type are applied:
+     * {@code participation} for POV; {@code gamma} and {@code quoteSize} for the Avellaneda–Stoikov
+     * maker. Everything else about a run is fixed at launch.
+     */
+    public record ModifyStrategyRequest(
+            Double participation,
+            Double gamma,
+            Double quoteSize
+    ) {}
+
     public record StrategyView(
             String id,
             String type,

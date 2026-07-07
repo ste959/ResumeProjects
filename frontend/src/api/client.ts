@@ -10,8 +10,10 @@ import type {
   CryptoPosition,
   DeskRiskSummary,
   DeskSummary,
+  EquityStatus,
   ExecutionQuality,
   Findings,
+  ModifyStrategyRequest,
   MicroSnapshot,
   Order,
   PaperOrder,
@@ -131,11 +133,18 @@ export const api = {
   cryptoPositions: () => request<CryptoPosition[]>('/market/positions'),
   cryptoOrders: () => request<PaperOrder[]>('/market/orders'),
 
-  // Strategy engine (execution algos + market making).
+  // Strategy engine (execution algos + market making) + live controls.
   strategies: () => request<StrategyView[]>('/strategies'),
   createStrategy: (req: CreateStrategyRequest) =>
     request<StrategyView>('/strategies', { method: 'POST', body: JSON.stringify(req) }),
   stopStrategy: (id: string) => request<StrategyView>(`/strategies/${id}/stop`, { method: 'POST' }),
+  pauseStrategy: (id: string) => request<StrategyView>(`/strategies/${id}/pause`, { method: 'POST' }),
+  resumeStrategy: (id: string) => request<StrategyView>(`/strategies/${id}/resume`, { method: 'POST' }),
+  modifyStrategy: (id: string, req: ModifyStrategyRequest) =>
+    request<StrategyView>(`/strategies/${id}/modify`, { method: 'POST', body: JSON.stringify(req) }),
+
+  // Equity operational loop (read-only ops status; always available).
+  equityStatus: () => request<EquityStatus>('/equity/status'),
 
   // Research service (Python/FastAPI over the mds research layer).
   researchHealth: () =>
