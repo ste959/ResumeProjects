@@ -26,6 +26,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/research/, '/api/research'),
       },
+      // Live market-data WebSocket → backend :8080 (ws: true upgrades the connection).
+      '/ws': {
+        target: process.env.VITE_API_TARGET ?? 'http://localhost:8080',
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
 });

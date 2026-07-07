@@ -148,6 +148,7 @@ export interface BookView {
 }
 
 export interface TradePrint {
+  seq?: number;
   product: string;
   price: number;
   size: number;
@@ -360,3 +361,25 @@ export interface Construction {
   }[];
   verdict: string;
 }
+
+// ---- Live market-data stream (WebSocket /ws/market) ----
+
+export interface StreamMetrics {
+  ready: boolean;
+  mid: number;
+  microprice: number;
+  imbalance: number;
+  spreadBps: number;
+  microPremiumBps: number;
+  bookUpdatesPerSec: number;
+  tradesPerSec: number;
+  bookAgeMs: number;
+  fillRatePct: number;
+  avgSlippageBps: number;
+  paperOrders: number;
+}
+
+export type StreamFrame =
+  | { type: 'book'; product: string; quote: ProductQuote; bids: DepthLevel[]; asks: DepthLevel[] }
+  | { type: 'trade'; product: string; trades: TradePrint[] }
+  | { type: 'metrics'; product: string; metrics: StreamMetrics };

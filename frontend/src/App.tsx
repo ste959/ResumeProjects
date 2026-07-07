@@ -5,12 +5,11 @@ import type { Security } from './api/types';
 import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { Architecture } from './components/Architecture';
 import { Blotter } from './components/Blotter';
-import { LiveMarket } from './components/LiveMarket';
+import { MarketStream } from './components/MarketStream';
 import { OrderTicket } from './components/OrderTicket';
 import { Positions } from './components/Positions';
 import { ResearchLab } from './components/ResearchLab';
 import { RiskDashboard } from './components/RiskDashboard';
-import { Signals } from './components/Signals';
 import { Strategies } from './components/Strategies';
 import { usePolling } from './hooks/usePolling';
 
@@ -148,21 +147,7 @@ function Shell() {
           }
         />
 
-        <Route
-          path="/microstructure"
-          element={
-            <main className="risk-main">
-              <div className="risk-intro">
-                <span className="dot live" />
-                Live <b>Coinbase</b> order book (real depth &amp; price action) with{' '}
-                <b>microstructure signals</b> — imbalance, microprice premium, spread &amp; an
-                information coefficient
-              </div>
-              <LiveMarket />
-              <Signals />
-            </main>
-          }
-        />
+        <Route path="/microstructure" element={<MarketStream />} />
 
         <Route
           path="/execution"

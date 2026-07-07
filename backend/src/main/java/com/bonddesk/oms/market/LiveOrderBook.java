@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A live price-level order book for one product, maintained from Coinbase's {@code level2}
@@ -29,9 +30,23 @@ public final class LiveOrderBook {
 
     private final String product;
     private volatile Sides sides = emptySides();
+    // Monotonic count of feed events applied — a real throughput signal for the live stream
+    // (the broadcaster diffs it each tick to report book updates/sec). Incremented on the feed thread.
+    private final AtomicLong updates = new AtomicLong();
+    private volatile long lastUpdateMillis;
 
     public LiveOrderBook(String product) {
         this.product = product;
+    }
+
+    /** Total feed events applied to this book since start (snapshot replaces + increments). */
+    public long updateCount() {
+        return updates.get();
+    }
+
+    /** Wall-clock millis of the most recent feed event (0 if none yet) — for a book-age/latency read. */
+    public long lastUpdateMillis() {
+        return lastUpdateMillis;
     }
 
     private static Sides emptySides() {
@@ -50,6 +65,7 @@ public final class LiveOrderBook {
         bidLevels.forEach(l -> next.bids().put(l.price(), l.size()));
         askLevels.forEach(l -> next.asks().put(l.price(), l.size()));
         sides = next;
+        touch();
     }
 
     /** Apply one incremental change; size 0 removes the level. */
@@ -61,6 +77,12 @@ public final class LiveOrderBook {
         } else {
             side.put(price, size);
         }
+        touch();
+    }
+
+    private void touch() {
+        updates.incrementAndGet();
+        lastUpdateMillis = System.currentTimeMillis();
     }
 
     public BigDecimal bestBid() {
