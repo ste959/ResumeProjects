@@ -1,0 +1,89 @@
+"""Portfolio construction over signals — the systematic trader's core job.
+
+Given several strategies' return streams, decide how to allocate capital/risk across them to
+maximize the portfolio's net-of-cost, risk-adjusted return. Everything here is **walk-forward
+and out-of-sample**: weights are estimated on a trailing window and applied to the *next* block,
+so the reported result is honest and reflects the classic lesson — naive mean-variance
+over-fits the estimated means, while risk-parity and covariance shrinkage generalize.
+
+    combined, log = walk_forward_allocate(signal_net_returns, method="risk_parity")
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+TRADING_DAYS = 252
+
+
+def _shrink_cov(returns: np.ndarray, lam: float = 0.3) -> np.ndarray:
+    """Ledoit-Wolf-style shrinkage of the sample covariance toward a scaled identity — this is
+    what keeps mean-variance from exploding on a noisy, short estimation window."""
+    cov = np.atleast_2d(np.cov(returns, rowvar=False))
+    avg_var = float(np.mean(np.diag(cov)))
+    return (1.0 - lam) * cov + lam * avg_var * np.eye(cov.shape[0])
+
+
+def optimize_weights(window: pd.DataFrame, method: str = "risk_parity", lam: float = 0.3) -> np.ndarray:
+    """Non-negative signal weights that sum to 1, estimated from a trailing return window."""
+    R = window.to_numpy(dtype=float)
+    n = R.shape[1]
+    if method == "equal":
+        w = np.ones(n)
+    elif method in ("inverse_vol", "risk_parity"):
+        vol = R.std(axis=0, ddof=0)
+        w = np.divide(1.0, vol, out=np.zeros_like(vol), where=vol > 0)
+    elif method == "max_sharpe":
+        mu = R.mean(axis=0)
+        w = np.linalg.solve(_shrink_cov(R, lam), mu)
+        w = np.clip(w, 0.0, None)  # long-only: don't short your own signal
+    else:
+        raise ValueError(f"unknown method: {method}")
+    total = w.sum()
+    return w / total if total > 0 else np.ones(n) / n
+
+
+def walk_forward_allocate(signal_returns: pd.DataFrame, method: str = "risk_parity",
+                          lookback: int = 126, rebalance: int = 21):
+    """Estimate weights on the trailing `lookback` days, hold them for the next `rebalance` days,
+    and roll forward. Returns the combined out-of-sample return series and the weight history."""
+    R = signal_returns.dropna()
+    combined = pd.Series(np.nan, index=R.index)
+    log = []
+    for start in range(lookback, len(R), rebalance):
+        w = optimize_weights(R.iloc[start - lookback:start], method)
+        test = R.iloc[start:start + rebalance]
+        combined.loc[test.index] = test.to_numpy() @ w
+        log.append((R.index[start], w))
+    return combined.dropna(), log
+
+
+def vol_target(returns: pd.Series, target_annual_vol: float = 0.10) -> pd.Series:
+    """Scale a return series to a target annualized volatility (portfolio-level risk control)."""
+    realized = returns.std(ddof=0) * np.sqrt(TRADING_DAYS)
+    if realized <= 0:
+        return returns
+    return returns * (target_annual_vol / realized)
+
+
+def kelly_fraction(returns: pd.Series) -> float:
+    """Full-Kelly leverage f* = mean / variance (per period). Practitioners use a FRACTION of
+    this — full Kelly is famously too aggressive (its drawdowns are brutal)."""
+    var = float(returns.var(ddof=0))
+    return float(returns.mean() / var) if var > 0 else 0.0
+
+
+def sharpe(returns: pd.Series, ppy: int = TRADING_DAYS) -> float:
+    r = returns.dropna()
+    s = r.std(ddof=0)
+    return float(r.mean() / s * np.sqrt(ppy)) if s > 0 and len(r) else 0.0
+
+
+def metrics(returns: pd.Series) -> dict:
+    r = returns.dropna()
+    equity = (1.0 + r).cumprod()
+    max_dd = float((equity / equity.cummax() - 1.0).min()) if len(equity) else 0.0
+    ann = float(equity.iloc[-1] ** (TRADING_DAYS / max(len(r), 1)) - 1.0) if len(r) else 0.0
+    return {"sharpe": sharpe(r), "ann_return": ann, "max_drawdown": max_dd,
+            "kelly": kelly_fraction(r), "days": int(len(r))}

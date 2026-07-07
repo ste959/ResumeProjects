@@ -258,6 +258,56 @@ on: fit where the answer is known, *then* turn the model loose on the real feed.
 
 ---
 
+## ML research layer (Phase 5 — the quant *researcher*)
+
+**Naive:** train a model, report the in-sample IC or a shuffled-CV R², call it alpha.
+**Reality:** the two ways to fool yourself are look-ahead (using information you wouldn't have had) and
+cost-blindness (an edge smaller than the spread you must cross to capture it). The research stack
+(`research/mds/`, Python: DuckDB + Parquet + sklearn) is built so neither can hide:
+
+- **Leakage-free harness** — features are computed point-in-time from the reconstructed book; labels are
+  *forward* returns; validation is **walk-forward** (expanding window, never shuffled). A deterministic
+  test proves the lag is what kills a look-ahead signal (cheating Sharpe ≫ honest Sharpe).
+- **Model zoo** — Ridge → gradient boosting → small MLP, each scaled on train folds only.
+- **Cost-aware verdict** — every signal is charged half-spread + fee per unit turnover; the headline is
+  the **gross-vs-net gap**, not the gross number.
+
+Validated on the ground truth above, the pipeline behaves correctly and the honest findings are:
+
+| study | best IC | net-of-cost verdict |
+|---|---|---|
+| SYNTH noise (α=0) | +0.005 | finds nothing — the false-positive check passes |
+| SYNTH signal (α=2.5) | +0.922 | recovers the planted signal, but **dies after spread** at tick frequency |
+| REAL BTC-USD microstructure | +0.287 | real predictive signal, but **dies after spread** — bid-ask bounce, not tradable |
+| REAL equity momentum (cross-sectional) | — | **survives** net +0.36 Sharpe at low turnover (0.08) |
+| REAL equity reversal / low-vol | — | **die** — reversal bleeds to costs at 0.62 turnover |
+
+The lesson the whole layer is built to teach: **what survives is low turnover, not high IC.** A +0.29 IC
+that trades every tick is worthless; a weak monthly signal can be a business. IC is not tradability.
+
+## Portfolio construction (Phase 6 — the quant *trader*)
+
+**Naive:** run mean-variance on the signals' historical returns and trust the optimal weights.
+**Reality:** naive Markowitz over-fits the estimated means and blows up out-of-sample; and no optimizer
+can create alpha that isn't in the inputs. The allocator (`research/mds/portfolio.py`) is therefore
+**walk-forward** (weights fit on a trailing window, applied to the *next* block) and offers equal-weight,
+inverse-vol / risk-parity, and **shrunk** max-Sharpe (Ledoit-Wolf-style covariance shrinkage, long-only).
+
+Two honest results, deliberately shown side by side:
+
+- **Machinery works (ground truth):** across four uncorrelated synthetic Sharpe-0.7 signals, walk-forward
+  allocation lifts the Sharpe from ~0.8 (avg single) to ~1.6 — the ~√N diversification benefit, pinned by
+  a test.
+- **Machinery can't rescue bad inputs (real):** allocating across the three equity signals **fails to beat
+  momentum alone** (best allocation −0.48 vs momentum +0.36), because two of the three lose money.
+  Garbage in, garbage out — the optimizer's value appears only with a richer set of *good* signals.
+
+Reporting the second result rather than fishing for a flattering combination is the point. Also included:
+vol-targeting (scale to a risk budget) and a Kelly-fraction helper (with the standard caveat that full
+Kelly is too aggressive to run).
+
+---
+
 ## Bias register — every known simplification and which way it cuts
 
 Naming the *direction* of a bias is the actual skill — a simplification that flatters the
@@ -297,4 +347,7 @@ convention. The lesson: verify the assumption, then design so the answer doesn't
 
 ---
 
-*Phase 5 (ML on real + simulated data) and Phase 6 extend this log as each layer lands.*
+*Phases 1–6 span the three-persona lifecycle: the engineer who builds the market and backtester,
+the researcher who mines it for signal, and the trader who allocates risk across what survives.
+Phase 6b (crowding / capacity decay) and a deep-learning model (DeepLOB, blocked on a torch env)
+extend this log next.*
