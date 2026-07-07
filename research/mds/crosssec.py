@@ -35,22 +35,46 @@ def _market_return(rets: pd.DataFrame) -> pd.Series:
     return rets.mean(axis=1, skipna=True)
 
 
-def _rolling_beta(rets: pd.DataFrame, mkt: pd.Series, window: int = 126) -> pd.DataFrame:
-    """Rolling market beta per name: cov(r_i, mkt) / var(mkt). Slow-moving → low turnover."""
-    mkt_var = mkt.rolling(window).var()
-    return pd.DataFrame({col: rets[col].rolling(window).cov(mkt) / mkt_var for col in rets.columns})
-
-
-def _idio_vol(rets: pd.DataFrame, mkt: pd.Series, window: int = 126) -> pd.DataFrame:
-    """Rolling idiosyncratic volatility per name: the vol left after removing the market
-    component. idio_var = var(r_i) − cov(r_i, mkt)² / var(mkt) (residual variance from a single
-    CAPM regression). Distinct from raw total vol — that's what makes it a real anomaly."""
-    mkt_var = mkt.rolling(window).var()
+def _loo_market(rets: pd.DataFrame) -> pd.DataFrame:
+    """Leave-one-out market return per name (dates × symbols): each column is the equal-weight
+    universe return with that name EXCLUDED. Regressing a stock on a benchmark that contains
+    ~1/N of itself biases its beta up and understates its idiosyncratic vol; leaving it out fixes
+    that. Where a name is missing that day it is already out of both the sum and the count."""
+    n = rets.count(axis=1)
+    total = rets.sum(axis=1)
     out = {}
     for col in rets.columns:
-        cov = rets[col].rolling(window).cov(mkt)
+        denom = (n - rets[col].notna().astype(int)).replace(0, np.nan)
+        out[col] = (total - rets[col].fillna(0.0)) / denom
+    return pd.DataFrame(out)
+
+
+def _col_market(mkt, col: str) -> pd.Series:
+    """The benchmark series for one name: a per-name leave-one-out frame column, or a shared
+    market Series (used by the unit tests, which pass a single known market)."""
+    return mkt[col] if isinstance(mkt, pd.DataFrame) else mkt
+
+
+def _rolling_beta(rets: pd.DataFrame, mkt, window: int = 126) -> pd.DataFrame:
+    """Rolling market beta per name: cov(r_i, mkt_i) / var(mkt_i). Slow-moving → low turnover.
+    `mkt` is a per-name leave-one-out frame (or a shared Series in tests)."""
+    out = {}
+    for col in rets.columns:
+        m = _col_market(mkt, col)
+        out[col] = rets[col].rolling(window).cov(m) / m.rolling(window).var()
+    return pd.DataFrame(out)
+
+
+def _idio_vol(rets: pd.DataFrame, mkt, window: int = 126) -> pd.DataFrame:
+    """Rolling idiosyncratic volatility per name: the vol left after removing the market
+    component. idio_var = var(r_i) − cov(r_i, mkt_i)² / var(mkt_i) (residual variance from a single
+    CAPM regression on its leave-one-out benchmark). Distinct from raw total vol — that's the anomaly."""
+    out = {}
+    for col in rets.columns:
+        m = _col_market(mkt, col)
+        cov = rets[col].rolling(window).cov(m)
         var_i = rets[col].rolling(window).var()
-        out[col] = np.sqrt((var_i - cov ** 2 / mkt_var).clip(lower=0))
+        out[col] = np.sqrt((var_i - cov ** 2 / m.rolling(window).var()).clip(lower=0))
     return pd.DataFrame(out)
 
 
@@ -63,9 +87,9 @@ def signals(px: pd.DataFrame, rets: pd.DataFrame) -> dict[str, pd.DataFrame]:
     sample size — see the t-stat/CI reporting in run_crosssec.py), not just pile on more trend."""
     logpx = np.log(px)
     mom = logpx.diff(252) - logpx.diff(21)
-    mkt = _market_return(rets)
-    beta = _rolling_beta(rets, mkt)
-    idio = _idio_vol(rets, mkt)
+    loo = _loo_market(rets)          # each name's benchmark excludes itself (no self-inclusion bias)
+    beta = _rolling_beta(rets, loo)
+    idio = _idio_vol(rets, loo)
     return {
         # 12–1 month momentum: last ~12m return skipping the most recent month.
         "momentum": mom,

@@ -77,10 +77,12 @@ public class AlpacaReconciler {
     }
 
     private void reconcileSafely() {
+        // Catch Throwable, not just RuntimeException: scheduleWithFixedDelay cancels the recurring
+        // task on ANY uncaught throwable (including Errors), which would silently stop reconciliation.
         try {
             reconcile();
-        } catch (RuntimeException e) {
-            log.debug("Reconcile cycle failed: {}", e.getMessage());
+        } catch (Throwable e) {
+            log.warn("Reconcile cycle failed: {}", e.toString());
         }
     }
 

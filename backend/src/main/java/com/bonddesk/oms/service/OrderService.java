@@ -215,6 +215,17 @@ public class OrderService {
             throw new BadRequestException("RFQ blocked by compliance: " + result.summary());
         }
 
+        // The RFQ is a live order path too, so it runs the same aggregate pre-trade risk guard.
+        Optional<String> riskBreach = riskGuard.check(order);
+        if (riskBreach.isPresent()) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setStatusReason(riskBreach.get());
+            Order saved = orders.save(order);
+            log.info("RFQ order {} REJECTED at entry: {}", saved.getOrderRef(), riskBreach.get());
+            publish(OrderEvent.Type.ORDER_REJECTED, saved);
+            throw new BadRequestException("RFQ blocked by risk limit: " + riskBreach.get());
+        }
+
         // Go straight to a fill at the agreed price — the trade is already done with the dealer.
         order.setStatus(OrderStatus.ROUTED);
         Order saved = orders.save(order);

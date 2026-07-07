@@ -29,6 +29,12 @@ public class MatchingService implements MatchingGateway {
     private static final String VENUE = "CLOB";
 
     private final Map<String, OrderBook> books = new ConcurrentHashMap<>();
+    // A per-instrument lock guarding fill PUBLISHING (not matching). Publishing runs the
+    // @Transactional recordFill -> applyFill, which load-modify-saves the shared resting Order and
+    // its Position (both @Version optimistically locked). Serialising publishing per instrument
+    // stops two concurrent fills on the same (portfolio, security) from colliding on that version
+    // check — without ever holding the fast in-memory book lock across the DB write.
+    private final Map<String, Object> publishLocks = new ConcurrentHashMap<>();
     private final Map<String, Long> deskRefToEngineId = new ConcurrentHashMap<>();
     private final AtomicLong idSeq = new AtomicLong();
     private final ApplicationEventPublisher events;
@@ -39,6 +45,10 @@ public class MatchingService implements MatchingGateway {
 
     private OrderBook bookFor(String cusip) {
         return books.computeIfAbsent(cusip, OrderBook::new);
+    }
+
+    private Object publishLockFor(String cusip) {
+        return publishLocks.computeIfAbsent(cusip, k -> new Object());
     }
 
     @Override
@@ -57,7 +67,9 @@ public class MatchingService implements MatchingGateway {
         // Match under the book lock (the engine's single-threaded core), but publish/persist the
         // resulting fills only AFTER releasing it. Fill publishing runs FillRecorder ->
         // OrderService.recordFill, a @Transactional DB write; holding the matching lock across
-        // that would let a slow DB stall every other order on this instrument.
+        // that would let a slow DB stall every other order on this instrument. Publishing is
+        // serialised on a SEPARATE per-instrument lock so concurrent fills on the same position
+        // still can't race the optimistic-version check.
         List<Trade> trades;
         synchronized (book) {
             trades = book.submit(bo);
@@ -65,7 +77,9 @@ public class MatchingService implements MatchingGateway {
                 deskRefToEngineId.put(order.getOrderRef(), id); // rests — remember it for cancels
             }
         }
-        publishFills(trades);
+        synchronized (publishLockFor(cusip)) {
+            publishFills(trades);
+        }
     }
 
     @Override
@@ -89,7 +103,9 @@ public class MatchingService implements MatchingGateway {
         synchronized (book) {
             trades = book.submit(bo);
         }
-        publishFills(trades); // persist/publish outside the matching lock (see route())
+        synchronized (publishLockFor(cusip)) { // serialised persist outside the matching lock (see route())
+            publishFills(trades);
+        }
         return id;
     }
 

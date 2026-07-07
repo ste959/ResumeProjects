@@ -17,6 +17,12 @@ import java.util.Optional;
  *
  * <p>This makes an aggregate breaker part of live order entry — previously the only aggregate
  * kill-switch lived in {@code BacktestService}, so live flow had no aggregate protection.
+ *
+ * <p><b>Scope / limitation:</b> this is a soft pre-trade check against <em>committed</em>
+ * positions. It does not reserve exposure for in-flight (created/routed but unfilled) orders, and
+ * it is not serialised across concurrent entries — so a burst of orders can each pass individually
+ * yet collectively exceed the limit before any fills land. A hard limit would require an
+ * exposure-reservation ledger updated at entry; that is deliberately out of scope here.
  */
 @Service
 public class PreTradeRiskGuard {
