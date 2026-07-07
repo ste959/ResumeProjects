@@ -4,18 +4,21 @@ import { api } from '../api/client';
 import type { Security } from '../api/types';
 import { usePolling } from '../hooks/usePolling';
 import { AnalyticsPanel } from './AnalyticsPanel';
-import { FixedIncomeDesk } from './FixedIncomeDesk';
+import { Blotter } from './Blotter';
+import { OrderTicket } from './OrderTicket';
+import { Positions } from './Positions';
+import { RatesTerminal } from './RatesTerminal';
 import { RiskDashboard } from './RiskDashboard';
 import { TaxPanel } from './TaxPanel';
 
-// The Fixed-Income OMS as its own self-contained app: a dealer-RFQ trading desk and a risk/tax view,
-// under its own identity header. Reuses the OMS backend endpoints (orders, RFQ, curve, analytics, tax).
+// The Fixed-Income product: its flagship is a live rates dealing desk (dealer RFQ market + curve +
+// key-rate risk + P&L attribution). Supporting views keep the electronic cash OMS and the risk/tax layer.
 const PORTFOLIO = 'PORT-DEMO';
-type Tab = 'desk' | 'risk';
+type Tab = 'rates' | 'cash' | 'risk';
 
 export function OmsApp() {
   const [securities, setSecurities] = useState<Security[]>([]);
-  const [tab, setTab] = useState<Tab>('desk');
+  const [tab, setTab] = useState<Tab>('rates');
 
   const orders = usePolling(api.orders, 2000);
   const positions = usePolling(useCallback(() => api.positions(PORTFOLIO), []), 2000);
@@ -33,17 +36,33 @@ export function OmsApp() {
         <Link to="/" className="shell-back">← Projects</Link>
         <div className="shell-brand">
           <span className="shell-mark">▤</span>
-          <div><h1>Fixed-Income Desk</h1><p>OMS · dealer RFQ · curve pricing · analytics · tax</p></div>
+          <div><h1>Fixed-Income Desk</h1><p>rates dealing · dealer RFQ · risk &amp; tax</p></div>
         </div>
         <nav className="shell-nav">
-          <button className={tab === 'desk' ? 'active' : ''} onClick={() => setTab('desk')}>Trading Desk</button>
+          <button className={tab === 'rates' ? 'active' : ''} onClick={() => setTab('rates')}>Rates Desk</button>
+          <button className={tab === 'cash' ? 'active' : ''} onClick={() => setTab('cash')}>Cash OMS</button>
           <button className={tab === 'risk' ? 'active' : ''} onClick={() => setTab('risk')}>Risk &amp; Tax</button>
         </nav>
       </header>
 
-      {tab === 'desk' && (
-        <FixedIncomeDesk securities={securities} orders={orders.data ?? []} positions={positions.data ?? []} onChanged={refresh} portfolio={PORTFOLIO} />
+      {tab === 'rates' && <RatesTerminal />}
+
+      {tab === 'cash' && (
+        <main className="risk-main">
+          <div className="risk-intro">
+            <span className="dot live" />
+            Electronic order path — stage, route &amp; fill bond orders through the OMS
+          </div>
+          <div className="fi-order-grid">
+            <OrderTicket securities={securities} portfolio={PORTFOLIO} onSubmitted={refresh} />
+            <div className="fi-order-content">
+              <Blotter orders={orders.data ?? []} onChanged={refresh} />
+              <Positions positions={positions.data ?? []} />
+            </div>
+          </div>
+        </main>
       )}
+
       {tab === 'risk' && (
         <main className="risk-main">
           <div className="risk-intro">

@@ -22,6 +22,10 @@ import type {
   PlaceExRequest,
   PlaceExResponse,
   Position,
+  RaRfq,
+  RatesRfqRequest,
+  RatesShockRequest,
+  RatesSnapshot,
   ProductQuote,
   Rfq,
   RfqExecution,
@@ -156,6 +160,13 @@ export const api = {
   cancelExchangeOrder: (id: number) =>
     request<{ orderId: number; cancelled: boolean }>(`/exchange/orders/${id}/cancel`, { method: 'POST' }),
   exchangeAnalytics: () => request<ExAnalytics>('/exchange/analytics'),
+
+  // Rates desk (dealer RFQ + curve shock; market data streams over /ws/rates).
+  ratesSnapshot: () => request<RatesSnapshot>('/rates/snapshot'),
+  ratesSubmitRfq: (req: RatesRfqRequest) =>
+    request<RaRfq>('/rates/rfq', { method: 'POST', body: JSON.stringify(req) }),
+  ratesShock: (req: RatesShockRequest) =>
+    request<RatesSnapshot>('/rates/shock', { method: 'POST', body: JSON.stringify(req) }),
 
   // Research service (Python/FastAPI over the mds research layer).
   researchHealth: () =>

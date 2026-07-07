@@ -1761,3 +1761,96 @@ code {
 .xt-hublink:hover { color: var(--accent); }
 
 @media (max-width: 860px) { .hub-grid { grid-template-columns: 1fr; } }
+
+/* ============================================================================
+   RATES DESK terminal (/oms flagship) — light institutional
+   ============================================================================ */
+.rt { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.rt-intro { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 11px; letter-spacing: 0.4px; text-transform: uppercase; border-left: 3px solid var(--accent); padding: 7px 11px; background: var(--panel); border-radius: 0 3px 3px 0; box-shadow: var(--shadow); }
+.rt-intro b { color: var(--accent); }
+.rt-loading { padding: 60px; text-align: center; color: var(--muted); font-family: var(--mono); }
+.rt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.rt-card { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; box-shadow: var(--shadow); }
+.rt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--head); border-radius: 4px 4px 0 0; }
+.rt-head h2 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--ink); }
+.rt-sub { font-size: 10.5px; color: var(--muted); font-family: var(--mono); }
+.rt-sub b { color: var(--ink); }
+.rt .pos { color: var(--buy); } .rt .neg { color: var(--sell); } .rt .dim { color: var(--muted); }
+.rt .buy { color: var(--buy); font-weight: 700; } .rt .sell { color: var(--sell); font-weight: 700; }
+.rt-empty { padding: 20px; text-align: center; color: var(--muted); font-size: 11px; }
+
+/* centered diverging bar (key-rate DV01, P&L, dealer inventory) */
+.rt-kr-bar-wrap, .rt-pnl-bar-wrap { position: relative; height: 14px; background: var(--panel-2); border-radius: 2px; }
+.rt-kr-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border-strong); }
+.rt-kr-bar, .rt-pnl-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 1px; }
+.rt-kr-bar.pos, .rt-pnl-bar.pos { background: var(--buy); }
+.rt-kr-bar.neg, .rt-pnl-bar.neg { background: var(--sell); }
+
+/* curve */
+.rt-curve-svg { width: 100%; height: auto; display: block; padding: 8px 4px; }
+.rt-grid { stroke: var(--border); stroke-width: 1; }
+.rt-axis { fill: var(--muted); font-family: var(--mono); font-size: 9px; }
+.rt-curve-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.rt-curve-dot { fill: var(--accent); }
+.rt-shock { display: flex; align-items: center; gap: 16px; padding: 10px 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.rt-shock label { display: flex; flex-direction: column; gap: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--dim); font-family: var(--mono); }
+.rt-shock label b { color: var(--accent); }
+.rt-shock input[type=range] { accent-color: var(--accent); width: 150px; }
+.rt-reset { align-self: flex-end; background: transparent; border: 1px solid var(--border-strong); color: var(--dim); border-radius: 3px; padding: 5px 12px; font-family: var(--mono); font-size: 11px; cursor: pointer; }
+
+/* rfq */
+.rt-rfq-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.rt-rfq-form select { font-family: var(--mono); font-size: 12px; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 3px; background: var(--panel); color: var(--ink); }
+.rt-rfq-form label { display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: 10px; color: var(--dim); }
+.rt-rfq-form input[type=range] { accent-color: var(--accent); width: 90px; }
+.rt-sidetoggle { display: flex; }
+.rt-sidetoggle button { border: 1px solid var(--border-strong); background: var(--panel); color: var(--dim); padding: 6px 12px; font-family: var(--mono); font-size: 11px; font-weight: 700; cursor: pointer; }
+.rt-sidetoggle button:first-child { border-radius: 3px 0 0 3px; } .rt-sidetoggle button:last-child { border-radius: 0 3px 3px 0; border-left: none; }
+.rt-sidetoggle button.buy.on { background: var(--buy); color: #fff; border-color: var(--buy); }
+.rt-sidetoggle button.sell.on { background: var(--sell); color: #fff; border-color: var(--sell); }
+.rt-send { background: var(--accent); color: #fff; border: none; border-radius: 3px; padding: 7px 16px; font-family: var(--mono); font-size: 11px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+.rt-auction { padding: 12px 14px; }
+.rt-auction-head { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--mono); font-size: 12px; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+.rt-mid { color: var(--dim); font-size: 11px; } .rt-mid b { color: var(--warn); }
+.rt-manual { margin-left: 6px; font-size: 9px; color: var(--accent); border: 1px solid var(--accent); border-radius: 2px; padding: 1px 5px; }
+.rt-quotes { display: flex; flex-direction: column; gap: 2px; }
+.rt-quote { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 4px 8px; font-family: var(--mono); font-size: 12px; border-radius: 3px; }
+.rt-quote.best { background: color-mix(in srgb, var(--buy) 10%, transparent); }
+.rt-quote.us { outline: 1px solid var(--accent); outline-offset: -1px; }
+.rt-q-name { color: var(--ink); display: flex; align-items: center; gap: 6px; }
+.rt-q-px { text-align: right; font-weight: 700; } .rt-q-bps { text-align: right; color: var(--muted); font-size: 10px; }
+.rt-tag { font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 2px; }
+.rt-tag.us { color: var(--accent); border: 1px solid var(--accent); } .rt-tag.best { color: var(--buy); border: 1px solid var(--buy); }
+.rt-auction-foot { margin-top: 8px; font-size: 10.5px; color: var(--muted); font-family: var(--mono); } .rt-auction-foot b { color: var(--ink); }
+
+/* book + key-rate */
+.rt-book-body { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; padding: 12px 14px; }
+.rt-kr-title, .rt-an-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 8px; }
+.rt-kr-row, .rt-pnl-row, .rt-leak-row, .rt-dealer { display: grid; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; padding: 2px 0; }
+.rt-kr-row { grid-template-columns: 34px 1fr 70px; }
+.rt-kr-tenor { color: var(--dim); } .rt-kr-val { text-align: right; } .rt-kr-val.pos { color: var(--buy); } .rt-kr-val.neg { color: var(--sell); }
+.rt-positions table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; }
+.rt-positions th { text-align: left; font-size: 9px; text-transform: uppercase; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.rt-positions th.r, .rt-positions td.r { text-align: right; }
+.rt-positions td { padding: 3px 6px; border-bottom: 1px solid var(--border); }
+.rt-positions td.pos { color: var(--buy); } .rt-positions td.neg { color: var(--sell); }
+
+/* pnl */
+.rt-pnl-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.rt-pnl-row { grid-template-columns: 160px 1fr 90px; }
+.rt-pnl-k { color: var(--dim); font-family: var(--sans); font-size: 11.5px; } .rt-pnl-v { text-align: right; } .rt-pnl-v.pos { color: var(--buy); } .rt-pnl-v.neg { color: var(--sell); }
+.rt-pnl-note { padding: 10px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); line-height: 1.5; background: var(--head); border-radius: 0 0 4px 4px; }
+
+/* analytics + dealers */
+.rt-an-title { padding: 12px 14px 0; }
+.rt-leak, .rt-dealer-list { padding: 6px 14px 14px; display: flex; flex-direction: column; gap: 5px; }
+.rt-leak-row { grid-template-columns: 48px 1fr 58px 74px; }
+.rt-leak-n { color: var(--dim); } .rt-leak-cost { text-align: right; color: var(--ink); } .rt-leak-leak { text-align: right; color: var(--muted); font-size: 10px; }
+.rt-leak-bar-wrap { height: 12px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
+.rt-leak-bar { height: 100%; background: var(--warn); opacity: 0.7; border-radius: 2px; }
+.rt-dealer { grid-template-columns: 130px 1fr 44px; }
+.rt-dealer.us .rt-dealer-name { color: var(--accent); font-weight: 700; }
+.rt-dealer-name { color: var(--ink); display: flex; align-items: center; gap: 6px; }
+.rt-dealer-inv { text-align: right; } .rt-dealer-inv.pos { color: var(--buy); } .rt-dealer-inv.neg { color: var(--sell); }
+
+@media (max-width: 1000px) { .rt-row, .rt-book-body { grid-template-columns: 1fr; } }

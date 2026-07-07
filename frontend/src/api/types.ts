@@ -457,6 +457,27 @@ export interface ExFillView {
 export interface ExSummary { fills: number; adverseFills: number; informedShare: number; avgEdgeBps: number; avgMarkoutBps: number }
 export interface ExAnalytics { pnl: ExPnlAttribution; latency: ExLatencyReport; fills: ExFillView[]; summary: ExSummary }
 
+// ---- Rates desk (WebSocket /ws/rates + /api/rates) ----
+
+export interface RaCurve { asOf: string; tenors: number[]; parYields: number[]; zeroRates: number[]; parallelShockBps: number; slopeShockBps: number }
+export interface RaQuote { name: string; price: number; fromMidBps: number; best: boolean; us: boolean }
+export interface RaRfq {
+  instrument: string; side: string; sizeMM: number; nDealers: number; compositeMid: number;
+  leakagePx: number; executedPrice: number; winner: string; weWon: boolean; costBps: number;
+  competitionPx: number; quotes: RaQuote[];
+}
+export interface RaDealer { name: string; inventory: number; us: boolean }
+export interface RaKr { tenor: number; dv01Usd: number }
+export interface RaPosition { instrument: string; positionMM: number; price: number; dv01Usd: number }
+export interface RaPnl { totalUsd: number; trading: number; carry: number; rateParallel: number; rateReshape: number; credit: number }
+export interface RaBook { valueUsd: number; dv01Usd: number; keyRateDv01: RaKr[]; positions: RaPosition[]; pnl: RaPnl }
+export interface RaLeak { dealers: number; avgLeakagePx: number; avgCostBps: number; count: number }
+export interface RaCostBySize { bucket: string; avgCostBps: number; count: number }
+export interface RaAnalytics { winRatePct: number; ourWins: number; totalRfqs: number; avgCostBps: number; leakageCurve: RaLeak[]; costBySize: RaCostBySize[] }
+export interface RatesSnapshot { tick: number; curve: RaCurve; lastRfq: RaRfq | null; dealers: RaDealer[]; book: RaBook; analytics: RaAnalytics }
+export interface RatesShockRequest { parallelBps: number; slopeBps: number }
+export interface RatesRfqRequest { instrument: string; side: string; sizeMM: number; nDealers: number }
+
 // ---- Fixed-income OTC desk (RFQ), yield curve, bond analytics, tax ----
 
 export interface DealerQuote {
