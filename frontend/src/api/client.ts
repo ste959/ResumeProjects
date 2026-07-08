@@ -25,6 +25,11 @@ import type {
   LabTemplates,
   LabResult,
   LabPromoteResult,
+  Screener,
+  Technicals,
+  Sector,
+  NewsItem,
+  Catalysts,
   Order,
   PaperOrder,
   PaperOrderRequest,
@@ -222,4 +227,12 @@ export const api = {
     ),
   labPromote: (body: { kind: string; symbol: string; timeframe: string; params: Record<string, number>; notional: number }) =>
     request<LabPromoteResult>('/lab/promote', { method: 'POST', body: JSON.stringify(body) }, RESEARCH_BASE),
+
+  // Exploration.
+  mktScreener: () => request<Screener>('/market/screener', undefined, RESEARCH_BASE),
+  mktTechnicals: (symbol: string) => request<Technicals>(`/market/technicals?symbol=${encodeURIComponent(symbol)}`, undefined, RESEARCH_BASE),
+  mktSectors: () => request<Sector[]>('/market/sectors', undefined, RESEARCH_BASE),
+  mktNews: (symbols = '', limit = 20) =>
+    request<NewsItem[]>(`/market/news?symbols=${encodeURIComponent(symbols)}&limit=${limit}`, undefined, RESEARCH_BASE),
+  mktCatalysts: () => request<Catalysts>('/market/catalysts', undefined, RESEARCH_BASE),
 };

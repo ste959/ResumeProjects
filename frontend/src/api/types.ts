@@ -426,6 +426,47 @@ export interface LabResult {
 }
 export interface LabPromoteResult { ok: boolean; strategy_id: string; name: string; }
 
+// ── Exploration ──
+export interface ScreenerRow {
+  symbol: string;
+  price: number | null;
+  change: number | null;
+  percent_change: number | null;
+  volume: number | null;
+  trade_count: number | null;
+}
+export interface Screener { most_active: ScreenerRow[]; gainers: ScreenerRow[]; losers: ScreenerRow[]; }
+export interface Technicals {
+  symbol: string;
+  ok: boolean;
+  last?: number;
+  sma20?: number | null;
+  sma50?: number | null;
+  trend?: boolean;
+  rsi14?: number | null;
+  atr14?: number | null;
+  atr_pct?: number | null;
+  ret_1w?: number | null;
+  ret_1m?: number | null;
+  ret_3m?: number | null;
+  hi?: number;
+  lo?: number;
+  n?: number;
+  spark?: number[];
+}
+export interface Sector { symbol: string; name: string; price: number | null; change: number | null; }
+export interface NewsItem {
+  id: number | string;
+  headline: string;
+  summary: string;
+  source: string;
+  url: string;
+  created_at: string;
+  symbols: string[];
+}
+export interface Catalyst { date: string; days_out: number; close?: string }
+export interface Catalysts { fomc: Catalyst[]; next_holiday: Catalyst | null; next_early_close: Catalyst | null; }
+
 // ── Microstructure study (order-flow alpha on an event-driven backtester) ──
 export interface MicroDecayPoint {
   horizon: number;

@@ -113,6 +113,11 @@ def portfolio_history(period: str = "1M", timeframe: str = "1D") -> dict:
                 {"period": period, "timeframe": timeframe, "extended_hours": "true"})
 
 
+def calendar(start: str, end: str) -> list[dict]:
+    """The real trading calendar between two dates (open days only; early closes differ from 16:00)."""
+    return _get(TRADING_BASE, "/v2/calendar", {"start": start, "end": end})  # type: ignore[return-value]
+
+
 def submit_order(symbol: str, qty: float | str, side: str, type_: str = "market",
                  tif: str = "gtc", client_order_id: str | None = None) -> dict:
     body: dict = {"symbol": symbol, "qty": str(qty), "side": side, "type": type_, "time_in_force": tif}
@@ -127,10 +132,14 @@ def stock_snapshots(symbols: list[str]) -> dict:
 
 
 def stock_bars(symbol: str, timeframe: str = "1Day", limit: int = 120) -> dict:
+    return stock_bars_multi([symbol], timeframe, limit)
+
+
+def stock_bars_multi(symbols: list[str], timeframe: str = "1Day", limit: int = 120) -> dict:
     span_h = _TF_HOURS.get(timeframe, 24.0) * (limit + 8)
     start = (datetime.now(timezone.utc) - timedelta(hours=span_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    params = {"symbols": symbol, "timeframe": timeframe, "limit": 10000, "start": start, "feed": "iex"}
-    return _paginate_bars(DATA_BASE, "/v2/stocks/bars", [symbol], params, limit)
+    params = {"symbols": ",".join(symbols), "timeframe": timeframe, "limit": 10000, "start": start, "feed": "iex"}
+    return _paginate_bars(DATA_BASE, "/v2/stocks/bars", symbols, params, limit)
 
 
 def most_actives(top: int = 25) -> dict:

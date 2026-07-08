@@ -14,6 +14,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from . import alpaca
 from . import engine
 from . import lab
+from . import market
 from . import strategies as S
 
 router = APIRouter(prefix="/api/research", tags=["desk"])
@@ -195,3 +196,52 @@ def lab_promote(body: dict = Body(...)) -> dict:
         raise HTTPException(status_code=400, detail=str(e))
     engine.refresh()  # pick the new strategy into the books immediately
     return {"ok": True, "strategy_id": defn.id, "name": defn.name, **engine.snapshot()}
+
+
+# ── Exploration (screener · technicals · sectors · news · catalysts) ──────────────────────────────
+def _guard_configured():
+    if not alpaca.configured():
+        raise HTTPException(status_code=503, detail="Alpaca not configured")
+
+
+@router.get("/market/screener")
+def market_screener() -> dict:
+    _guard_configured()
+    try:
+        return market.screener()
+    except alpaca.AlpacaError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.get("/market/technicals")
+def market_technicals(symbol: str = Query(...)) -> dict:
+    _guard_configured()
+    try:
+        return market.technicals(symbol.upper())
+    except alpaca.AlpacaError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.get("/market/sectors")
+def market_sectors() -> list[dict]:
+    _guard_configured()
+    try:
+        return market.sectors()
+    except alpaca.AlpacaError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.get("/market/news")
+def market_news(symbols: str = Query(""), limit: int = Query(20, ge=1, le=50)) -> list[dict]:
+    _guard_configured()
+    syms = [s.strip().upper() for s in symbols.split(",") if s.strip()] or None
+    try:
+        return market.news(syms, limit=limit)
+    except alpaca.AlpacaError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.get("/market/catalysts")
+def market_catalysts() -> dict:
+    _guard_configured()
+    return market.catalysts()
