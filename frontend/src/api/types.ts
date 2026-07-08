@@ -403,6 +403,8 @@ export interface QpRisk {
   gross_used: number;
   dd_limit: number;
   session_dd: number;
+  net_vol: number;
+  vol_limit: number;
   halt: boolean;
 }
 

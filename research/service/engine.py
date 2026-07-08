@@ -22,6 +22,7 @@ import time
 import traceback
 
 from . import alpaca
+from . import risk
 from . import strategies as S
 
 INTERVAL_SECONDS = 60
@@ -29,11 +30,18 @@ MIN_ORDER_USD = 25.0
 BAR_TIMEFRAME = "1Hour"
 BAR_LIMIT = 120
 MAX_ACTIONS = 60
+PPY_HOURLY = 24 * 365            # bars/year for annualizing hourly-bar vol/covariance
+RISK_BARS = 200                 # lookback for the vol/correlation estimate
 
 # Automated risk limits (the autonomous loss containment a manual kill switch can't provide):
 MAX_GROSS_USD = 8000.0           # aggregate gross exposure cap across all sleeves — blocks new entries
 MAX_SESSION_DRAWDOWN_USD = 750.0  # peak-to-current drop in TOTAL engine P&L → auto-flatten all + latch kill
 MAX_STRATEGY_DRAWDOWN_USD = 400.0  # per-sleeve drawdown → flatten + disarm that sleeve (a winner can't mask a loser)
+# Risk-based sizing + correlation-aware exposure:
+TARGET_SLEEVE_VOL_USD = 1000.0   # each sleeve is sized to contribute ~this much annualized $ vol
+MIN_NOTIONAL_USD = 300.0         # clamp on the vol-targeted notional
+MAX_NOTIONAL_USD = 3000.0
+MAX_PORTFOLIO_VOL_USD = 3000.0   # cap on correlation-aware portfolio vol (nets correlated sleeves)
 
 _LOCK = threading.RLock()
 _STOP = threading.Event()
@@ -70,6 +78,7 @@ _STATE: dict = {
     "pnl_peak": None,        # high-water total engine P&L this session (for the aggregate drawdown limit)
     "strat_peak": {},        # per-strategy high-water P&L (for the per-sleeve stop)
     "gross_used": 0.0,       # aggregate gross exposure
+    "net_vol": 0.0,          # correlation-aware portfolio volatility ($, annualized)
     "session_dd": 0.0,       # current peak-to-current drawdown (≤ 0)
     "risk_halt": False,      # engine is in an auto-flatten risk halt
 }
@@ -168,13 +177,37 @@ def _open_tagged() -> set[tuple[str, str]]:
     return out
 
 
-def _trade_armed(real: dict, marks: dict) -> None:
-    """Sign-with-hysteresis: enter full notional on a flip to long, hold while long (NO rebalancing),
-    exit on a flip to flat. Re-checks the kill switch / armed set immediately before every order."""
+def _risk_model() -> dict | None:
+    """Estimate each symbol's annualized vol + the covariance matrix from recent hourly bars — the
+    inputs to vol-targeted sizing and the correlation-aware portfolio-vol cap. None on data failure."""
+    syms = _all_symbols()
+    if not syms:
+        return None
+    try:
+        data = alpaca.crypto_bars(syms, timeframe=BAR_TIMEFRAME, limit=RISK_BARS)
+    except alpaca.AlpacaError:
+        return None
+    bars = data.get("bars") or {}
+    rets = {s: risk.returns_from_closes([b["c"] for b in (bars.get(s) or []) if b.get("c") is not None]) for s in syms}
+    return {"order": syms,
+            "vols": {s: risk.ann_vol(rets[s], PPY_HOURLY) for s in syms},
+            "cov": risk.cov_annualized(rets, syms, PPY_HOURLY)}
+
+
+def _weights(real: dict, marks: dict) -> dict:
+    """Signed position values ($) per symbol — the portfolio weight vector for risk math."""
+    return {sym: float(v.get("qty", 0.0)) * (marks.get(sym) or 0.0) for sym, v in real.items()}
+
+
+def _trade_armed(real: dict, marks: dict, rmodel: dict | None = None) -> None:
+    """Sign-with-hysteresis: enter on a flip to long, hold while long (NO rebalancing), exit on a flip
+    to flat. Entry size is VOL-TARGETED (risk budget / asset vol), and each entry is checked against
+    both the gross cap and the correlation-aware PORTFOLIO-VOL cap. Re-checks kill before every order."""
     with _LOCK:
         armed = list(_STATE["armed"])
     pending = _open_tagged()
-    gross = sum(abs(float(v.get("qty", 0.0)) * (marks.get(sym) or 0.0)) for sym, v in real.items())
+    weights = _weights(real, marks)
+    gross = sum(abs(w) for w in weights.values())
     for sid in armed:
         defn = S.REGISTRY.get(sid)
         if defn is None:
@@ -194,16 +227,27 @@ def _trade_armed(real: dict, marks: dict) -> None:
                 cur = float(rp.get("qty", 0.0))
                 held = abs(cur) * px >= MIN_ORDER_USD
                 if sign == 1 and not held:                         # flip to long → enter
-                    qty = round(defn.notional / px - max(cur, 0.0), 6)   # top up any dust, don't stack on it
+                    sigma = rmodel["vols"].get(sym) if rmodel else None
+                    notional = (risk.vol_target_notional(TARGET_SLEEVE_VOL_USD, sigma, MIN_NOTIONAL_USD, MAX_NOTIONAL_USD)
+                                if sigma else defn.notional)      # vol-targeted; fixed notional if vol unknown
+                    qty = round(notional / px - max(cur, 0.0), 6)  # top up any dust, don't stack on it
                     if qty * px < MIN_ORDER_USD:
                         continue
                     if gross + qty * px > MAX_GROSS_USD:            # aggregate gross exposure cap
-                        _log("risk", f"{sid}: blocked {sym} entry — gross cap ${MAX_GROSS_USD:,.0f} (used ${gross:,.0f})", strategy=sid, symbol=sym)
+                        _log("risk", f"{sid}: blocked {sym} — gross cap ${MAX_GROSS_USD:,.0f} (used ${gross:,.0f})", strategy=sid, symbol=sym)
                         continue
+                    if rmodel:                                     # correlation-aware portfolio-vol cap
+                        proj = dict(weights)
+                        proj[sym] = proj.get(sym, 0.0) + qty * px
+                        pv = risk.portfolio_vol(proj, rmodel["order"], rmodel["cov"])
+                        if pv > MAX_PORTFOLIO_VOL_USD:
+                            _log("risk", f"{sid}: blocked {sym} — portfolio vol ${pv:,.0f} > ${MAX_PORTFOLIO_VOL_USD:,.0f} cap", strategy=sid, symbol=sym)
+                            continue
                     if _halted(sid):
                         return
                     alpaca.submit_order(sym, qty, "buy", type_="market", tif="gtc", client_order_id=S.order_tag(sid, _next_seq()))
-                    _log("order", f"{sid}: enter buy {qty} {sym} @~{px:.2f}", strategy=sid, symbol=sym, side="buy", qty=qty)
+                    _log("order", f"{sid}: enter buy {qty} {sym} @~{px:.2f} (vol-tgt ${notional:,.0f})", strategy=sid, symbol=sym, side="buy", qty=qty)
+                    weights[sym] = weights.get(sym, 0.0) + qty * px
                     gross += qty * px
                 elif sign == 0 and held:                           # flip to flat → exit the whole position
                     avail = str(rp.get("qty_available") or cur)
@@ -223,10 +267,15 @@ def flatten_all() -> bool:
     return all([flatten(sid) for sid in list(S.REGISTRY)])   # list() forces all to run, not short-circuit
 
 
-def _risk_check() -> bool:
+def _risk_check(real: dict | None = None, marks: dict | None = None, rmodel: dict | None = None) -> bool:
     """Enforce risk limits from the freshly-updated books (runs after refresh). Returns True only on an
     AGGREGATE halt (caller then skips trading). Per-sleeve stops fire as side effects (flatten + disarm
-    just the bleeding sleeve) so one loser can't hide behind another sleeve's gains."""
+    just the bleeding sleeve) so one loser can't hide behind another sleeve's gains. Also records the
+    correlation-aware net portfolio vol for display."""
+    if rmodel and real is not None and marks is not None:
+        net_vol = risk.portfolio_vol(_weights(real, marks), rmodel["order"], rmodel["cov"])
+        with _LOCK:
+            _STATE["net_vol"] = net_vol
     with _LOCK:
         books = list(_STATE["books"])
         armed = set(_STATE["armed"])
@@ -276,7 +325,8 @@ def run_once() -> None:
     """One engine cycle: refresh books, enforce risk, then (if clear) trade the armed strategies."""
     try:
         _, marks, real, _ = refresh()
-        if real is not None and _risk_check():   # auto-flatten fired → nothing else this cycle
+        rmodel = _risk_model() if real is not None else None
+        if real is not None and _risk_check(real, marks, rmodel):   # auto-flatten fired → nothing else this cycle
             return
         with _LOCK:
             killed = _STATE["kill"]
@@ -284,7 +334,7 @@ def run_once() -> None:
         if killed or real is None:      # killed, or positions unknown this cycle → don't trade
             return
         if armed:
-            _trade_armed(real, marks)
+            _trade_armed(real, marks, rmodel)
         with _LOCK:
             _STATE["last_error"] = None
     except alpaca.AlpacaError as e:
@@ -403,6 +453,7 @@ def snapshot() -> dict:
             "risk": {
                 "max_gross": MAX_GROSS_USD, "gross_used": round(_STATE["gross_used"], 2),
                 "dd_limit": MAX_SESSION_DRAWDOWN_USD, "session_dd": round(_STATE["session_dd"], 2),
+                "net_vol": round(_STATE["net_vol"], 2), "vol_limit": MAX_PORTFOLIO_VOL_USD,
                 "halt": _STATE["risk_halt"],
             },
         }

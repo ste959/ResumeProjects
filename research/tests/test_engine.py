@@ -18,6 +18,7 @@ if "httpx" not in sys.modules:
     _fake.HTTPError = type("HTTPError", (Exception,), {})
     sys.modules["httpx"] = _fake
 
+import numpy as np  # noqa: E402
 import pytest  # noqa: E402
 
 from service import engine  # noqa: E402
@@ -167,6 +168,31 @@ def test_per_sleeve_stop_flattens_only_the_bleeder(broker):
     assert "btc-trend" not in engine._STATE["armed"]  # the bleeder is disarmed
     assert "eth-mom" in engine._STATE["armed"]        # the winner keeps trading
     assert any(o["side"] == "sell" for o in broker["submitted"])   # bleeder auto-flattened
+
+
+def test_entry_is_vol_targeted(broker):
+    broker["closes"] = RISING
+    engine._STATE["armed"].add("btc-trend")
+    # BTC vol 0.5, low covariance → notional = TARGET(1000)/0.5 = $2000 → 20 units at px 100 (not the
+    # fixed 15 the old fixed-$1,500 sizing gave). Higher-vol assets would get proportionally less.
+    rmodel = {"order": ["BTC/USD", "ETH/USD"], "vols": {"BTC/USD": 0.5, "ETH/USD": 0.9},
+              "cov": np.array([[0.25, 0.0], [0.0, 0.81]])}
+    engine._trade_armed({"BTC/USD": {"qty": 0.0, "qty_available": "0"}}, {"BTC/USD": 100.0, "ETH/USD": 100.0}, rmodel)
+    assert len(broker["submitted"]) == 1
+    assert abs(broker["submitted"][0]["qty"] - 20.0) < 1e-6
+
+
+def test_portfolio_vol_cap_blocks_correlated_entry(broker):
+    broker["closes"] = RISING
+    engine._STATE["armed"].add("btc-trend")
+    # ETH already carries $4,440 at 0.9 vol → portfolio vol ≈ $4,000, already over the $3,000 cap; a
+    # correlated BTC entry would only add risk, so it's blocked (gross is fine — the vol cap binds).
+    rmodel = {"order": ["BTC/USD", "ETH/USD"], "vols": {"BTC/USD": 0.6, "ETH/USD": 0.9},
+              "cov": np.array([[0.36, 0.8 * 0.6 * 0.9], [0.8 * 0.6 * 0.9, 0.81]])}
+    real = {"ETH/USD": {"qty": 44.4, "qty_available": "44.4"}}
+    engine._trade_armed(real, {"BTC/USD": 100.0, "ETH/USD": 100.0}, rmodel)
+    assert broker["submitted"] == []
+    assert any(a["kind"] == "risk" and "portfolio vol" in a["msg"] for a in engine._STATE["actions"])
 
 
 def test_flatten_skips_symbol_with_working_order(broker):

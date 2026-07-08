@@ -59,8 +59,9 @@ export function StrategyEngine() {
         <div className={`se-risk ${eng.risk.halt ? 'halt' : ''}`}>
           {eng.risk.halt && <span className="se-risk-halt">RISK HALT · auto-flattened</span>}
           <RiskBar label="Gross exposure" used={eng.risk.gross_used} limit={eng.risk.max_gross} kind="gross" />
+          <RiskBar label="Portfolio vol (net)" used={eng.risk.net_vol} limit={eng.risk.vol_limit} kind="vol" />
           <RiskBar label="Session drawdown" used={-eng.risk.session_dd} limit={eng.risk.dd_limit} kind="dd" />
-          <span className="se-risk-note">auto-flatten at the drawdown limit · gross cap blocks new entries</span>
+          <span className="se-risk-note">vol-targeted sizing · correlation-aware vol cap · auto-flatten on drawdown</span>
         </div>
       )}
       {eng.kill && !eng.risk?.halt && <div className="se-killbar">KILL ENGAGED — all strategies disarmed. Release to trade again.</div>}
