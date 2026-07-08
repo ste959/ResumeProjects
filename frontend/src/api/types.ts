@@ -413,14 +413,23 @@ export interface LabResult {
   params: Record<string, number>;
   cost_bps: number;
   n_bars: number;
+  bars_per_year: number;
+  freq: string;
+  window_days: number;
   net_sharpe: number;
   hac_t: number;
+  bar_t: number;
+  trials: number;
+  boot_lo: number | null;
+  boot_hi: number | null;
+  min_detectable: number;
+  underpowered: boolean;
   total_return: number;
-  ann_return: number;
   max_drawdown: number;
   avg_turnover: number;
   hit_rate: number;
   passes: boolean;
+  significant: boolean;
   equity_curve: LabCurvePoint[];
   verdict: string;
 }

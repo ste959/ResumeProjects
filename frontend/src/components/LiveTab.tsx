@@ -151,8 +151,10 @@ export function LiveTab() {
 
       <p className="live-foot">
         Every strategy order is tagged, so this account decomposes into <b>per-strategy P&L</b> above —
-        which sleeve is buying what, and how each is performing. Holdings reconcile to the real position
-        (fee-exact); the engine is disarmed until you arm it.
+        which sleeve is buying what, and how each is performing. Holdings reconcile to the real position and
+        split across strategies that share a symbol; P&L is <b>net of taker fees</b>. Positions use
+        sign-with-hysteresis (enter/exit on flips, no rebalancing), matching the backtest. The kill switch
+        <b> latches</b> until you resume.
       </p>
     </main>
   );

@@ -1,13 +1,16 @@
 """The live strategy engine — a background loop that trades armed strategies on the paper account.
 
 Safety model:
-  • Starts **disarmed**: strategies trade only after an explicit arm() (from the UI). The loop still
-    runs while disarmed, but read-only — it just rebuilds books and marks.
-  • A global **kill switch** halts all trading instantly and clears the armed set.
-  • Every order is tagged (`client_order_id = qd-{strategy}-{ms}`), so the per-strategy book is
-    reconstructed from Alpaca's own order history each cycle — no fragile local position state.
-  • Orders below a min notional are skipped (no dust), and each (strategy, symbol) submits at most
-    one delta order per cycle.
+  • Starts **disarmed**: strategies trade only after an explicit arm(). The loop still runs while
+    disarmed, but read-only — it just rebuilds books and marks.
+  • A global **kill switch latches**: it halts trading and clears the armed set, and stays engaged
+    until an explicit resume() — arming does NOT release it. It is also re-checked immediately before
+    every order, so an in-flight cycle stops the instant kill is pressed.
+  • Position is **sign-with-hysteresis**: enter on a signal flip to long, hold while long (no
+    rebalancing), exit on a flip to flat. This matches the backtest exactly (it, too, only trades on
+    sign changes) — no live/backtest turnover drift.
+  • Every order is tagged (`client_order_id = qd-{strategy}-{seq}`, seq strictly increasing), so the
+    per-strategy book is reconstructed from Alpaca's own order history — no fragile local state.
 
 All account mutation flows through here; strategies.py stays pure.
 """
@@ -30,6 +33,25 @@ MAX_ACTIONS = 60
 _LOCK = threading.RLock()
 _STOP = threading.Event()
 _THREAD: threading.Thread | None = None
+_last_seq = 0
+
+
+def _next_seq() -> int:
+    """Strictly-increasing order sequence: wall-clock ms, bumped so it never repeats within the process
+    and (because it's clock-based) doesn't collide with a prior run's tags after a restart."""
+    global _last_seq
+    with _LOCK:
+        s = int(time.time() * 1000)
+        if s <= _last_seq:
+            s = _last_seq + 1
+        _last_seq = s
+        return s
+
+
+def _halted(sid: str) -> bool:
+    """True if the engine is killed or this strategy is no longer armed — checked right before trading."""
+    with _LOCK:
+        return _STATE["kill"] or sid not in _STATE["armed"]
 
 _STATE: dict = {
     "armed": set(),          # strategy ids currently trading
@@ -60,8 +82,10 @@ def _log(kind: str, msg: str, **extra) -> None:
 
 
 def _fills_by_strategy() -> dict[str, dict[str, list[dict]]]:
-    """Rebuild every strategy's fills from tagged, filled Alpaca orders (time-ordered per symbol)."""
-    orders = alpaca.orders(status="all", limit=200)
+    """Rebuild every strategy's fills from tagged, filled Alpaca orders (time-ordered per symbol).
+    Paginates the full order history so realized P&L never loses an old opening fill (which would
+    otherwise leave a sell with no buy and book a phantom short)."""
+    orders = alpaca.all_orders()
     grouped: dict[str, dict[str, list[dict]]] = {}
     for o in orders:
         sid = S.strategy_of(o.get("client_order_id"))
@@ -91,7 +115,8 @@ def _real_by_symbol(symbols: list[str]) -> dict[str, dict]:
         p = by_norm.get(alpaca.position_symbol(sym))
         if p:
             out[sym] = {"qty": float(p.get("qty") or 0), "avg_cost": float(p.get("avg_entry_price") or 0),
-                        "unrealized": float(p.get("unrealized_pl") or 0), "market_value": float(p.get("market_value") or 0)}
+                        "qty_available": str(p.get("qty_available") or p.get("qty") or "0"),
+                        "market_value": float(p.get("market_value") or 0)}
     return out
 
 
@@ -101,7 +126,7 @@ def refresh() -> tuple[dict, dict, dict, list]:
     fbs = _fills_by_strategy()
     marks = alpaca.crypto_marks(syms)
     real = _real_by_symbol(syms)
-    rows = S.attribute(fbs, real)
+    rows = S.attribute(fbs, real, marks)
     with _LOCK:
         _STATE["books"] = rows
         _STATE["marks"] = marks
@@ -124,8 +149,10 @@ def _open_tagged() -> set[tuple[str, str]]:
 
 
 def _trade_armed(real: dict, marks: dict) -> None:
+    """Sign-with-hysteresis: enter full notional on a flip to long, hold while long (NO rebalancing),
+    exit on a flip to flat. Re-checks the kill switch / armed set immediately before every order."""
     with _LOCK:
-        armed = set(_STATE["armed"])
+        armed = list(_STATE["armed"])
     pending = _open_tagged()
     for sid in armed:
         defn = S.REGISTRY.get(sid)
@@ -133,22 +160,35 @@ def _trade_armed(real: dict, marks: dict) -> None:
             continue
         for sym in defn.symbols:
             if (sid, sym) in pending:
-                continue  # a prior order is still working — wait for it to fill before sizing again
+                continue  # a prior order is still working — wait for it to fill
+            if _halted(sid):
+                return    # kill pressed / disarmed mid-cycle — stop before placing anything more
             try:
                 closes = alpaca.crypto_closes(sym, timeframe=defn.timeframe, limit=BAR_LIMIT)
                 if len(closes) < 5:
                     continue
-                target = S.target_qty(defn, closes)
-                current = float(real.get(sym, {}).get("qty", 0.0))     # ground-truth holding, self-healing
-                delta = round(target - current, 6)
+                sign = S.target_sign(defn, closes)
                 px = marks.get(sym) or closes[-1]
-                if abs(delta) * px < MIN_ORDER_USD:
-                    continue
-                side = "buy" if delta > 0 else "sell"
-                coid = S.order_tag(sid, int(time.time() * 1000))
-                alpaca.submit_order(sym, abs(delta), side, type_="market", tif="gtc", client_order_id=coid)
-                _log("order", f"{sid}: {side} {abs(delta)} {sym} @~{px:.2f} (target {target}, had {current:g})",
-                     strategy=sid, symbol=sym, side=side, qty=abs(delta))
+                rp = real.get(sym, {})
+                cur = float(rp.get("qty", 0.0))
+                held = abs(cur) * px >= MIN_ORDER_USD
+                if sign == 1 and not held:                         # flip to long → enter
+                    qty = round(defn.notional / px, 6)
+                    if qty * px < MIN_ORDER_USD:
+                        continue
+                    if _halted(sid):
+                        return
+                    alpaca.submit_order(sym, qty, "buy", type_="market", tif="gtc", client_order_id=S.order_tag(sid, _next_seq()))
+                    _log("order", f"{sid}: enter buy {qty} {sym} @~{px:.2f}", strategy=sid, symbol=sym, side="buy", qty=qty)
+                elif sign == 0 and held:                           # flip to flat → exit the whole position
+                    avail = str(rp.get("qty_available") or cur)
+                    if float(avail) <= 0:
+                        continue
+                    if _halted(sid):
+                        return
+                    alpaca.submit_order(sym, avail, "sell", type_="market", tif="gtc", client_order_id=S.order_tag(sid, _next_seq()))
+                    _log("order", f"{sid}: exit sell {avail} {sym} @~{px:.2f}", strategy=sid, symbol=sym, side="sell", qty=float(avail))
+                # else: long & signal long → hold; flat & signal flat → nothing (no rebalancing)
             except alpaca.AlpacaError as e:
                 _log("error", f"{sid} {sym}: {e}", strategy=sid, symbol=sym)
 
@@ -199,13 +239,13 @@ def start() -> None:
 
 # ── Controls (called from the API) ───────────────────────────────────────────────────────────────
 def arm(sid: str) -> None:
+    """Arm a strategy. Does NOT release the kill switch — a latched kill must be cleared with resume()
+    first, or nothing trades. (Arming while killed just queues it for when kill is released.)"""
     if sid not in S.REGISTRY:
         raise KeyError(sid)
     with _LOCK:
-        if _STATE["kill"]:
-            _STATE["kill"] = False
         _STATE["armed"].add(sid)
-    _log("arm", f"armed {sid}")
+    _log("arm", f"armed {sid}" + (" (kill still engaged — resume to trade)" if _STATE["kill"] else ""))
 
 
 def disarm(sid: str) -> None:
@@ -251,7 +291,7 @@ def flatten(sid: str) -> None:
         if qty == 0 or float(avail_str) <= 0:
             continue
         side = "sell" if qty > 0 else "buy"
-        coid = S.order_tag(sid, int(time.time() * 1000))
+        coid = S.order_tag(sid, _next_seq())
         try:
             alpaca.submit_order(sym, avail_str, side, type_="market", tif="gtc", client_order_id=coid)
             _log("flatten", f"{sid}: {side} {avail_str} {sym} to close", strategy=sid, symbol=sym)

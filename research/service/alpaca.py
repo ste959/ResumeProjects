@@ -108,6 +108,28 @@ def orders(status: str = "all", limit: int = 50) -> list[dict]:
                 {"status": status, "limit": limit, "direction": "desc", "nested": "true"})
 
 
+def all_orders(page: int = 500, max_pages: int = 12) -> list[dict]:
+    """Full order history, paginated newest-first via `until`. Needed so realized-P&L reconstruction
+    never loses an old opening fill (a limit=200 window silently corrupts P&L past 200 orders)."""
+    out: list[dict] = []
+    until: str | None = None
+    for _ in range(max_pages):
+        params = {"status": "all", "limit": page, "direction": "desc", "nested": "true"}
+        if until:
+            params["until"] = until
+        batch = _get(TRADING_BASE, "/v2/orders", params)
+        if not batch:
+            break
+        out.extend(batch)
+        if len(batch) < page:
+            break
+        nxt = batch[-1].get("submitted_at")
+        if not nxt or nxt == until:
+            break
+        until = nxt
+    return out
+
+
 def portfolio_history(period: str = "1M", timeframe: str = "1D") -> dict:
     return _get(TRADING_BASE, "/v2/account/portfolio/history",
                 {"period": period, "timeframe": timeframe, "extended_hours": "true"})
@@ -176,7 +198,8 @@ def _paginate_bars(base: str, path: str, symbols: list[str], params: dict, limit
         for s in symbols:
             acc[s].extend(page.get(s) or [])
         token = data.get("next_page_token")
-        if not token or (symbols and max(len(acc[s]) for s in symbols) >= limit):
+        # stop only when EVERY symbol has enough (min, not max) so a thin symbol isn't truncated
+        if not token or (symbols and min(len(acc[s]) for s in symbols) >= limit):
             break
     return {"bars": {s: acc[s][:limit] for s in symbols}}
 

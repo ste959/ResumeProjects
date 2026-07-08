@@ -48,6 +48,10 @@ TEMPLATES = [
 ]
 TEMPLATE_BY_KIND = {t["kind"]: t for t in TEMPLATES}
 
+# Assumed size of the parameter search behind each template — used to Bonferroni-correct the promote
+# bar. Dragging the sliders IS a multiple-testing search; the winner must clear a bar raised for it.
+SEARCH_TRIALS = {"ma_crossover": 40, "momentum": 15}
+
 # The universe the lab can test. Crypto is promotable to live (24/7, matches the engine); equities are
 # evaluate-only for now (market hours + separate order path).
 UNIVERSE = [
@@ -126,6 +130,7 @@ def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps
         return {"ok": False, "reason": "not enough history for this symbol/timeframe.",
                 "symbol": symbol, "timeframe": timeframe, "n_bars": n}
 
+    ppy = BARS_PER_YEAR.get(timeframe, 252)
     mean = sum(net) / n
     var = sum((x - mean) ** 2 for x in net) / n
     sd = var ** 0.5
@@ -137,28 +142,48 @@ def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps
         e *= (1.0 + x)
         equity.append(e)
     total_return = equity[-1] - 1.0
-    ann_return = (equity[-1] ** (BARS_PER_YEAR.get(timeframe, 252) / n)) - 1.0 if equity[-1] > 0 else -1.0
     mdd = _max_drawdown(equity)
     avg_turn = turn_sum / n
     hit = (wins / active) if active else 0.0
-    passes = abs(hac_t) >= 2.0 and sharpe > 0
 
+    # Honest gauntlet: correct for the parameter SEARCH (you tried many combos → raise the bar), test
+    # significance with an autocorrelation-preserving bootstrap CI, and flag an underpowered sample.
+    trials = SEARCH_TRIALS.get(kind, 20)
+    bar_t = float(val.bonferroni_z(trials))                        # ~2.9-3.1: the multiple-testing bar
+    boot_lo, boot_hi = (float("nan"), float("nan"))
+    if sd > 0 and n >= 8:
+        boot_lo, boot_hi = val.block_bootstrap_sharpe_ci(net, ppy=ppy)   # annualized, autocorr-aware
+    min_det = float(val.min_detectable_sharpe(n, ppy=ppy))         # smallest ann. Sharpe this N can see
+    underpowered = sharpe < min_det
+    significant = abs(hac_t) >= bar_t and boot_lo > 0
+    passes = significant and sharpe > 0
+
+    days = n / (ppy / 365.0)
+    freq = {"1Hour": "hourly", "4Hour": "4-hour", "1Day": "daily"}.get(timeframe, timeframe)
     if passes:
-        verdict = (f"Net Sharpe {sharpe:.2f} (HAC t {hac_t:+.1f}) over {n} bars — clears the |t|>2 bar with a "
-                   f"positive edge. A candidate: promote it to a live paper sleeve and watch it out-of-sample. "
-                   f"A backtest edge is necessary, not sufficient.")
+        verdict = (f"Clears the search-corrected bar (|t| {abs(hac_t):.1f} > {bar_t:.1f} for ~{trials} tries) and the "
+                   f"bootstrap Sharpe CI [{boot_lo:.1f}, {boot_hi:.1f}] excludes zero. A candidate — promote it and "
+                   f"watch it forward; the backtest is in-sample, so live is the real out-of-sample test.")
+    elif underpowered and sharpe > 0:
+        verdict = (f"Only {n} {freq} bars (~{days:.0f}d): this sample can't reliably detect an annualized Sharpe "
+                   f"below ~{min_det:.1f}, and yours is {sharpe:.1f}. Underpowered — 'too little data to tell', not "
+                   f"proven edge. Test on a longer window before trusting it.")
     elif sharpe > 0:
-        verdict = (f"Net Sharpe {sharpe:.2f} but HAC t is only {hac_t:+.1f} (< 2) — not distinguishable from "
-                   f"luck once autocorrelation is accounted for. Not yet a candidate.")
+        verdict = (f"Sharpe {sharpe:.1f} ({freq}, annualized) but it fails the search-corrected bar — |t| {abs(hac_t):.1f} "
+                   f"< {bar_t:.1f} and/or the bootstrap CI [{boot_lo:.1f}, {boot_hi:.1f}] includes zero. Given the param "
+                   f"sweep, this is consistent with luck, not edge.")
     else:
-        verdict = (f"Net Sharpe {sharpe:.2f} after {cost_bps:.0f} bps cost — a costed loser. The signal doesn't "
-                   f"survive execution at this frequency.")
+        verdict = (f"Net Sharpe {sharpe:.1f} after {cost_bps:.0f} bps/side — a costed loser at {freq} frequency; the "
+                   f"signal doesn't survive execution.")
 
     return {
         "ok": True, "kind": kind, "symbol": symbol, "timeframe": timeframe, "params": params,
-        "cost_bps": cost_bps, "n_bars": n,
-        "net_sharpe": round(sharpe, 3), "hac_t": round(hac_t, 2),
-        "total_return": round(total_return, 4), "ann_return": round(ann_return, 4),
+        "cost_bps": cost_bps, "n_bars": n, "bars_per_year": ppy, "freq": freq, "window_days": round(days, 1),
+        "net_sharpe": round(sharpe, 3), "hac_t": round(hac_t, 2), "bar_t": round(bar_t, 2), "trials": trials,
+        "boot_lo": None if boot_lo != boot_lo else round(boot_lo, 2),
+        "boot_hi": None if boot_hi != boot_hi else round(boot_hi, 2),
+        "min_detectable": round(min_det, 2), "underpowered": bool(underpowered),
+        "total_return": round(total_return, 4),
         "max_drawdown": round(mdd, 4), "avg_turnover": round(avg_turn, 4), "hit_rate": round(hit, 4),
-        "passes": passes, "equity_curve": _curve(equity), "verdict": verdict,
+        "passes": passes, "significant": significant, "equity_curve": _curve(equity), "verdict": verdict,
     }

@@ -45,7 +45,7 @@ export function StrategyEngine() {
           </span>
         </div>
         <div className="se-total">
-          <span>Engine P&amp;L</span>
+          <span>Engine P&amp;L · net of fees</span>
           <b className={cls(totalPnl)}>{sgn(totalPnl)}</b>
         </div>
         {eng.kill ? (

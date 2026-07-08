@@ -189,10 +189,10 @@ def lab_promote(body: dict = Body(...)) -> dict:
     symbol = body.get("symbol")
     timeframe = body.get("timeframe", "1Hour")
     params = body.get("params") or {}
-    notional = float(body.get("notional", 1500.0))
     try:
+        notional = float(body.get("notional", 1500.0))
         defn = S.register(kind, symbol, timeframe, params, notional=notional)
-    except ValueError as e:
+    except (ValueError, TypeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     engine.refresh()  # pick the new strategy into the books immediately
     return {"ok": True, "strategy_id": defn.id, "name": defn.name, **engine.snapshot()}

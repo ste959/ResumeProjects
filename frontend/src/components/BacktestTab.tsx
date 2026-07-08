@@ -107,7 +107,7 @@ export function BacktestTab() {
           ))}
 
           <label className="bt-field">
-            <span>Round-trip cost: {costBps} bps</span>
+            <span>Execution cost: {costBps} bps per side {costBps < 15 ? '(low for crypto taker)' : ''}</span>
             <input type="range" min={0} max={50} step={1} value={costBps} onChange={(e) => setCostBps(Number(e.target.value))} />
           </label>
 
@@ -128,19 +128,23 @@ export function BacktestTab() {
               <div className="bt-result-head">
                 <div>
                   <h3>{result.symbol} · {result.timeframe}</h3>
-                  <span>{result.n_bars} bars · net of {result.cost_bps} bps · walk-forward, causal</span>
+                  <span>{result.n_bars} {result.freq} bars (~{result.window_days}d) · net of {result.cost_bps} bps/side · in-sample, causal</span>
                 </div>
-                <span className={`bt-verdict-chip ${result.passes ? 'pass' : (result.net_sharpe > 0 ? 'weak' : 'fail')}`}>
-                  {result.passes ? 'CANDIDATE' : result.net_sharpe > 0 ? 'NOT SIGNIFICANT' : 'COSTED LOSER'}
+                <span className={`bt-verdict-chip ${result.passes ? 'pass' : result.underpowered && result.net_sharpe > 0 ? 'weak' : result.net_sharpe > 0 ? 'weak' : 'fail'}`}>
+                  {result.passes ? 'CANDIDATE' : result.underpowered && result.net_sharpe > 0 ? 'UNDERPOWERED' : result.net_sharpe > 0 ? 'NOT SIGNIFICANT' : 'COSTED LOSER'}
                 </span>
               </div>
 
               <BtEquity curve={result.equity_curve} up={result.total_return >= 0} />
 
               <div className="bt-stats">
-                <Stat label="Net Sharpe" value={sh(result.net_sharpe)} tone={result.net_sharpe >= 0 ? 'good' : 'bad'} ctx="annualized, after cost" />
-                <Stat label="HAC t-stat" value={sh(result.hac_t)} ctx="|t|>2 to pass" />
-                <Stat label="Total return" value={pct(result.total_return)} tone={result.total_return >= 0 ? 'good' : 'bad'} ctx="over the window" />
+                <Stat label="Net Sharpe" value={sh(result.net_sharpe)} tone={result.net_sharpe >= 0 ? 'good' : 'bad'} ctx={`${result.freq}, annualized (×√${result.bars_per_year})`} />
+                <Stat label="HAC t-stat" value={sh(result.hac_t)} ctx={`bar |t|>${result.bar_t.toFixed(1)} (search-corrected, ~${result.trials} tries)`} />
+                <Stat label="Bootstrap Sharpe CI" value={result.boot_lo == null ? '—' : `${sh(result.boot_lo)}…${sh(result.boot_hi)}`}
+                  ctx="95% · block bootstrap · spans 0 = not significant" />
+                <Stat label="Min detectable" value={sh(result.min_detectable)} tone={result.underpowered ? 'bad' : undefined}
+                  ctx={`smallest Sharpe this ${result.n_bars}-bar sample can see`} />
+                <Stat label="Total return" value={pct(result.total_return)} tone={result.total_return >= 0 ? 'good' : 'bad'} ctx="over the window (not annualized)" />
                 <Stat label="Max drawdown" value={pct(result.max_drawdown)} tone="bad" ctx="worst peak-to-trough" />
                 <Stat label="Turnover" value={num(result.avg_turnover, 3)} ctx="per bar · lower = cheaper" />
                 <Stat label="Hit rate" value={pct(result.hit_rate, 0)} ctx="of in-position bars" />
@@ -153,13 +157,13 @@ export function BacktestTab() {
                   <div className="bt-promoted">✓ Promoted <b>{promoted}</b> — it's on the Live desk (disarmed). Arm it there to trade.</div>
                 ) : uni?.promotable ? (
                   <button className="btn primary" onClick={promote} disabled={!result.passes}
-                    title={result.passes ? '' : 'only a candidate (|t|>2) can be promoted'}>
+                    title={result.passes ? '' : 'must clear the search-corrected bar to promote'}>
                     Promote to live strategy →
                   </button>
                 ) : (
                   <span className="bt-noprom">{result.symbol} is evaluate-only — live trading is crypto (24/7) for now.</span>
                 )}
-                {uni?.promotable && !result.passes && <span className="bt-promote-note">Only a candidate (|t|&gt;2) can be promoted — that's the point of the bar.</span>}
+                {uni?.promotable && !result.passes && <span className="bt-promote-note">Only a candidate — clearing the <b>search-corrected</b> bar (|t|&gt;{result.bar_t.toFixed(1)}) with a bootstrap CI above zero — can be promoted. That's the multiple-testing defense.</span>}
               </div>
             </>
           ) : (

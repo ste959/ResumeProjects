@@ -123,37 +123,47 @@ class SymbolBook:
     realized: float = 0.0     # realized P&L booked on reductions
 
 
-def apply_fill(book: SymbolBook, side: str, qty: float, price: float) -> SymbolBook:
-    """Average-cost accounting for one fill. Booking realized P&L when a position is reduced/flipped."""
+# Alpaca crypto taker fee (lowest tier). Calibrated to the ~0.25% in-kind drift we observed live —
+# every fill pays it, so it belongs in the cost basis (buys) and the proceeds (sells).
+CRYPTO_FEE_RATE = 0.0025
+
+
+def apply_fill(book: SymbolBook, side: str, qty: float, price: float, fee_rate: float = 0.0) -> SymbolBook:
+    """Average-cost accounting for one fill, net of a per-side fee. Books realized P&L on a reduction/
+    flip. Fees raise the cost basis on the entering leg and cut the proceeds on the exiting leg, so no
+    trade is free — the omission a trader would flag first."""
     signed = qty if side == "buy" else -qty
     pos = book.qty
     if pos == 0 or (pos > 0) == (signed > 0):
-        # opening or adding in the same direction → blend average cost
+        # opening or adding in the same direction → blend average cost (fee-inclusive)
+        eff = price * (1 + fee_rate) if signed > 0 else price * (1 - fee_rate)
         new_qty = pos + signed
         if new_qty != 0:
-            book.avg_cost = (book.avg_cost * abs(pos) + price * abs(signed)) / abs(new_qty)
+            book.avg_cost = (book.avg_cost * abs(pos) + eff * abs(signed)) / abs(new_qty)
         book.qty = new_qty
         return book
-    # reducing or flipping: realize on the closed portion
+    # reducing or flipping: realize on the closed portion at the fee-adjusted exit price
     closing = min(abs(signed), abs(pos))
     direction = 1 if pos > 0 else -1
-    book.realized += closing * (price - book.avg_cost) * direction
+    exit_px = price * (1 - fee_rate) if direction > 0 else price * (1 + fee_rate)
+    book.realized += closing * (exit_px - book.avg_cost) * direction
     remaining = abs(signed) - closing
     book.qty = pos + signed
     if abs(pos) > closing:            # still open in the original direction; avg_cost unchanged
         return book
-    # fully closed (and maybe flipped); the flipped remainder opens at this price
-    book.avg_cost = price if remaining > 0 else 0.0
+    # fully closed (and maybe flipped); the flipped remainder opens (fee-inclusive) at this price
+    book.avg_cost = (price * (1 + fee_rate) if signed > 0 else price * (1 - fee_rate)) if remaining > 0 else 0.0
     return book
 
 
-def position_pnl(fills: list[dict], mark: float | None) -> dict:
-    """Reduce a symbol's fills (each {side, qty, price}, time-ordered) to realized + unrealized P&L."""
+def position_pnl(fills: list[dict], mark: float | None, fee_rate: float = 0.0) -> dict:
+    """Reduce a symbol's fills (each {side, qty, price}, time-ordered) to realized + unrealized P&L,
+    net of `fee_rate` per side."""
     book = SymbolBook()
     for f in fills:
         if f.get("price") is None or f.get("qty") in (None, 0):
             continue
-        apply_fill(book, f["side"], float(f["qty"]), float(f["price"]))
+        apply_fill(book, f["side"], float(f["qty"]), float(f["price"]), fee_rate=fee_rate)
     unreal = 0.0
     if mark is not None and book.qty != 0:
         unreal = book.qty * (mark - book.avg_cost)
@@ -163,34 +173,51 @@ def position_pnl(fills: list[dict], mark: float | None) -> dict:
 
 
 def attribute(fills_by_strategy: dict[str, dict[str, list[dict]]],
-              real_by_symbol: dict[str, dict]) -> list[dict]:
-    """Per-strategy P&L rollup — holdings from reality, realized from the tag record.
+              real_by_symbol: dict[str, dict], marks: dict[str, float] | None = None,
+              fee_rate: float = CRYPTO_FEE_RATE) -> list[dict]:
+    """Per-strategy P&L rollup — realized from the tag record, holdings reconciled to reality.
 
-    `fills_by_strategy`: {strategy_id: {symbol: [fill, ...]}} (tagged fills, for realized P&L).
-    `real_by_symbol`: {symbol: {qty, avg_cost, unrealized, market_value}} — the *real* Alpaca position,
-    the ground truth for live holdings (fee-exact, and self-healing if a position is touched outside the
-    tags). Live qty / unrealized / market value come from there; realized comes from round-trips in the
-    tagged fills. Returns one row per registered strategy (even untouched ones) so the UI shows the full book.
+    `fills_by_strategy`: {strategy_id: {symbol: [fill]}} (tagged fills → per-strategy book, fee-net).
+    `real_by_symbol`: {symbol: {qty, ...}} — the *real* Alpaca position (ground truth for the total held
+    per symbol). `marks`: {symbol: price} for mark-to-market.
+
+    When several strategies hold the same symbol, the single real position is **split across them
+    pro-rata by each strategy's tagged quantity** (not handed in full to each — the bug a reviewer would
+    catch), and the split absorbs fee drift so the parts sum to reality. If the real position is flat, a
+    stale tagged book self-heals to zero. Realized (fee-inclusive) comes from the tagged round-trips.
     """
+    marks = marks or {}
+
+    # Pass 1: each strategy's own tagged book per symbol, and the total tagged qty per symbol.
+    books: dict[tuple[str, str], dict] = {}
+    tagged_sum: dict[str, float] = {}
+    for sid, defn in REGISTRY.items():
+        for sym in defn.symbols:
+            b = position_pnl(fills_by_strategy.get(sid, {}).get(sym, []), None, fee_rate=fee_rate)
+            books[(sid, sym)] = b
+            tagged_sum[sym] = tagged_sum.get(sym, 0.0) + b["qty"]
+
+    # Pass 2: reconcile each strategy's share of the real position and mark it.
     rows = []
     for sid, defn in REGISTRY.items():
         by_symbol = fills_by_strategy.get(sid, {})
         positions, realized, unrealized, gross = [], 0.0, 0.0, 0.0
         for sym in defn.symbols:
-            fills = by_symbol.get(sym, [])
-            realized_sym = position_pnl(fills, None)["realized"]      # from the tagged round-trips
-            rp = real_by_symbol.get(sym) or {}
-            qty = float(rp.get("qty", 0.0))
-            avg_cost = float(rp.get("avg_cost", 0.0))
-            unreal_sym = float(rp.get("unrealized", 0.0))
-            mv = float(rp.get("market_value", 0.0))
-            realized += realized_sym
-            unrealized += unreal_sym
+            b = books[(sid, sym)]
+            realized += b["realized"]
+            real_total = float((real_by_symbol.get(sym) or {}).get("qty", 0.0))
+            s = tagged_sum.get(sym, 0.0)
+            scale = (real_total / s) if s != 0 else 0.0          # split the real position pro-rata
+            qty = b["qty"] * scale                                # this strategy's reconciled holding
+            mark = marks.get(sym)
+            unreal = qty * (mark - b["avg_cost"]) if (mark is not None and qty != 0) else 0.0
+            mv = qty * mark if (mark is not None) else 0.0
+            unrealized += unreal
             gross += abs(mv)
-            if qty != 0:                                          # only actually-open positions
-                positions.append({"symbol": sym, "qty": qty, "avg_cost": avg_cost,
-                                  "realized": realized_sym, "unrealized": unreal_sym,
-                                  "market_value": mv, "n_fills": len(fills)})
+            if qty != 0:
+                positions.append({"symbol": sym, "qty": qty, "avg_cost": b["avg_cost"],
+                                  "realized": b["realized"], "unrealized": unreal,
+                                  "market_value": mv, "n_fills": len(by_symbol.get(sym, []))})
         rows.append({
             "id": sid, "name": defn.name, "desc": defn.desc,
             "asset_class": defn.asset_class, "kind": defn.kind, "symbols": list(defn.symbols),
