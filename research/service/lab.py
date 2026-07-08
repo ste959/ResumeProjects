@@ -105,10 +105,23 @@ def backtest(kind: str, symbol: str, timeframe: str, params: dict, cost_bps: flo
     return _simulate(defn, closes, timeframe, cost_bps)
 
 
+# The live crypto taker fee (per side). A backtest vetted below this can't honestly promote to live —
+# "what you test is what trades" only holds if you test at the cost you'll pay.
+LIVE_TAKER_BPS = S.CRYPTO_FEE_RATE * 1e4
+
+
+def _bars_per_year(timeframe: str, is_crypto: bool) -> int:
+    """252 trading days for daily equities; 365 for 24/7 crypto; hours/4-hours otherwise."""
+    if timeframe == "1Day":
+        return 365 if is_crypto else 252
+    return BARS_PER_YEAR.get(timeframe, 252)
+
+
 def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps: float) -> dict:
     """Causal, cost-aware backtest over a close-price series — the pure core, no I/O."""
     kind, symbol, params = defn.kind, defn.symbols[0], defn.params
-    ann = (BARS_PER_YEAR.get(timeframe, 252)) ** 0.5
+    is_crypto = "/" in symbol
+    ann = _bars_per_year(timeframe, is_crypto) ** 0.5
 
     net, pos_prev, turn_sum, active, wins = [], 0.0, 0.0, 0, 0
     for t in range(len(closes) - 1):
@@ -130,7 +143,7 @@ def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps
         return {"ok": False, "reason": "not enough history for this symbol/timeframe.",
                 "symbol": symbol, "timeframe": timeframe, "n_bars": n}
 
-    ppy = BARS_PER_YEAR.get(timeframe, 252)
+    ppy = _bars_per_year(timeframe, is_crypto)
     mean = sum(net) / n
     var = sum((x - mean) ** 2 for x in net) / n
     sd = var ** 0.5
@@ -156,14 +169,20 @@ def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps
     min_det = float(val.min_detectable_sharpe(n, ppy=ppy))         # smallest ann. Sharpe this N can see
     underpowered = sharpe < min_det
     significant = abs(hac_t) >= bar_t and boot_lo > 0
-    passes = significant and sharpe > 0
+    # A candidate must also be vetted at (at least) the fee it will actually pay live.
+    realistic_cost = cost_bps >= LIVE_TAKER_BPS
+    passes = significant and sharpe > 0 and realistic_cost
 
     days = n / (ppy / 365.0)
     freq = {"1Hour": "hourly", "4Hour": "4-hour", "1Day": "daily"}.get(timeframe, timeframe)
     if passes:
         verdict = (f"Clears the search-corrected bar (|t| {abs(hac_t):.1f} > {bar_t:.1f} for ~{trials} tries) and the "
-                   f"bootstrap Sharpe CI [{boot_lo:.1f}, {boot_hi:.1f}] excludes zero. A candidate — promote it and "
-                   f"watch it forward; the backtest is in-sample, so live is the real out-of-sample test.")
+                   f"bootstrap Sharpe CI [{boot_lo:.1f}, {boot_hi:.1f}] excludes zero, at a realistic cost. A candidate — "
+                   f"promote it and watch it forward; the backtest is in-sample, so live is the real out-of-sample test.")
+    elif significant and sharpe > 0 and not realistic_cost:
+        verdict = (f"Clears the significance bar, but you vetted it at {cost_bps:.0f} bps/side — below the ~{LIVE_TAKER_BPS:.0f} "
+                   f"bps taker fee you'll actually pay live. Re-run at ≥{LIVE_TAKER_BPS:.0f} bps before promoting; a cheap-cost "
+                   f"edge that dies at the real fee is not tradable.")
     elif underpowered and sharpe > 0:
         verdict = (f"Only {n} {freq} bars (~{days:.0f}d): this sample can't reliably detect an annualized Sharpe "
                    f"below ~{min_det:.1f}, and yours is {sharpe:.1f}. Underpowered — 'too little data to tell', not "
@@ -183,6 +202,7 @@ def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps
         "boot_lo": None if boot_lo != boot_lo else round(boot_lo, 2),
         "boot_hi": None if boot_hi != boot_hi else round(boot_hi, 2),
         "min_detectable": round(min_det, 2), "underpowered": bool(underpowered),
+        "realistic_cost": bool(realistic_cost), "live_fee_bps": round(LIVE_TAKER_BPS, 1),
         "total_return": round(total_return, 4),
         "max_drawdown": round(mdd, 4), "avg_turnover": round(avg_turn, 4), "hit_rate": round(hit, 4),
         "passes": passes, "significant": significant, "equity_curve": _curve(equity), "verdict": verdict,

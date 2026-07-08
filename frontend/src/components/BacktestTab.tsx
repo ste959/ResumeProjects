@@ -15,7 +15,7 @@ export function BacktestTab() {
   const [kind, setKind] = useState('ma_crossover');
   const [symbol, setSymbol] = useState('BTC/USD');
   const [timeframe, setTimeframe] = useState('1Hour');
-  const [costBps, setCostBps] = useState(10);
+  const [costBps, setCostBps] = useState(25);
   const [params, setParams] = useState<Record<string, number>>({ fast: 12, slow: 48, lookback: 24 });
   const [result, setResult] = useState<LabResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -107,7 +107,7 @@ export function BacktestTab() {
           ))}
 
           <label className="bt-field">
-            <span>Execution cost: {costBps} bps per side {costBps < 15 ? '(low for crypto taker)' : ''}</span>
+            <span>Execution cost: {costBps} bps per side {costBps < 25 ? '(below live taker fee)' : ''}</span>
             <input type="range" min={0} max={50} step={1} value={costBps} onChange={(e) => setCostBps(Number(e.target.value))} />
           </label>
 
@@ -130,8 +130,11 @@ export function BacktestTab() {
                   <h3>{result.symbol} · {result.timeframe}</h3>
                   <span>{result.n_bars} {result.freq} bars (~{result.window_days}d) · net of {result.cost_bps} bps/side · in-sample, causal</span>
                 </div>
-                <span className={`bt-verdict-chip ${result.passes ? 'pass' : result.underpowered && result.net_sharpe > 0 ? 'weak' : result.net_sharpe > 0 ? 'weak' : 'fail'}`}>
-                  {result.passes ? 'CANDIDATE' : result.underpowered && result.net_sharpe > 0 ? 'UNDERPOWERED' : result.net_sharpe > 0 ? 'NOT SIGNIFICANT' : 'COSTED LOSER'}
+                <span className={`bt-verdict-chip ${result.passes ? 'pass' : result.net_sharpe > 0 ? 'weak' : 'fail'}`}>
+                  {result.passes ? 'CANDIDATE'
+                    : result.significant && !result.realistic_cost ? 'RAISE COST'
+                    : result.underpowered && result.net_sharpe > 0 ? 'UNDERPOWERED'
+                    : result.net_sharpe > 0 ? 'NOT SIGNIFICANT' : 'COSTED LOSER'}
                 </span>
               </div>
 

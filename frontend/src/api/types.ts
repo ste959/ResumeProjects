@@ -424,6 +424,8 @@ export interface LabResult {
   boot_hi: number | null;
   min_detectable: number;
   underpowered: boolean;
+  realistic_cost: boolean;
+  live_fee_bps: number;
   total_return: number;
   max_drawdown: number;
   avg_turnover: number;

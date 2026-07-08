@@ -87,7 +87,12 @@ def _fills_by_strategy() -> dict[str, dict[str, list[dict]]]:
     otherwise leave a sell with no buy and book a phantom short)."""
     orders = alpaca.all_orders()
     grouped: dict[str, dict[str, list[dict]]] = {}
+    seen_ids: set = set()
     for o in orders:
+        oid = o.get("id")
+        if oid in seen_ids:        # de-dup across pagination boundaries (same submitted_at)
+            continue
+        seen_ids.add(oid)
         sid = S.strategy_of(o.get("client_order_id"))
         if sid is None:
             continue
@@ -104,11 +109,10 @@ def _fills_by_strategy() -> dict[str, dict[str, list[dict]]]:
 
 
 def _real_by_symbol(symbols: list[str]) -> dict[str, dict]:
-    """Map real Alpaca positions (keyed 'BTCUSD') onto strategy symbols ('BTC/USD') — ground truth."""
-    try:
-        rows = alpaca.positions()
-    except alpaca.AlpacaError:
-        return {}
+    """Map real Alpaca positions (keyed 'BTCUSD') onto strategy symbols ('BTC/USD') — ground truth.
+    Propagates AlpacaError (does NOT return {}): a failed read must NOT read as 'flat', or the engine
+    would re-enter a position it already holds. Callers skip trading when this can't be established."""
+    rows = alpaca.positions()
     by_norm = {alpaca.position_symbol(p["symbol"]): p for p in rows}
     out: dict[str, dict] = {}
     for sym in symbols:
@@ -120,17 +124,23 @@ def _real_by_symbol(symbols: list[str]) -> dict[str, dict]:
     return out
 
 
-def refresh() -> tuple[dict, dict, dict, list]:
-    """Read-only cycle: rebuild books (real holdings + tagged realized) + marks. Never places orders."""
+def refresh() -> tuple[dict, dict, dict | None, list]:
+    """Read-only cycle: rebuild books (real holdings + tagged realized) + marks. Never places orders.
+    If the real positions read fails, `real` is None — books are left as-is and trading is skipped this
+    cycle (fail-safe: never trade against an unknown position)."""
     syms = _all_symbols()
     fbs = _fills_by_strategy()
     marks = alpaca.crypto_marks(syms)
-    real = _real_by_symbol(syms)
-    rows = S.attribute(fbs, real, marks)
+    try:
+        real: dict | None = _real_by_symbol(syms)
+    except alpaca.AlpacaError:
+        real = None
     with _LOCK:
-        _STATE["books"] = rows
         _STATE["marks"] = marks
         _STATE["last_run"] = time.time()
+        if real is not None:
+            _STATE["books"] = S.attribute(fbs, real, marks)
+        rows = _STATE["books"]
     return fbs, marks, real, rows
 
 
@@ -173,7 +183,7 @@ def _trade_armed(real: dict, marks: dict) -> None:
                 cur = float(rp.get("qty", 0.0))
                 held = abs(cur) * px >= MIN_ORDER_USD
                 if sign == 1 and not held:                         # flip to long → enter
-                    qty = round(defn.notional / px, 6)
+                    qty = round(defn.notional / px - max(cur, 0.0), 6)   # top up any dust, don't stack on it
                     if qty * px < MIN_ORDER_USD:
                         continue
                     if _halted(sid):
@@ -200,7 +210,7 @@ def run_once() -> None:
         with _LOCK:
             killed = _STATE["kill"]
             armed = bool(_STATE["armed"])
-        if killed:
+        if killed or real is None:      # killed, or positions unknown this cycle → don't trade
             return
         if armed:
             _trade_armed(real, marks)

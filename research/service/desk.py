@@ -170,7 +170,7 @@ def lab_templates() -> dict:
 
 @router.get("/lab/backtest")
 def lab_backtest(kind: str = Query(...), symbol: str = Query(...), timeframe: str = Query("1Hour"),
-                 cost_bps: float = Query(10.0, ge=0.0, le=200.0),
+                 cost_bps: float = Query(25.0, ge=0.0, le=200.0),
                  fast: int = Query(12), slow: int = Query(48), lookback: int = Query(24)) -> dict:
     """Run one parameterized, cost-aware backtest over real Alpaca history."""
     params = {"fast": fast, "slow": slow} if kind == "ma_crossover" else {"lookback": lookback}

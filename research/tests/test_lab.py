@@ -17,9 +17,17 @@ def _defn(kind="ma_crossover", **params):
 
 def test_uptrend_is_a_positive_edge():
     closes = [100 * (1.001 ** i) for i in range(300)]      # steady rise → long trend follows it
-    r = lab._simulate(_defn(), closes, "1Hour", cost_bps=0.0)
+    r = lab._simulate(_defn(), closes, "1Hour", cost_bps=25.0)   # vetted at the live taker fee
     assert r["ok"] and r["net_sharpe"] > 0 and r["total_return"] > 0
-    assert r["passes"]
+    assert r["passes"]                                     # significant AND at a realistic cost
+
+
+def test_low_cost_cannot_promote():
+    # A strong edge vetted below the live fee is not a candidate — you must test at the cost you'll pay.
+    closes = [100 * (1.001 ** i) for i in range(300)]
+    r = lab._simulate(_defn(), closes, "1Hour", cost_bps=0.0)
+    assert r["significant"] and not r["realistic_cost"]
+    assert not r["passes"]
 
 
 def test_costs_erode_returns():

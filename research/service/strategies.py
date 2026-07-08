@@ -51,6 +51,8 @@ def register(kind: str, symbol: str, timeframe: str, params: dict, notional: flo
         raise ValueError(f"unknown strategy kind: {kind}")
     if "/" not in symbol:
         raise ValueError("only crypto strategies can go live for now")
+    if not (0 < notional <= 100_000):
+        raise ValueError("notional must be between 0 and 100,000")
     pslug = "-".join(str(params[k]) for k in sorted(params))
     sid = f"{kind.split('_')[0]}-{symbol.split('/')[0].lower()}-{pslug}"
     if sid in REGISTRY:
@@ -210,7 +212,10 @@ def attribute(fills_by_strategy: dict[str, dict[str, list[dict]]],
             scale = (real_total / s) if s != 0 else 0.0          # split the real position pro-rata
             qty = b["qty"] * scale                                # this strategy's reconciled holding
             mark = marks.get(sym)
-            unreal = qty * (mark - b["avg_cost"]) if (mark is not None and qty != 0) else 0.0
+            # Unrealized is the *liquidation* value: mark net of the exit fee you'd pay to close, so the
+            # figure is genuinely net of fees (not just the entry fee baked into avg_cost).
+            net_mark = mark * (1 - (fee_rate if qty > 0 else -fee_rate)) if mark is not None else None
+            unreal = qty * (net_mark - b["avg_cost"]) if (net_mark is not None and qty != 0) else 0.0
             mv = qty * mark if (mark is not None) else 0.0
             unrealized += unreal
             gross += abs(mv)
