@@ -55,7 +55,15 @@ export function StrategyEngine() {
         )}
       </div>
 
-      {eng.kill && <div className="se-killbar">KILL ENGAGED — all strategies disarmed. Release to trade again.</div>}
+      {eng.risk && (
+        <div className={`se-risk ${eng.risk.halt ? 'halt' : ''}`}>
+          {eng.risk.halt && <span className="se-risk-halt">RISK HALT · auto-flattened</span>}
+          <RiskBar label="Gross exposure" used={eng.risk.gross_used} limit={eng.risk.max_gross} kind="gross" />
+          <RiskBar label="Session drawdown" used={-eng.risk.session_dd} limit={eng.risk.dd_limit} kind="dd" />
+          <span className="se-risk-note">auto-flatten at the drawdown limit · gross cap blocks new entries</span>
+        </div>
+      )}
+      {eng.kill && !eng.risk?.halt && <div className="se-killbar">KILL ENGAGED — all strategies disarmed. Release to trade again.</div>}
       {eng.last_error && <div className="se-errbar">last cycle error: {eng.last_error}</div>}
 
       <div className="se-grid">
@@ -144,6 +152,17 @@ function StrategyCard({ s, live, mark, busy, onArm, onDisarm, onFlatten }: {
         )}
         <button className="se-btn flat" disabled={!pos || busy === `${s.id}-flat`} onClick={onFlatten}>Flatten</button>
       </div>
+    </div>
+  );
+}
+
+function RiskBar({ label, used, limit, kind }: { label: string; used: number; limit: number; kind: string }) {
+  const frac = Math.max(0, Math.min(1, limit > 0 ? used / limit : 0));
+  const hot = frac > 0.8;
+  return (
+    <div className="se-riskbar">
+      <div className="se-riskbar-top"><span>{label}</span><b>{money(Math.max(0, used), 0)} / {money(limit, 0)}</b></div>
+      <div className="se-riskbar-track"><div className={`se-riskbar-fill ${kind} ${hot ? 'hot' : ''}`} style={{ width: `${frac * 100}%` }} /></div>
     </div>
   );
 }

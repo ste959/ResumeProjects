@@ -182,6 +182,18 @@ def lab_backtest(kind: str = Query(...), symbol: str = Query(...), timeframe: st
         raise HTTPException(status_code=502, detail=f"market data error: {e}")
 
 
+@router.get("/lab/walkforward")
+def lab_walkforward(kind: str = Query(...), symbol: str = Query(...), timeframe: str = Query("1Hour"),
+                    cost_bps: float = Query(25.0, ge=0.0, le=200.0)) -> dict:
+    """Anchored walk-forward: select params in-sample per fold, trade the next window out-of-sample."""
+    try:
+        return lab.walk_forward(kind, symbol, timeframe, cost_bps)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown template: {kind}")
+    except alpaca.AlpacaError as e:
+        raise HTTPException(status_code=502, detail=f"market data error: {e}")
+
+
 @router.post("/lab/promote")
 def lab_promote(body: dict = Body(...)) -> dict:
     """Register a backtested config as a live (disarmed) strategy on the engine."""

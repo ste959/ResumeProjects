@@ -59,6 +59,25 @@ def test_momentum_template_runs_and_is_causal():
     assert r["total_return"] > 0                           # captures the up leg, not the down
 
 
+def test_walk_forward_is_out_of_sample(monkeypatch):
+    # A trending series → walk-forward should select params in-sample and still profit OOS.
+    closes = [100 * (1.0008 ** i) for i in range(800)]
+    monkeypatch.setattr(lab, "_bars", lambda sym, tf: closes)
+    r = lab.walk_forward("ma_crossover", "BTC/USD", "1Hour", cost_bps=25.0)
+    assert r["ok"] and r["oos"] is True
+    assert len(r["folds"]) == 4                         # anchored expanding folds
+    assert r["n_bars"] < len(closes)                    # OOS is only the back portion
+    assert r["total_return"] > 0                         # the edge survives out-of-sample
+    # every fold picked a param from the grid on its in-sample window only
+    assert all("params" in f and f["test_bars"] > 0 for f in r["folds"])
+
+
+def test_walk_forward_needs_history(monkeypatch):
+    monkeypatch.setattr(lab, "_bars", lambda sym, tf: [100.0] * 50)
+    r = lab.walk_forward("momentum", "ETH/USD", "1Hour", cost_bps=25.0)
+    assert r["ok"] is False
+
+
 def test_backtest_matches_live_signal():
     # The backtest's final-bar position equals what the live engine would target right now — same code.
     closes = [100 * (1.001 ** i) for i in range(300)]

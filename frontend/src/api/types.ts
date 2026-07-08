@@ -396,6 +396,14 @@ export interface QpEngine {
   strategies: QpStrategy[];
   marks: Record<string, number>;
   actions: QpAction[];
+  risk?: QpRisk;
+}
+export interface QpRisk {
+  max_gross: number;
+  gross_used: number;
+  dd_limit: number;
+  session_dd: number;
+  halt: boolean;
 }
 
 // ── Backtest lab ──
@@ -434,7 +442,10 @@ export interface LabResult {
   significant: boolean;
   equity_curve: LabCurvePoint[];
   verdict: string;
+  oos?: boolean;
+  folds?: LabFold[];
 }
+export interface LabFold { train_end: number; test_bars: number; params: Record<string, number>; oos_sharpe: number; }
 export interface LabPromoteResult { ok: boolean; strategy_id: string; name: string; }
 
 // ── Exploration ──

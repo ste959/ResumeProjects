@@ -225,6 +225,10 @@ export const api = {
       undefined,
       RESEARCH_BASE,
     ),
+  labWalkforward: (kind: string, symbol: string, timeframe: string, costBps: number) =>
+    request<LabResult>(
+      `/lab/walkforward?kind=${kind}&symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&cost_bps=${costBps}`,
+      undefined, RESEARCH_BASE),
   labPromote: (body: { kind: string; symbol: string; timeframe: string; params: Record<string, number>; notional: number }) =>
     request<LabPromoteResult>('/lab/promote', { method: 'POST', body: JSON.stringify(body) }, RESEARCH_BASE),
 

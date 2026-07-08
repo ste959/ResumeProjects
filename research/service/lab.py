@@ -117,32 +117,104 @@ def _bars_per_year(timeframe: str, is_crypto: bool) -> int:
     return BARS_PER_YEAR.get(timeframe, 252)
 
 
-def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps: float) -> dict:
-    """Causal, cost-aware backtest over a close-price series — the pure core, no I/O."""
-    kind, symbol, params = defn.kind, defn.symbols[0], defn.params
-    is_crypto = "/" in symbol
-    ann = _bars_per_year(timeframe, is_crypto) ** 0.5
+PARAM_GRID = {
+    "ma_crossover": [{"fast": f, "slow": s} for f in (6, 12, 24, 48) for s in (24, 48, 96, 192) if f < s],
+    "momentum": [{"lookback": lb} for lb in (6, 12, 24, 48, 96)],
+}
 
+
+def _defn_of(kind: str, symbol: str, params: dict, is_crypto: bool) -> S.StrategyDef:
+    return S.StrategyDef(id="bt", name="", desc="", kind=kind,
+                         asset_class="crypto" if is_crypto else "us_equity",
+                         symbols=(symbol,), params=params)
+
+
+def _run_series(defn: S.StrategyDef, closes: list[float], cost_bps: float,
+                start: int = 0, end: int | None = None) -> tuple[list[float], float, int, int]:
+    """Per-bar net returns over [start, end), the signal always using the FULL history through each bar
+    (so an out-of-sample window still has enough lookback for its moving averages)."""
+    end = (len(closes) - 1) if end is None else min(end, len(closes) - 1)
     net, pos_prev, turn_sum, active, wins = [], 0.0, 0.0, 0, 0
-    for t in range(len(closes) - 1):
+    for t in range(start, end):
         sign = float(S.target_sign(defn, closes[:t + 1]))     # causal: decided from data through t
         r = closes[t + 1] / closes[t] - 1.0
         gross = sign * r
         turn = abs(sign - pos_prev)
-        net_t = gross - turn * (cost_bps / 1e4)
-        net.append(net_t)
+        net.append(gross - turn * (cost_bps / 1e4))
         turn_sum += turn
         pos_prev = sign
         if sign != 0:
             active += 1
             if gross > 0:
                 wins += 1
+    return net, turn_sum, active, wins
 
+
+def _sharpe(net: list[float]) -> float:
+    if not net:
+        return 0.0
+    m = sum(net) / len(net)
+    v = sum((x - m) ** 2 for x in net) / len(net)
+    return (m / v ** 0.5) if v > 0 else 0.0
+
+
+def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps: float) -> dict:
+    """Causal, cost-aware IN-SAMPLE backtest over a close-price series."""
+    kind, symbol, params = defn.kind, defn.symbols[0], defn.params
+    is_crypto = "/" in symbol
+    if len(closes) < 6:
+        return {"ok": False, "reason": "not enough history for this symbol/timeframe.",
+                "symbol": symbol, "timeframe": timeframe, "n_bars": len(closes)}
+    net, turn_sum, active, wins = _run_series(defn, closes, cost_bps)
+    return _finish(net, turn_sum, active, wins, kind, symbol, params, timeframe, cost_bps, is_crypto)
+
+
+def walk_forward(kind: str, symbol: str, timeframe: str, cost_bps: float,
+                 n_folds: int = 4, train_frac: float = 0.5) -> dict:
+    """Anchored walk-forward OUT-OF-SAMPLE validation: on each expanding in-sample window, pick the best
+    parameter from the grid, then trade the NEXT untouched window with it. The concatenated OOS returns
+    are the honest generalization test the single in-sample backtest can't give."""
+    if kind not in PARAM_GRID:
+        raise KeyError(kind)
+    closes = _bars(symbol, timeframe)
+    is_crypto = "/" in symbol
+    n = len(closes)
+    oos_start = int(n * train_frac)
+    fold = (n - 1 - oos_start) // n_folds
+    if n < 120 or fold < 10:
+        return {"ok": False, "reason": "not enough history for walk-forward.", "symbol": symbol, "timeframe": timeframe}
+
+    grid = PARAM_GRID[kind]
+    oos_net: list[float] = []
+    turn_sum, active, wins, folds = 0.0, 0, 0, []
+    for i in range(n_folds):
+        tr_end = oos_start + i * fold
+        te_end = (oos_start + (i + 1) * fold) if i < n_folds - 1 else (n - 1)
+        best, best_sh = grid[0], -1e18
+        for p in grid:                                        # select param on the in-sample window only
+            tr_net, *_ = _run_series(_defn_of(kind, symbol, p, is_crypto), closes, cost_bps, 0, tr_end)
+            s = _sharpe(tr_net)
+            if s > best_sh:
+                best_sh, best = s, p
+        te_net, ts, ac, wn = _run_series(_defn_of(kind, symbol, best, is_crypto), closes, cost_bps, tr_end, te_end)
+        oos_net += te_net
+        turn_sum += ts; active += ac; wins += wn
+        folds.append({"train_end": tr_end, "test_bars": len(te_net), "params": best,
+                      "oos_sharpe": round(_sharpe(te_net) * (_bars_per_year(timeframe, is_crypto) ** 0.5), 2)})
+
+    res = _finish(oos_net, turn_sum, active, wins, kind, symbol, {"walk_forward": True}, timeframe, cost_bps, is_crypto, oos=True)
+    res["folds"] = folds
+    return res
+
+
+def _finish(net: list[float], turn_sum: float, active: int, wins: int, kind: str, symbol: str,
+            params: dict, timeframe: str, cost_bps: float, is_crypto: bool, oos: bool = False) -> dict:
+    """Turn a net-return series into the honest stat block + verdict (shared by in-sample & walk-forward)."""
     n = len(net)
     if n < 5:
         return {"ok": False, "reason": "not enough history for this symbol/timeframe.",
                 "symbol": symbol, "timeframe": timeframe, "n_bars": n}
-
+    ann = _bars_per_year(timeframe, is_crypto) ** 0.5
     ppy = _bars_per_year(timeframe, is_crypto)
     mean = sum(net) / n
     var = sum((x - mean) ** 2 for x in net) / n
@@ -175,10 +247,15 @@ def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps
 
     days = n / (ppy / 365.0)
     freq = {"1Hour": "hourly", "4Hour": "4-hour", "1Day": "daily"}.get(timeframe, timeframe)
-    if passes:
+    scope = "out-of-sample" if oos else "in-sample"
+    if passes and oos:
+        verdict = (f"Survives out-of-sample: on {n} bars the params never saw, net Sharpe {sharpe:.1f} clears the bar "
+                   f"(|t| {abs(hac_t):.1f} > {bar_t:.1f}) with a bootstrap CI [{boot_lo:.1f}, {boot_hi:.1f}] above zero, at a "
+                   f"realistic cost. This is the real generalization test — promotable.")
+    elif passes:
         verdict = (f"Clears the search-corrected bar (|t| {abs(hac_t):.1f} > {bar_t:.1f} for ~{trials} tries) and the "
-                   f"bootstrap Sharpe CI [{boot_lo:.1f}, {boot_hi:.1f}] excludes zero, at a realistic cost. A candidate — "
-                   f"promote it and watch it forward; the backtest is in-sample, so live is the real out-of-sample test.")
+                   f"bootstrap Sharpe CI [{boot_lo:.1f}, {boot_hi:.1f}] excludes zero, at a realistic cost — in-sample. "
+                   f"Run the walk-forward below to confirm it holds out-of-sample before promoting.")
     elif significant and sharpe > 0 and not realistic_cost:
         verdict = (f"Clears the significance bar, but you vetted it at {cost_bps:.0f} bps/side — below the ~{LIVE_TAKER_BPS:.0f} "
                    f"bps taker fee you'll actually pay live. Re-run at ≥{LIVE_TAKER_BPS:.0f} bps before promoting; a cheap-cost "
@@ -192,11 +269,11 @@ def _simulate(defn: S.StrategyDef, closes: list[float], timeframe: str, cost_bps
                    f"< {bar_t:.1f} and/or the bootstrap CI [{boot_lo:.1f}, {boot_hi:.1f}] includes zero. Given the param "
                    f"sweep, this is consistent with luck, not edge.")
     else:
-        verdict = (f"Net Sharpe {sharpe:.1f} after {cost_bps:.0f} bps/side — a costed loser at {freq} frequency; the "
-                   f"signal doesn't survive execution.")
+        verdict = (f"Net Sharpe {sharpe:.1f} after {cost_bps:.0f} bps/side — a costed loser at {freq} frequency ({scope}); "
+                   f"the signal doesn't survive execution.")
 
     return {
-        "ok": True, "kind": kind, "symbol": symbol, "timeframe": timeframe, "params": params,
+        "ok": True, "oos": oos, "kind": kind, "symbol": symbol, "timeframe": timeframe, "params": params,
         "cost_bps": cost_bps, "n_bars": n, "bars_per_year": ppy, "freq": freq, "window_days": round(days, 1),
         "net_sharpe": round(sharpe, 3), "hac_t": round(hac_t, 2), "bar_t": round(bar_t, 2), "trials": trials,
         "boot_lo": None if boot_lo != boot_lo else round(boot_lo, 2),

@@ -30,6 +30,10 @@ BAR_TIMEFRAME = "1Hour"
 BAR_LIMIT = 120
 MAX_ACTIONS = 60
 
+# Automated risk limits (the autonomous loss containment a manual kill switch can't provide):
+MAX_GROSS_USD = 8000.0           # aggregate gross exposure cap across all sleeves — blocks new entries
+MAX_SESSION_DRAWDOWN_USD = 750.0  # peak-to-current drop in engine P&L → auto-flatten + latch kill
+
 _LOCK = threading.RLock()
 _STOP = threading.Event()
 _THREAD: threading.Thread | None = None
@@ -62,6 +66,10 @@ _STATE: dict = {
     "books": [],             # last per-strategy attribution rows
     "marks": {},             # last {symbol: price}
     "running": False,        # is the background loop alive
+    "pnl_peak": None,        # high-water engine P&L this session (for the drawdown limit)
+    "gross_used": 0.0,       # aggregate gross exposure
+    "session_dd": 0.0,       # current peak-to-current drawdown (≤ 0)
+    "risk_halt": False,      # last cycle auto-flattened on a risk breach
 }
 
 
@@ -164,6 +172,7 @@ def _trade_armed(real: dict, marks: dict) -> None:
     with _LOCK:
         armed = list(_STATE["armed"])
     pending = _open_tagged()
+    gross = sum(abs(float(v.get("qty", 0.0)) * (marks.get(sym) or 0.0)) for sym, v in real.items())
     for sid in armed:
         defn = S.REGISTRY.get(sid)
         if defn is None:
@@ -186,10 +195,14 @@ def _trade_armed(real: dict, marks: dict) -> None:
                     qty = round(defn.notional / px - max(cur, 0.0), 6)   # top up any dust, don't stack on it
                     if qty * px < MIN_ORDER_USD:
                         continue
+                    if gross + qty * px > MAX_GROSS_USD:            # aggregate gross exposure cap
+                        _log("risk", f"{sid}: blocked {sym} entry — gross cap ${MAX_GROSS_USD:,.0f} (used ${gross:,.0f})", strategy=sid, symbol=sym)
+                        continue
                     if _halted(sid):
                         return
                     alpaca.submit_order(sym, qty, "buy", type_="market", tif="gtc", client_order_id=S.order_tag(sid, _next_seq()))
                     _log("order", f"{sid}: enter buy {qty} {sym} @~{px:.2f}", strategy=sid, symbol=sym, side="buy", qty=qty)
+                    gross += qty * px
                 elif sign == 0 and held:                           # flip to flat → exit the whole position
                     avail = str(rp.get("qty_available") or cur)
                     if float(avail) <= 0:
@@ -203,10 +216,44 @@ def _trade_armed(real: dict, marks: dict) -> None:
                 _log("error", f"{sid} {sym}: {e}", strategy=sid, symbol=sym)
 
 
+def flatten_all() -> None:
+    """Close every strategy's positions (used by the risk auto-flatten and the kill path)."""
+    for sid in list(S.REGISTRY):
+        flatten(sid)
+
+
+def _risk_check() -> bool:
+    """Enforce the session-drawdown limit. Returns True (and auto-flattens + latches kill) on a breach.
+    Reads the freshly-updated books, so it runs after refresh()."""
+    with _LOCK:
+        books = _STATE["books"]
+        gross = sum(float(r.get("gross_exposure", 0.0)) for r in books)
+        pnl = sum(float(r.get("total_pnl", 0.0)) for r in books)
+        peak = pnl if _STATE["pnl_peak"] is None else max(_STATE["pnl_peak"], pnl)
+        _STATE["pnl_peak"] = peak
+        _STATE["gross_used"] = gross
+        dd = pnl - peak
+        _STATE["session_dd"] = dd
+        breach = dd <= -MAX_SESSION_DRAWDOWN_USD and (gross > 0 or _STATE["armed"])
+        already = _STATE["risk_halt"]
+    if breach and not already:
+        _log("risk", f"RISK HALT — session drawdown {dd:,.0f} ≤ -{MAX_SESSION_DRAWDOWN_USD:,.0f}; auto-flattening")
+        flatten_all()
+        kill()
+        with _LOCK:
+            _STATE["risk_halt"] = True
+        return True
+    with _LOCK:
+        _STATE["risk_halt"] = breach
+    return breach
+
+
 def run_once() -> None:
-    """One engine cycle: refresh books, then (if not killed) trade the armed strategies."""
+    """One engine cycle: refresh books, enforce risk, then (if clear) trade the armed strategies."""
     try:
         _, marks, real, _ = refresh()
+        if real is not None and _risk_check():   # auto-flatten fired → nothing else this cycle
+            return
         with _LOCK:
             killed = _STATE["kill"]
             armed = bool(_STATE["armed"])
@@ -274,6 +321,8 @@ def kill() -> None:
 def resume() -> None:
     with _LOCK:
         _STATE["kill"] = False
+        _STATE["risk_halt"] = False
+        _STATE["pnl_peak"] = None      # reset the drawdown high-water so a fresh session starts clean
     _log("resume", "kill switch released")
 
 
@@ -320,4 +369,9 @@ def snapshot() -> dict:
             "strategies": _STATE["books"],
             "marks": _STATE["marks"],
             "actions": list(_STATE["actions"]),
+            "risk": {
+                "max_gross": MAX_GROSS_USD, "gross_used": round(_STATE["gross_used"], 2),
+                "dd_limit": MAX_SESSION_DRAWDOWN_USD, "session_dd": round(_STATE["session_dd"], 2),
+                "halt": _STATE["risk_halt"],
+            },
         }

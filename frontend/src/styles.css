@@ -2103,3 +2103,27 @@ code {
 .xp-news-sym { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 3px; cursor: pointer; }
 
 @media (max-width: 900px) { .xp-grid { grid-template-columns: 1fr; } .xp-ind { grid-template-columns: 1fr 1fr; } }
+
+/* ── Risk strip (Strategy engine) ────────────────────────────────────────── */
+.se-risk { display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: center; padding: 10px 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); }
+.se-risk.halt { border-color: var(--sell); background: color-mix(in srgb, var(--sell) 8%, var(--panel)); }
+.se-risk-halt { grid-column: 1 / -1; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--sell); }
+.se-riskbar { display: flex; flex-direction: column; gap: 5px; }
+.se-riskbar-top { display: flex; justify-content: space-between; font-family: var(--sans); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.se-riskbar-top b { font-family: var(--mono); color: var(--ink); font-size: 11px; text-transform: none; letter-spacing: 0; }
+.se-riskbar-track { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.se-riskbar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.3s; }
+.se-riskbar-fill.dd { background: var(--warn); }
+.se-riskbar-fill.hot { background: var(--sell); }
+.se-risk-note { font-family: var(--sans); font-size: 10px; color: var(--muted); text-align: right; max-width: 160px; }
+
+/* ── Walk-forward panel (Backtest) ───────────────────────────────────────── */
+.bt-wf { margin-top: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); padding: 14px 16px; }
+.bt-wf-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.bt-wf-head h4 { margin: 0 0 2px; font-family: var(--sans); font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.bt-wf-head span { font-family: var(--sans); font-size: 11px; color: var(--dim); }
+.bt-wf-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.bt-wf-folds { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.bt-fold { font-family: var(--mono); font-size: 10px; color: var(--dim); background: var(--panel); border: 1px solid var(--border); border-radius: 3px; padding: 3px 7px; }
+
+@media (max-width: 900px) { .se-risk, .bt-wf-stats { grid-template-columns: 1fr; } }

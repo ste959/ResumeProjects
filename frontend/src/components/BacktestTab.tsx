@@ -19,6 +19,8 @@ export function BacktestTab() {
   const [params, setParams] = useState<Record<string, number>>({ fast: 12, slow: 48, lookback: 24 });
   const [result, setResult] = useState<LabResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [wf, setWf] = useState<LabResult | null>(null);
+  const [wfRunning, setWfRunning] = useState(false);
   const [promoted, setPromoted] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -28,7 +30,7 @@ export function BacktestTab() {
   const uni: LabUniverse | undefined = meta?.universe.find((u) => u.symbol === symbol);
 
   const run = useCallback(async () => {
-    setRunning(true); setErr(null); setPromoted(null);
+    setRunning(true); setErr(null); setPromoted(null); setWf(null);
     try {
       const r = await api.labBacktest({ kind, symbol, timeframe, cost_bps: costBps, fast: params.fast, slow: params.slow, lookback: params.lookback });
       setResult(r);
@@ -40,20 +42,33 @@ export function BacktestTab() {
     }
   }, [kind, symbol, timeframe, costBps, params]);
 
+  const runWf = useCallback(async () => {
+    setWfRunning(true); setPromoted(null);
+    try {
+      setWf(await api.labWalkforward(kind, symbol, timeframe, costBps));
+    } catch {
+      setWf(null);
+    } finally {
+      setWfRunning(false);
+    }
+  }, [kind, symbol, timeframe, costBps]);
+
   useEffect(() => { if (meta) void run(); /* run once meta loads */ /* eslint-disable-next-line */ }, [meta]);
 
   const promote = useCallback(async () => {
     if (!tpl) return;
-    const p: Record<string, number> = tpl.kind === 'ma_crossover'
-      ? { fast: params.fast, slow: params.slow }
-      : { lookback: params.lookback };
+    // Promote the params the walk-forward selected on its most recent in-sample window (what you'd
+    // trade next), not whatever the sliders happen to show.
+    const p: Record<string, number> = wf?.folds?.length
+      ? wf.folds[wf.folds.length - 1].params
+      : tpl.kind === 'ma_crossover' ? { fast: params.fast, slow: params.slow } : { lookback: params.lookback };
     try {
       const r = await api.labPromote({ kind, symbol, timeframe, params: p, notional: 1500 });
       setPromoted(r.name);
     } catch {
       setErr('promote failed');
     }
-  }, [tpl, kind, symbol, timeframe, params]);
+  }, [tpl, kind, symbol, timeframe, params, wf]);
 
   const codeText = useMemo(() => {
     if (!tpl) return '';
@@ -155,18 +170,48 @@ export function BacktestTab() {
 
               <div className={`bt-verdict ${result.passes ? 'good' : 'warn'}`}>{result.verdict}</div>
 
+              {/* ---- walk-forward (out-of-sample) — the promotion gate ---- */}
+              {uni?.promotable && (
+                <div className="bt-wf">
+                  <div className="bt-wf-head">
+                    <div>
+                      <h4>Walk-forward validation</h4>
+                      <span>select params in-sample per fold, trade the next untouched window — the real out-of-sample test</span>
+                    </div>
+                    <button className="btn" onClick={runWf} disabled={wfRunning}>{wfRunning ? 'Running…' : 'Run walk-forward'}</button>
+                  </div>
+                  {wf && wf.ok && (
+                    <>
+                      <div className="bt-wf-stats">
+                        <Stat label="OOS Sharpe" value={sh(wf.net_sharpe)} tone={wf.net_sharpe >= 0 ? 'good' : 'bad'} ctx={`${wf.freq}, annualized`} />
+                        <Stat label="OOS |t|" value={sh(wf.hac_t)} ctx={`bar |t|>${wf.bar_t.toFixed(1)}`} />
+                        <Stat label="OOS return" value={pct(wf.total_return)} tone={wf.total_return >= 0 ? 'good' : 'bad'} ctx={`${wf.n_bars} unseen bars`} />
+                        <Stat label="OOS CI" value={wf.boot_lo == null ? '—' : `${sh(wf.boot_lo)}…${sh(wf.boot_hi)}`} ctx="bootstrap · spans 0 = fail" />
+                      </div>
+                      <div className="bt-wf-folds">
+                        {(wf.folds ?? []).map((f, i) => (
+                          <span key={i} className="bt-fold">fold {i + 1}: {Object.entries(f.params).map(([k, v]) => `${k}=${v}`).join('/')} → Sh {f.oos_sharpe.toFixed(1)}</span>
+                        ))}
+                      </div>
+                      <div className={`bt-verdict ${wf.passes ? 'good' : 'warn'}`}>{wf.verdict}</div>
+                    </>
+                  )}
+                  {wf && !wf.ok && <div className="bt-err">{wf.reason}</div>}
+                </div>
+              )}
+
               <div className="bt-promote">
                 {promoted ? (
                   <div className="bt-promoted">✓ Promoted <b>{promoted}</b> — it's on the Live desk (disarmed). Arm it there to trade.</div>
                 ) : uni?.promotable ? (
-                  <button className="btn primary" onClick={promote} disabled={!result.passes}
-                    title={result.passes ? '' : 'must clear the search-corrected bar to promote'}>
+                  <button className="btn primary" onClick={promote} disabled={!wf?.passes}
+                    title={wf?.passes ? '' : 'run the walk-forward and clear the out-of-sample bar to promote'}>
                     Promote to live strategy →
                   </button>
                 ) : (
                   <span className="bt-noprom">{result.symbol} is evaluate-only — live trading is crypto (24/7) for now.</span>
                 )}
-                {uni?.promotable && !result.passes && <span className="bt-promote-note">Only a candidate — clearing the <b>search-corrected</b> bar (|t|&gt;{result.bar_t.toFixed(1)}) with a bootstrap CI above zero — can be promoted. That's the multiple-testing defense.</span>}
+                {uni?.promotable && !wf?.passes && <span className="bt-promote-note">Promotion requires clearing the <b>out-of-sample</b> walk-forward above — not just the in-sample backtest. It promotes the params the walk-forward last selected.</span>}
               </div>
             </>
           ) : (

@@ -47,9 +47,15 @@ def broker(monkeypatch):
     engine._STATE["armed"].clear()
     engine._STATE["kill"] = False
     engine._STATE["actions"].clear()
+    engine._STATE["books"] = []
+    engine._STATE["pnl_peak"] = None
+    engine._STATE["risk_halt"] = False
     yield state
     engine._STATE["armed"].clear()
     engine._STATE["kill"] = False
+    engine._STATE["books"] = []
+    engine._STATE["pnl_peak"] = None
+    engine._STATE["risk_halt"] = False
 
 
 def _pos(sym, qty):
@@ -121,3 +127,24 @@ def test_run_once_skips_trading_while_killed(broker):
     engine._STATE["kill"] = True
     engine.run_once()                    # refresh runs, but trading is skipped
     assert broker["submitted"] == []
+
+
+def test_gross_cap_blocks_new_entry(broker):
+    broker["closes"] = RISING            # btc-trend wants to go long BTC
+    engine._STATE["armed"].add("btc-trend")
+    # BTC is flat for this sleeve, but ETH already holds $7,000 → entering $1,500 more would breach $8,000
+    real = {"ETH/USD": {"qty": 70.0, "qty_available": "70"}}
+    engine._trade_armed(real, {"BTC/USD": 100.0, "ETH/USD": 100.0})
+    assert broker["submitted"] == []     # gross cap blocked the entry
+    assert any(a["kind"] == "risk" for a in engine._STATE["actions"])
+
+
+def test_session_drawdown_auto_flattens_and_kills(broker):
+    broker["positions"] = [_pos("BTC/USD", 15)]      # a real position to close
+    engine._STATE["armed"].add("btc-trend")
+    engine._STATE["books"] = [{"gross_exposure": 1500.0, "total_pnl": -800.0}]  # dropped below the -750 limit
+    engine._STATE["pnl_peak"] = 0.0
+    halted = engine._risk_check()
+    assert halted is True
+    assert engine._STATE["kill"] is True             # latched off
+    assert any(o["side"] == "sell" for o in broker["submitted"])   # auto-flattened the position

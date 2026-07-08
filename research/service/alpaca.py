@@ -9,6 +9,7 @@ erroring. Deliberately dependency-light: direct REST over httpx, no SDK, so ever
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -44,40 +45,43 @@ def _headers() -> dict[str, str]:
     return {"APCA-API-KEY-ID": _key(), "APCA-API-SECRET-KEY": _secret()}
 
 
-def _get(base: str, path: str, params: dict | None = None) -> dict:
+_RETRYABLE = {429, 500, 502, 503, 504}   # rate limit + transient server errors
+
+
+def _request(method: str, base: str, path: str, params: dict | None = None,
+             body: dict | None = None, retries: int = 3) -> dict:
+    """One HTTP call with exponential backoff on 429/5xx/network errors. A persistent 4xx (bad request,
+    auth) raises immediately — only transient failures are retried."""
     if not configured():
         raise AlpacaError("Alpaca keys not configured", status=None)
-    try:
-        r = _client.get(base + path, headers=_headers(), params=params)
-    except httpx.HTTPError as e:
-        raise AlpacaError(f"network error: {e}", status=None) from e
-    if r.status_code >= 400:
-        raise AlpacaError(f"{r.status_code} {r.text[:180]}", status=r.status_code)
-    return r.json()
+    last: AlpacaError | None = None
+    for attempt in range(retries):
+        try:
+            r = _client.request(method, base + path, headers=_headers(), params=params, json=body)
+        except httpx.HTTPError as e:
+            last = AlpacaError(f"network error: {e}", status=None)
+            time.sleep(0.4 * (2 ** attempt))
+            continue
+        if r.status_code in _RETRYABLE and attempt < retries - 1:
+            last = AlpacaError(f"{r.status_code} {r.text[:120]}", status=r.status_code)
+            time.sleep(0.4 * (2 ** attempt))
+            continue
+        if r.status_code >= 400:
+            raise AlpacaError(f"{r.status_code} {r.text[:180]}", status=r.status_code)
+        return r.json() if r.text else {}
+    raise last or AlpacaError("request failed", status=None)
+
+
+def _get(base: str, path: str, params: dict | None = None) -> dict:
+    return _request("GET", base, path, params=params)
 
 
 def _post(base: str, path: str, body: dict) -> dict:
-    if not configured():
-        raise AlpacaError("Alpaca keys not configured", status=None)
-    try:
-        r = _client.post(base + path, headers=_headers(), json=body)
-    except httpx.HTTPError as e:
-        raise AlpacaError(f"network error: {e}", status=None) from e
-    if r.status_code >= 400:
-        raise AlpacaError(f"{r.status_code} {r.text[:180]}", status=r.status_code)
-    return r.json()
+    return _request("POST", base, path, body=body)
 
 
 def _delete(base: str, path: str) -> dict:
-    if not configured():
-        raise AlpacaError("Alpaca keys not configured", status=None)
-    try:
-        r = _client.delete(base + path, headers=_headers())
-    except httpx.HTTPError as e:
-        raise AlpacaError(f"network error: {e}", status=None) from e
-    if r.status_code >= 400:
-        raise AlpacaError(f"{r.status_code} {r.text[:180]}", status=r.status_code)
-    return r.json() if r.text else {}
+    return _request("DELETE", base, path)
 
 
 def position_symbol(symbol: str) -> str:
