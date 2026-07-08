@@ -9,7 +9,9 @@ a "connect Alpaca" state rather than an error.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, HTTPException, Query
+import os
+
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 
 from . import alpaca
 from . import engine
@@ -18,6 +20,19 @@ from . import market
 from . import strategies as S
 
 router = APIRouter(prefix="/api/research", tags=["desk"])
+
+# Opt-in auth: if QD_API_TOKEN is set in the environment, every state-changing endpoint (arm/disarm/
+# flatten/kill/resume/promote) requires a matching `X-QD-Token` header. Unset (the local demo) → open,
+# so the desk works out of the box; set it in any shared/hosted deployment to lock down order control.
+QD_API_TOKEN = os.environ.get("QD_API_TOKEN", "").strip()
+
+
+def require_token(x_qd_token: str | None = Header(default=None)) -> None:
+    if QD_API_TOKEN and x_qd_token != QD_API_TOKEN:
+        raise HTTPException(status_code=401, detail="invalid or missing X-QD-Token")
+
+
+auth = [Depends(require_token)]   # attach to mutating routes
 
 
 def _f(x, default: float | None = 0.0) -> float | None:
@@ -124,7 +139,7 @@ def strategies() -> dict:
     return {"configured": True, **engine.snapshot()}
 
 
-@router.post("/strategies/{sid}/arm")
+@router.post("/strategies/{sid}/arm", dependencies=auth)
 def arm(sid: str) -> dict:
     try:
         engine.arm(sid)
@@ -133,13 +148,13 @@ def arm(sid: str) -> dict:
     return {"ok": True, **engine.snapshot()}
 
 
-@router.post("/strategies/{sid}/disarm")
+@router.post("/strategies/{sid}/disarm", dependencies=auth)
 def disarm(sid: str) -> dict:
     engine.disarm(sid)
     return {"ok": True, **engine.snapshot()}
 
 
-@router.post("/strategies/{sid}/flatten")
+@router.post("/strategies/{sid}/flatten", dependencies=auth)
 def flatten(sid: str) -> dict:
     try:
         engine.flatten(sid)
@@ -148,13 +163,13 @@ def flatten(sid: str) -> dict:
     return {"ok": True, **engine.snapshot()}
 
 
-@router.post("/strategies/kill")
+@router.post("/strategies/kill", dependencies=auth)
 def kill() -> dict:
     engine.kill()
     return {"ok": True, **engine.snapshot()}
 
 
-@router.post("/strategies/resume")
+@router.post("/strategies/resume", dependencies=auth)
 def resume() -> dict:
     engine.resume()
     return {"ok": True, **engine.snapshot()}
@@ -194,20 +209,36 @@ def lab_walkforward(kind: str = Query(...), symbol: str = Query(...), timeframe:
         raise HTTPException(status_code=502, detail=f"market data error: {e}")
 
 
-@router.post("/lab/promote")
+@router.post("/lab/promote", dependencies=auth)
 def lab_promote(body: dict = Body(...)) -> dict:
-    """Register a backtested config as a live (disarmed) strategy on the engine."""
+    """Register a config as a live strategy — but only after it clears the walk-forward here on the
+    SERVER (not just in the UI). The out-of-sample validation is re-run and the params it selected are
+    what gets registered, so the gate is a real invariant a direct API call can't bypass."""
     kind = body.get("kind")
     symbol = body.get("symbol")
     timeframe = body.get("timeframe", "1Hour")
-    params = body.get("params") or {}
     try:
         notional = float(body.get("notional", 1500.0))
+        wf = lab.walk_forward(kind, symbol, timeframe, cost_bps=lab.LIVE_TAKER_BPS)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown template: {kind}")
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except alpaca.AlpacaError as e:
+        raise HTTPException(status_code=502, detail=f"market data error: {e}")
+    if not wf.get("ok"):
+        raise HTTPException(status_code=400, detail=wf.get("reason", "walk-forward could not run"))
+    if not wf.get("passes"):
+        raise HTTPException(status_code=400,
+                            detail=f"does not clear out-of-sample walk-forward (OOS Sharpe {wf.get('net_sharpe')})")
+    params = wf["folds"][-1]["params"]              # register the params the walk-forward last selected
+    try:
         defn = S.register(kind, symbol, timeframe, params, notional=notional)
     except (ValueError, TypeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
-    engine.refresh()  # pick the new strategy into the books immediately
-    return {"ok": True, "strategy_id": defn.id, "name": defn.name, **engine.snapshot()}
+    engine.refresh()
+    return {"ok": True, "strategy_id": defn.id, "name": defn.name,
+            "oos_sharpe": wf.get("net_sharpe"), "params": params, **engine.snapshot()}
 
 
 # ── Exploration (screener · technicals · sectors · news · catalysts) ──────────────────────────────

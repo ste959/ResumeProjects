@@ -55,6 +55,10 @@ export function BacktestTab() {
 
   useEffect(() => { if (meta) void run(); /* run once meta loads */ /* eslint-disable-next-line */ }, [meta]);
 
+  // The walk-forward is specific to this symbol/timeframe/cost/template — invalidate it (and any
+  // stale promote-enabled state) the moment the target changes, so you can't promote the wrong thing.
+  useEffect(() => { setWf(null); setPromoted(null); }, [symbol, timeframe, costBps, kind, params]);
+
   const promote = useCallback(async () => {
     if (!tpl) return;
     // Promote the params the walk-forward selected on its most recent in-sample window (what you'd

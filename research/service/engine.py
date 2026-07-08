@@ -32,7 +32,8 @@ MAX_ACTIONS = 60
 
 # Automated risk limits (the autonomous loss containment a manual kill switch can't provide):
 MAX_GROSS_USD = 8000.0           # aggregate gross exposure cap across all sleeves — blocks new entries
-MAX_SESSION_DRAWDOWN_USD = 750.0  # peak-to-current drop in engine P&L → auto-flatten + latch kill
+MAX_SESSION_DRAWDOWN_USD = 750.0  # peak-to-current drop in TOTAL engine P&L → auto-flatten all + latch kill
+MAX_STRATEGY_DRAWDOWN_USD = 400.0  # per-sleeve drawdown → flatten + disarm that sleeve (a winner can't mask a loser)
 
 _LOCK = threading.RLock()
 _STOP = threading.Event()
@@ -66,10 +67,11 @@ _STATE: dict = {
     "books": [],             # last per-strategy attribution rows
     "marks": {},             # last {symbol: price}
     "running": False,        # is the background loop alive
-    "pnl_peak": None,        # high-water engine P&L this session (for the drawdown limit)
+    "pnl_peak": None,        # high-water total engine P&L this session (for the aggregate drawdown limit)
+    "strat_peak": {},        # per-strategy high-water P&L (for the per-sleeve stop)
     "gross_used": 0.0,       # aggregate gross exposure
     "session_dd": 0.0,       # current peak-to-current drawdown (≤ 0)
-    "risk_halt": False,      # last cycle auto-flattened on a risk breach
+    "risk_halt": False,      # engine is in an auto-flatten risk halt
 }
 
 
@@ -216,17 +218,18 @@ def _trade_armed(real: dict, marks: dict) -> None:
                 _log("error", f"{sid} {sym}: {e}", strategy=sid, symbol=sym)
 
 
-def flatten_all() -> None:
-    """Close every strategy's positions (used by the risk auto-flatten and the kill path)."""
-    for sid in list(S.REGISTRY):
-        flatten(sid)
+def flatten_all() -> bool:
+    """Close every strategy's positions; True only if every close was submitted without error."""
+    return all([flatten(sid) for sid in list(S.REGISTRY)])   # list() forces all to run, not short-circuit
 
 
 def _risk_check() -> bool:
-    """Enforce the session-drawdown limit. Returns True (and auto-flattens + latches kill) on a breach.
-    Reads the freshly-updated books, so it runs after refresh()."""
+    """Enforce risk limits from the freshly-updated books (runs after refresh). Returns True only on an
+    AGGREGATE halt (caller then skips trading). Per-sleeve stops fire as side effects (flatten + disarm
+    just the bleeding sleeve) so one loser can't hide behind another sleeve's gains."""
     with _LOCK:
-        books = _STATE["books"]
+        books = list(_STATE["books"])
+        armed = set(_STATE["armed"])
         gross = sum(float(r.get("gross_exposure", 0.0)) for r in books)
         pnl = sum(float(r.get("total_pnl", 0.0)) for r in books)
         peak = pnl if _STATE["pnl_peak"] is None else max(_STATE["pnl_peak"], pnl)
@@ -234,18 +237,39 @@ def _risk_check() -> bool:
         _STATE["gross_used"] = gross
         dd = pnl - peak
         _STATE["session_dd"] = dd
-        breach = dd <= -MAX_SESSION_DRAWDOWN_USD and (gross > 0 or _STATE["armed"])
-        already = _STATE["risk_halt"]
-    if breach and not already:
-        _log("risk", f"RISK HALT — session drawdown {dd:,.0f} ≤ -{MAX_SESSION_DRAWDOWN_USD:,.0f}; auto-flattening")
-        flatten_all()
-        kill()
+        speak = _STATE["strat_peak"]
+        sleeves = []
+        for r in books:
+            sid = r.get("id")
+            if not sid:
+                continue
+            p_i = float(r.get("total_pnl", 0.0))
+            speak[sid] = p_i if sid not in speak else max(speak[sid], p_i)
+            sleeves.append((sid, p_i - speak[sid], float(r.get("gross_exposure", 0.0))))
+        agg_breach = dd <= -MAX_SESSION_DRAWDOWN_USD and (gross > 0 or armed)
+
+    if agg_breach:                                             # portfolio-level halt: flatten everything
+        with _LOCK:
+            first = not _STATE["risk_halt"]
+        if first:
+            _log("risk", f"RISK HALT — total drawdown {dd:,.0f} ≤ -{MAX_SESSION_DRAWDOWN_USD:,.0f}; auto-flattening all")
+            kill()
+        if gross > 0:
+            flatten_all()          # idempotent (skips symbols with a working close) → safe to retry each cycle
         with _LOCK:
             _STATE["risk_halt"] = True
         return True
+
+    # Aggregate ok → per-sleeve stops for any single bleeding sleeve.
+    for sid, dd_i, gross_i in sleeves:
+        if dd_i <= -MAX_STRATEGY_DRAWDOWN_USD and (gross_i > 0 or sid in armed):
+            _log("risk", f"{sid}: sleeve stop — drawdown {dd_i:,.0f} ≤ -{MAX_STRATEGY_DRAWDOWN_USD:,.0f}; flatten + disarm",
+                 strategy=sid)
+            flatten(sid)
+            disarm(sid)
     with _LOCK:
-        _STATE["risk_halt"] = breach
-    return breach
+        _STATE["risk_halt"] = False
+    return False
 
 
 def run_once() -> None:
@@ -322,16 +346,19 @@ def resume() -> None:
     with _LOCK:
         _STATE["kill"] = False
         _STATE["risk_halt"] = False
-        _STATE["pnl_peak"] = None      # reset the drawdown high-water so a fresh session starts clean
+        _STATE["pnl_peak"] = None       # reset the drawdown high-water marks so a fresh session starts clean
+        _STATE["strat_peak"] = {}
     _log("resume", "kill switch released")
 
 
-def flatten(sid: str) -> None:
-    """Close a strategy's open positions (does not disarm it).
+def flatten(sid: str) -> bool:
+    """Close a strategy's open positions (does not disarm it). Returns True iff every needed close was
+    submitted without error — the caller (risk halt) retries until it succeeds, rather than firing once
+    and trusting the API.
 
-    Sells the *real available* balance — not the tagged quantity — because crypto fees make the
-    filled quantity slightly overstate what's actually holdable, and over-selling is rejected. The
-    closing order is tagged so it's attributed back to the strategy."""
+    Sells the *real available* balance — not the tagged quantity — because crypto fees make the filled
+    quantity slightly overstate what's holdable. Skips a symbol that already has a working close order,
+    so re-attempts don't stack. Closes are tagged so they attribute back to the strategy."""
     if sid not in S.REGISTRY:
         raise KeyError(sid)
     defn = S.REGISTRY[sid]
@@ -339,23 +366,27 @@ def flatten(sid: str) -> None:
         real = {alpaca.position_symbol(p["symbol"]): p for p in alpaca.positions()}
     except alpaca.AlpacaError as e:
         _log("error", f"flatten {sid}: {e}")
-        return
+        return False                                          # couldn't read → not done, retry next cycle
+    pending = _open_tagged()
+    ok = True
     for sym in defn.symbols:
         p = real.get(alpaca.position_symbol(sym))
         if not p:
             continue
         qty = float(p.get("qty") or 0)
-        # Use Alpaca's exact available string — never round (rounding up over-sells and is rejected).
         avail_str = str(p.get("qty_available") or p.get("qty") or "0")
         if qty == 0 or float(avail_str) <= 0:
             continue
+        if (sid, sym) in pending:                             # a close is already working — don't stack
+            continue
         side = "sell" if qty > 0 else "buy"
-        coid = S.order_tag(sid, _next_seq())
         try:
-            alpaca.submit_order(sym, avail_str, side, type_="market", tif="gtc", client_order_id=coid)
+            alpaca.submit_order(sym, avail_str, side, type_="market", tif="gtc", client_order_id=S.order_tag(sid, _next_seq()))
             _log("flatten", f"{sid}: {side} {avail_str} {sym} to close", strategy=sid, symbol=sym)
         except alpaca.AlpacaError as e:
             _log("error", f"flatten {sid} {sym}: {e}")
+            ok = False                                        # submission failed → risk halt will retry
+    return ok
 
 
 def snapshot() -> dict:

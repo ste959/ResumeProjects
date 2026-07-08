@@ -44,16 +44,17 @@ def broker(monkeypatch):
     monkeypatch.setattr(engine.alpaca, "orders", lambda **k: state["open"])
     monkeypatch.setattr(engine.alpaca, "submit_order", submit)
 
+    for k, v in {"kill": False, "risk_halt": False, "pnl_peak": None}.items():
+        engine._STATE[k] = v
     engine._STATE["armed"].clear()
-    engine._STATE["kill"] = False
     engine._STATE["actions"].clear()
     engine._STATE["books"] = []
-    engine._STATE["pnl_peak"] = None
-    engine._STATE["risk_halt"] = False
+    engine._STATE["strat_peak"] = {}
     yield state
     engine._STATE["armed"].clear()
     engine._STATE["kill"] = False
     engine._STATE["books"] = []
+    engine._STATE["strat_peak"] = {}
     engine._STATE["pnl_peak"] = None
     engine._STATE["risk_halt"] = False
 
@@ -142,9 +143,44 @@ def test_gross_cap_blocks_new_entry(broker):
 def test_session_drawdown_auto_flattens_and_kills(broker):
     broker["positions"] = [_pos("BTC/USD", 15)]      # a real position to close
     engine._STATE["armed"].add("btc-trend")
-    engine._STATE["books"] = [{"gross_exposure": 1500.0, "total_pnl": -800.0}]  # dropped below the -750 limit
+    engine._STATE["books"] = [{"id": "btc-trend", "gross_exposure": 1500.0, "total_pnl": -800.0}]  # below -750
     engine._STATE["pnl_peak"] = 0.0
     halted = engine._risk_check()
     assert halted is True
     assert engine._STATE["kill"] is True             # latched off
     assert any(o["side"] == "sell" for o in broker["submitted"])   # auto-flattened the position
+
+
+def test_per_sleeve_stop_flattens_only_the_bleeder(broker):
+    broker["positions"] = [_pos("BTC/USD", 15)]      # only BTC has a position
+    engine._STATE["armed"].update({"btc-trend", "eth-mom"})
+    # BTC sleeve is down 500 from its peak (breaches the -400 sleeve stop); ETH is up (aggregate is fine)
+    engine._STATE["books"] = [
+        {"id": "btc-trend", "gross_exposure": 1500.0, "total_pnl": -500.0},
+        {"id": "eth-mom", "gross_exposure": 1500.0, "total_pnl": 300.0},
+    ]
+    engine._STATE["pnl_peak"] = 0.0                  # aggregate dd = -200, below the -750 aggregate limit
+    engine._STATE["strat_peak"] = {"btc-trend": 0.0, "eth-mom": 300.0}
+    halted = engine._risk_check()
+    assert halted is False                           # NOT an aggregate halt
+    assert engine._STATE["kill"] is False            # engine keeps running
+    assert "btc-trend" not in engine._STATE["armed"]  # the bleeder is disarmed
+    assert "eth-mom" in engine._STATE["armed"]        # the winner keeps trading
+    assert any(o["side"] == "sell" for o in broker["submitted"])   # bleeder auto-flattened
+
+
+def test_flatten_skips_symbol_with_working_order(broker):
+    broker["positions"] = [_pos("BTC/USD", 15)]
+    broker["open"] = [{"client_order_id": "qd-btc-trend-9", "symbol": "BTC/USD"}]  # a close already working
+    ok = engine.flatten("btc-trend")
+    assert ok is True                                # nothing errored
+    assert broker["submitted"] == []                 # didn't stack a second close on the pending one
+
+
+def test_flatten_reports_failure_for_retry(broker, monkeypatch):
+    broker["positions"] = [_pos("BTC/USD", 15)]
+
+    def boom(*a, **k):
+        raise engine.alpaca.AlpacaError("429 rate limited", status=429)
+    monkeypatch.setattr(engine.alpaca, "submit_order", boom)
+    assert engine.flatten("btc-trend") is False      # a failed close reports False so the halt retries
