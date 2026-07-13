@@ -5,6 +5,10 @@ how quant desks are actually organised: the **Java/Spring system** handles low-l
 trading (matching, execution, feed handling); this **Python layer** does research and
 backtesting over a columnar data warehouse. Two languages, each for the job it's best at.
 
+> The `mds/` modules below are the **research library**. They're driven both by the `run_*.py` CLI
+> studies and, live, by the **Quant Desk** FastAPI service — the Alpaca-backed research→backtest→live
+> app at `/research`. See [`service/README.md`](service/README.md).
+
 ## Data architecture (capture → warehouse → research)
 
 ```
@@ -28,6 +32,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/backtest.py` | vectorized backtester: transaction costs, **one-period execution lag (no look-ahead)**, Sharpe / drawdown / turnover / hit-rate |
 | `mds/statarb.py` | the **BTC/ETH stat-arb study** (cointegration diagnostic → walk-forward OOS z-score backtest → honest verdict) |
 | `mds/lob.py`, `mds/models.py` | **microstructure ML** — leakage-free L2 feature/label harness + model zoo (ridge/GBM/MLP), walk-forward, purge/embargo, cost-aware |
+| `mds/microstructure.py` | **order-flow-imbalance event-driven backtester** — known-IC synthetic tape, IC-by-horizon decay, cost-aware net-of-fees P&L (signal vs. tradability) |
 | `mds/maker.py` | **maker-execution study** — passive fills, markout-based **adverse selection**, spread-vs-adverse decomposition (does a taker-dead signal survive as a maker?) |
 | `mds/crosssec.py`, `mds/portfolio.py`, `mds/capacity.py` | **cross-sectional factors** (momentum/reversal/low-vol/BAB/idio-vol), beta+sector neutralization, a **walk-forward allocator**, and a **capacity/crowding** sizing model |
 | `mds/validation.py` | **overfitting stats** — Newey–West Sharpe t-stat, block-bootstrap CI, **Deflated Sharpe**, **PBO** (CPCV), min-detectable-Sharpe power |

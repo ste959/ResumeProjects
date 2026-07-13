@@ -1,301 +1,153 @@
-# Fixed Income Trading Platform
+# Quantitative Trading Platform
 
-> **BondDesk OMS** — a full-stack, event-driven Order & Execution Management System for bonds.
+> Three independent trading applications behind a single landing hub — a **crypto matching
+> engine + market maker**, a **fixed-income rates / dealer desk**, and a **research→backtest→live
+> quant desk** — sharing one event-driven Java + Python + React stack.
 
 [![CI](https://github.com/ste959/FixedIncomeTradingPlatform/actions/workflows/ci.yml/badge.svg)](https://github.com/ste959/FixedIncomeTradingPlatform/actions/workflows/ci.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-009688)
 ![React 18](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript 5](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-event--driven-231F20)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
-![Tests](https://img.shields.io/badge/tests-150%2B%20passing-brightgreen)
-![Matching engine](https://img.shields.io/badge/matching%20engine-3.3M%20ord%2Fs-blueviolet)
+![Tests](https://img.shields.io/badge/tests-320%2B%20passing-brightgreen)
+![Matching engine](https://img.shields.io/badge/matching%20engine-~2.1M%20ord%2Fs-blueviolet)
 
-A full-stack, event-driven **Order & Execution Management System (OEMS)** for trading
-fixed-income instruments (bonds), built to mirror the engineering surface of a Charles
-River–style investment management platform.
+A single **landing hub** (`/`) links three **self-contained, independently-navigable apps**, each its
+own product with its own identity — not one mashed dashboard:
 
-A trader stages a bond order → it clears **pre-trade compliance** → it is **routed** to an
-execution venue → **fills** stream back and update the firm's **positions** in real time.
-Every state change is published to **Kafka**, where an independent **risk microservice**
-consumes the stream to maintain a live view of desk exposure.
+| App | Route | What it is |
+|---|---|---|
+| **Exchange & Market Maker** | `/exchange` | A price-time-priority **matching engine** anchored to a live Coinbase mid, with an Avellaneda–Stoikov **market maker** and maker P&L analytics. |
+| **Fixed-Income Desk** | `/oms` | A **rates dealing desk** (multi-dealer RFQ + curve + key-rate risk), an electronic **cash OMS** (order lifecycle, compliance, positions), and a **risk & tax** layer. |
+| **Quant Desk** | `/research` | An **Alpaca-backed research → backtest → live** pipeline: explore the market, walk-forward-validate a signal, then promote it to a live paper-trading strategy. |
 
-> Built with the exact stack a Fixed Income trading engineering team uses: **Java 21 +
-> Spring Boot** APIs, **React + TypeScript** UI, **PostgreSQL**, **Kafka** event streaming,
-> **Docker** & **Kubernetes**, with automated tests and CI.
+They share a backbone — **Java 21 + Spring Boot** services, a **Python + FastAPI** quant service, a
+**React + TypeScript** front end, **Kafka** event streaming, **PostgreSQL**, and **Docker / Kubernetes**.
 
 ---
 
 ## Architecture
 
 ```
-                         ┌──────────────────────────┐
-   Trader (browser)      │  React + TypeScript UI    │
-   ───────────────────▶  │  order ticket · blotter · │
-                         │  positions (Vite/nginx)   │
-                         └───────────┬──────────────┘
-                                     │ REST /api  (JSON)
-                                     ▼
-                         ┌──────────────────────────┐        ┌───────────────────┐
-                         │   OMS Backend (Spring)    │        │  PostgreSQL        │
-                         │  ┌─────────────────────┐  │  JPA   │  orders · security │
-                         │  │ Order lifecycle FSM │  │◀──────▶│  execution · pos.  │
-                         │  │ Compliance engine   │  │ Flyway └───────────────────┘
-                         │  │ Position keeper     │  │
-                         │  │ CLOB matching engine│  │
-                         │  └─────────┬───────────┘  │
-                         └────────────┼──────────────┘
-                                      │ publishes OrderEvent
-                                      ▼
-                         ┌──────────────────────────┐
-                         │        Kafka topic        │  order-events (keyed by orderRef)
-                         │      "order-events"       │
-                         └────────────┬──────────────┘
-                                      │ consumes
-                                      ▼
-                         ┌──────────────────────────┐
-                         │   Risk Service (Spring)   │  aggregates desk risk from the
-                         │  @KafkaListener + REST     │  event stream (own microservice)
-                         └──────────────────────────┘
+                             ┌───────────────────────── React + TypeScript (Vite / nginx) ─────────────────────────┐
+   Browser  ───────────────▶ │   Landing hub  →  /exchange  ·  /oms  ·  /research                                   │
+                             └───────┬───────────────────────┬───────────────────────────┬──────────────────────────┘
+                                     │ REST + WebSocket        │ REST + WebSocket           │ REST  (/research-api)
+                                     ▼                         ▼                            ▼
+                       ┌───────────────────────────────────────────────────┐   ┌──────────────────────────────────┐
+                       │        OMS Backend  (Spring Boot, :8080)          │   │  Quant Desk service (FastAPI,:8082)│
+                       │  exchange (CLOB + maker) · rates (curve/RFQ/DV01) │   │  Alpaca client · live strategy     │
+                       │  cash OMS (lifecycle · compliance · positions)    │   │  engine · walk-forward lab · risk  │
+                       │  matching · market data · strategy · TCA          │   │  (vol-target + portfolio netting)  │
+                       └───────┬───────────────────────────┬───────────────┘   └──────────────┬───────────────────┘
+                    JPA/Flyway │                            │ publishes OrderEvent              │ REST
+                               ▼                            ▼                                   ▼
+                       ┌──────────────┐            ┌──────────────────┐                 ┌──────────────────┐
+                       │  PostgreSQL  │            │  Kafka  "order-  │  @KafkaListener │  Alpaca paper +   │
+                       │              │            │      events"     │ ───────────────▶│  market data API  │
+                       └──────────────┘            └────────┬─────────┘                 └──────────────────┘
+                                                            ▼
+                                                 ┌────────────────────┐
+                                                 │  Risk Service      │  aggregates desk risk from the
+                                                 │  (Spring, :8081)   │  event stream (own microservice)
+                                                 └────────────────────┘
 ```
 
-**Why event-driven?** The OMS never calls the risk service directly — it only emits
-events. New consumers (audit, P&L, market-data) can be added without touching the OMS.
-Events are keyed by order reference so all events for one order stay strictly ordered on
-the same partition, and the risk aggregator is **idempotent** (replaying the topic yields
-the same numbers).
+**Why event-driven?** The OMS never calls the risk service directly — it only emits `OrderEvent`s to
+Kafka, keyed by order reference so all events for one order stay ordered on one partition. New
+consumers (risk, audit, P&L) attach without touching the OMS, and the risk aggregator is **idempotent**
+(replaying the topic yields the same numbers).
 
 ---
 
-## How this maps to the role
+## 1 · Exchange & Market Maker  (`/exchange`)
 
-| Job requirement | Where it lives in this project |
-|---|---|
-| **Java** backend APIs | `backend/` — Spring Boot 3.3, Java 21 |
-| **JavaScript/TypeScript + React** UI | `frontend/` — React 18 + TypeScript + Vite |
-| **API development (Spring Boot)** | REST controllers, DTO validation, OpenAPI/Swagger |
-| **Relational databases (SQL)** | PostgreSQL, **Flyway** migrations, **hand-written analytical SQL** (joins, `GROUP BY`, CTEs, window functions) via `JdbcTemplate` for the reporting/TCA layer |
-| **Fixed Income trading workflows** | Bond order lifecycle, pre-trade compliance, fills, positions, transaction cost analysis |
-| **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → separate `risk-service` consumer |
-| **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
-| **Test automation (unit/integration/UI)** | 129 backend (JUnit 5, Mockito, MockMvc, jqwik, **Testcontainers**/real Postgres) + 70 Python research + **Vitest/RTL** component tests + **Playwright** E2E |
-| **Code review / clean code / TDD** | Layered design, small classes, CI on every push |
-| **Data structures & algorithms** | **CLOB matching engine** (price-time priority, `TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
-| **Numerical methods / quant** | **Yield-to-maturity solver (Newton–Raphson)**, duration, convexity, DV01, accrued interest |
-| **Real-time data / WebSockets** | Live **Coinbase** order-book feed (JDK WebSocket) → depth ladder + **paper trading against real liquidity** with genuine slippage |
-| **Quant research / Python** | `research/` — **Parquet + DuckDB** warehouse, hand-rolled econometrics (**cointegration, OU half-life**), cost-aware **backtester**, BTC/ETH **stat-arb** study with an honest (overfit-flagging) verdict |
-| **Trading strategies / TCA** | `strategy/` — **execution algos** (TWAP/POV/**Almgren–Chriss**) with implementation-shortfall TCA, and an **Avellaneda–Stoikov market maker** — live on the feed |
+A real **central limit order book (CLOB)** with strict **price-time priority** (`com.bonddesk.exchange`),
+anchored to a **live Coinbase BTC mid** so the simulation tracks real price action.
 
----
+- **Order types:** LIMIT / MARKET / IOC / FOK / post-only, cancel-replace, self-trade prevention, L2/L3
+  market data. Price levels in `TreeMap`s (best O(1) to read), each a FIFO queue for time priority;
+  integer ticks + `long` quantities keep the hot path allocation-free.
+- **Market making:** an **Avellaneda–Stoikov** maker quotes around an inventory-skewed reservation
+  price; an agent-based flow generator supplies noise makers, informed takers, and noise traders.
+- **Analytics** decompose maker P&L into **spread capture vs. adverse selection vs. inventory**, with
+  per-fill **markouts**, a sortable fill log, and **latency-by-match-depth** buckets.
 
-## Domain model
-
-- **Security** — bond reference data (CUSIP, ISIN, coupon, maturity, rating, sector,
-  clean price, restricted flag). Seeded with 12 realistic bonds (Treasuries + corporates) and the
-  **123-name equity universe** (all 11 GICS sectors) the research trades.
-- **Order** — a bond order with quantity in **par notional** and prices as **% of par**
-  (the market convention). Lifecycle: `NEW → STAGED → ROUTED → PARTIALLY_FILLED → FILLED`,
-  or `CANCELLED` / `REJECTED`. Legal transitions are encoded on the `OrderStatus` enum.
-- **Execution** — an individual fill (partial or full) reported by a venue.
-- **Position** — the desk's signed holding per (portfolio, security), maintained
-  incrementally with weighted-average cost — including the tricky **flip-through-zero** case.
-
-### Pre-trade compliance (Strategy pattern)
-
-Each rule is a Spring bean implementing `ComplianceRule`; the engine runs all of them and
-aggregates breaches, so adding a rule means adding one class:
-
-- **Restricted list** — blocks trading in flagged securities.
-- **Minimum credit rating** — blocks *buys* below the desk floor (BB-).
-- **Max order notional** — blocks oversized single orders (> $25MM).
-- **Concentration limit** — blocks orders that would over-expose a portfolio to one name.
-
-Beyond per-order compliance, an **aggregate pre-trade risk guard** (`PreTradeRiskGuard`) caps the
-book's total gross notional across all open positions (`oms.risk.max-gross-notional`, a real **$50MM**
-desk cap — kept above the bond side's $25MM/order compliance so compliant blocks still route), so live
-protection isn't limited to the backtester's kill-switches. A breach doesn't error out — the order
-is persisted as `REJECTED` with the reason, mirroring a real desk's audit trail.
-
----
-
-## Research → execution bridge (paper)
-
-The alpha research lives in Python; the live OMS is Java. They're bridged the way real desks do it —
-a **target-portfolio file**. `research/export_target_book.py` writes the beta+sector-neutral momentum
-book (weights + reference prices) to `target-book/target-book.json`; the Java **`RebalanceService`**
-reads it, sizes each weight to whole shares against a configured gross capital, **diffs vs current
-positions**, classifies each delta (incl. **short-sale** flag + an Alpaca shortability check), and
-routes the deltas through the standard `create → stage → route` lifecycle to the Alpaca **paper** venue.
-
-It is deliberately fenced: **disabled by default** (`oms.rebalance.enabled=false`, controller not even
-registered), **dry-run by default**, and gated on the **tighter** of the desk cap and a $250k
-rebalance-book cap. A dry-run on the 123-name book plans ~110 dollar-neutral delta orders (~57 long /
-~53 short, ~$100k gross); an oversized request returns `BLOCKED_RISK_LIMIT` and routes nothing.
-
-**Turnkey operational loop** (so research can iterate and the plumbing "just works") — four pieces, all
-verified live against the paper account:
-
-- **Live pricing** (`AlpacaMarketDataClient`) — batched IEX snapshots mark the book and size the
-  rebalance at real prices, not stale reference marks.
-- **Broker position reconciliation** (`PositionReconciler`) — snaps the OMS positions to Alpaca truth
-  (`GET /v2/positions`) on startup and before each auto-run, so restarts/drift/missed fills self-heal.
-- **Market-hours auto-rebalancer** (`RebalanceScheduler`) — runs the rebalance *at most once per
-  New-York trading day, only while the Alpaca clock reports the market open*; **off by default**
-  (`auto-enabled=false`), and a scheduler throw can't cancel the recurring task.
-- **Ops status** (`GET /api/equity/status`) — read-only glance at broker reachability, market hours,
-  target-book date, live-marked positions (long/short/net), risk caps, and the last run. Never 500s.
-
-The workflow: edit signals → `python export_target_book.py` → the loop trades toward the new book,
-reconciles fills, and reports health — all paper, all gated.
-
-> **This is execution-infrastructure validation, not an alpha deployment.** The research found *no*
-> statistically significant edge (Deflated Sharpe ≈0.11); the bridge and its ops loop exist to prove the
-> signal → order → fill → reconcile plumbing works end-to-end, and every layer is off/dry-run by default
-> and labeled as such in the code, the config, and the target-book file itself.
-
----
-
-## Matching engine (the exchange core)
-
-Routed orders are matched by a real **central limit order book** (`backend/.../matching/`),
-not a random fill simulator. It implements strict **price-time priority**:
-
-- Price levels in `TreeMap`s (best price O(1) to read, any level O(log n) to find); each
-  level is a FIFO `ArrayDeque` for time priority. Cancels are lazy → O(1).
-- Prices are **integer ticks** and quantities are `long`s, so the hot path does only
-  integer arithmetic — no `BigDecimal`, no per-compare allocation.
-- Handles limit/market orders, partial fills, price improvement to the aggressor, and
-  cancel; the book is a **single-threaded core** (concurrency handled by a lock per book).
-- An automated **market-maker** (`LiquidityProvider`) keeps a two-sided book in every
-  security, so the desk always trades against genuine resting liquidity. Fills flow back
-  to the OMS as Spring events, keeping the engine free of any persistence dependency.
-
-**Correctness — property-based tests (jqwik).** Hundreds of randomized order flows assert
-the invariants a real exchange depends on: the book is *never crossed*, *quantity is
-conserved* across matches, *no order ever trades through its limit*, and resting quantity
-always reconciles. (One of these caught a real modeling bug during development.)
-
-**Performance — benchmark.** Single-threaded, no I/O
-(`java -cp target/classes com.bonddesk.oms.matching.MatchingBenchmark`):
+**Benchmark** (single-threaded, in-memory; `com.bonddesk.exchange.*`, reproduce with
+`./mvnw test -Dtest=ExchangeBenchmarkTest`):
 
 ```
-throughput   : ~3,300,000 orders/sec
-latency p50  : ~150 ns      p99 : ~1.9 µs      p99.9 : ~9 µs (tail varies run-to-run)
+throughput   : ~2,160,000 orders/sec
+latency p50  : ~300 ns     p99 : ~2.2 µs     p99.9 : ~17 µs   (tail varies run-to-run)
 ```
 
-Measured on an Intel Core i5-8279U (JDK 21); throughput and p50/p99 reproduce consistently,
-the p99.9 tail is noisy. Re-run the harness above to reproduce on your own hardware.
-
-> Design note: matching now happens under the per-book lock, but fills are collected and the
-> `@Transactional` persistence runs *after* the lock is released, so the matching core never
-> blocks on DB I/O while holding the book. A production HFT path would go further and hand fills
-> to an append-only event queue; the benchmark above measures the pure in-memory core.
+*Measured on a laptop-class CPU under JDK 21; throughput and p50 reproduce consistently, the p99.9 tail
+is noisy. This is the pure in-memory core, not a networked exchange.*
 
 ---
 
-## Bond analytics (from first principles)
+## 2 · Fixed-Income Desk  (`/oms`)
 
-`backend/.../pricing/BondMath` computes fixed-income risk from discounted cash flows —
-hand-rolled to show the numerical method, not a library call:
+An electronic **order & execution management system** for bonds, plus a live **rates dealing desk** —
+the workflows a Charles River-style investment-management platform runs.
 
-- **Yield to maturity** via **Newton–Raphson** (analytic derivative, not finite-difference)
-- **Accrued interest** (30/360), clean vs. **dirty price**
-- **Macaulay & modified duration**, **convexity**, and **DV01**
-
-Exposed at `GET /api/securities/{cusip}/analytics`; covered by tests asserting
-par/discount/premium yield relationships, accrued interest, and price round-tripping.
-
----
-
-## Live market data — real Coinbase feed (capability showcase)
-
-> This platform is **fixed-income-first** (above). This module is a self-contained
-> demonstration that the order-book engine is **asset-agnostic** and can integrate a
-> **real-time exchange feed** — not a change of focus. It lives in its own `market/`
-> package and "Live Market" tab, gated by `oms.crypto.enabled`.
-
-The same order-book machinery is asset-agnostic, so a **"Live Market" module** streams the
-**real Coinbase order book** and lets the desk **paper-trade against genuine liquidity**:
-
-- A **WebSocket client** (JDK built-in — no dependency) subscribes to Coinbase Advanced
-  Trade's public `level2` (full depth) and `market_trades` channels — **no API key required**.
-- `LiveOrderBook` reconstructs each product's book from the snapshot + incremental updates;
-  a live **depth ladder**, **spread/quote**, and **trade tape** are exposed over REST.
-- **Paper trading against the live book**: a market/limit order sweeps the real resting
-  liquidity level-by-level, paying **genuine multi-level slippage** vs. the arrival mid
-  (e.g. a 1.5 BTC market order filling across ~20+ real price levels), and updates a
-  crypto position with **live mark-to-market**.
-
-This grounds the platform in **real liquidity levels and price action** — the matching
-mechanics (sweep best-first, partial fills, slippage) are identical whether the book is a
-bond CLOB or a crypto exchange. Disabled by config (`oms.crypto.enabled`) in tests/offline.
+- **Rates dealing (`com.bonddesk.rates`):** bootstraps a **discount curve from par yields**; prices
+  bonds off a **z-spread** (bisection); computes **DV01, bucketed key-rate DV01** (localizes risk and
+  sums to parallel DV01), **spread DV01, convexity, and modified/Macaulay duration**. A live **multi-dealer
+  RFQ market** — dealers quote with inventory skew and competitive shading, a **best-execution auction**
+  fills client RFQs, and **information leakage is modeled as λ·size·ln(1+n_dealers)**. Driven off a real
+  Treasury curve, re-bootstrapped each tick, with **P&L attribution into carry / curve-parallel /
+  reshaping / credit** + TCA.
+- **Cash OMS:** bond order lifecycle (`NEW → STAGED → ROUTED → PARTIALLY_FILLED → FILLED` / `CANCELLED`
+  / `REJECTED`) with a legal-transition state machine; **pluggable pre-trade compliance** (restricted
+  list, min credit rating, max notional, concentration) plus an aggregate gross-notional risk guard;
+  positions maintained with weighted-average cost (incl. the **flip-through-zero** case).
+- **Bond analytics from first principles:** YTM via **Newton–Raphson**, accrued interest (30/360),
+  clean vs. dirty price, duration / convexity / DV01 — hand-rolled to show the numerical method.
+- **Reporting / TCA in hand-written SQL** (`JdbcTemplate`): joins + conditional aggregation for the
+  desk summary, a CTE + window function for running daily volume, `v_execution_quality` view for
+  slippage-vs-benchmark. Transactional side is JPA/Hibernate; **Flyway** owns schema evolution.
 
 ---
 
-## Quant research & backtesting (Python — `research/`)
+## 3 · Quant Desk  (`/research`)
 
-On top of the live feed sits a **Python research layer** — mirroring how quant desks
-actually split things: the Java/Spring system does low-latency trading; **Python does
-research** over a columnar data warehouse. (Polyglot *for the right reason*.)
+An end-to-end **research → backtest → live** pipeline, backed by a real **Alpaca paper account**, served
+by the Python **FastAPI** quant service (`research/service`). Three tabs, one honest workflow:
 
-- **Data architecture**: raw capture is an append-only log; the analytical store is
-  **columnar Parquet (zstd, partitioned) queried with DuckDB** — candles cached as Parquet
-  so studies don't re-hit the API. (Not CSV-as-a-database.)
-- **Hand-rolled econometrics** (no statsmodels): OLS, ADF unit-root, **Engle–Granger
-  cointegration**, **Ornstein–Uhlenbeck half-life**.
-- **Honest backtester**: transaction costs + a **one-period execution lag (no look-ahead)**,
-  reporting Sharpe / drawdown / turnover / hit-rate.
-- **BTC/ETH stat-arb study** that is built to *catch itself out*: it separates an in-sample
-  cointegration **diagnostic** from a **walk-forward out-of-sample** backtest (β re-fit on a
-  trailing window, traded on the next block). On real data the pair is **not cointegrated**, and
-  the shiny in-sample Sharpe of **3.56 collapses to −0.62 out-of-sample** — the "edge" was the
-  leakage. Reported as an honest negative result, not alpha. 55 tests on synthetic data. See
-  [`research/README.md`](research/README.md).
+- **Exploration** — a live screener (most-active / movers), **server-computed technicals** (Wilder
+  RSI-14, ATR-14, SMAs, returns), a **sector-ETF rotation** heatmap, the live news feed, and a
+  **catalyst rail** (FOMC schedule + market calendar) — all off one Alpaca backbone.
+- **Backtest** — a causal, cost-aware backtester with an **anchored walk-forward out-of-sample**
+  validation and a real overfitting gauntlet: **Newey–West HAC t-stat, block-bootstrap Sharpe CI,
+  Bonferroni multiple-testing correction, and a min-detectable-Sharpe power check**. Promotion to live
+  is **gated server-side on out-of-sample survival** — the tool *rejects* strategies whose in-sample
+  edge vanishes OOS.
+- **Live Strategies** — a background engine trading the paper account, with **per-strategy P&L
+  attribution reconstructed from tagged broker order history** and an automated risk layer:
+  **volatility-targeted sizing** (risk budget ÷ asset vol), a **correlation-aware portfolio-vol cap**
+  (√wᵀΣw, which nets correlated sleeves the gross cap can't), **per-sleeve loss stops**, and a
+  **latching drawdown auto-flatten** kill switch. Disarmed by default; opt-in token auth on order control.
 
----
+Underneath sits a deeper **Python research layer** (`research/mds`): a leakage-free cross-sectional
+**factor pipeline** with purge/embargo CV, **Deflated Sharpe & PBO**, a **factor risk-model optimizer**
+(Σ = BFBᵀ + D, constrained MVO), regime timing, options structuring, and tax-aware rebalancing — see
+[`research/README.md`](research/README.md) and the write-up in [`research/RESEARCH-NOTE.md`](research/RESEARCH-NOTE.md).
 
-## Strategy engine — execution algos + market making (live, with TCA)
-
-A unified **strategy engine** (`backend/.../strategy/`) runs trading strategies against the
-live Coinbase feed, covering **both sides of the market** with shared P&L / TCA plumbing:
-
-- **Execution algorithms (taker)** — **TWAP**, **POV** (percentage-of-volume), and
-  **Almgren–Chriss** optimal execution (risk-averse, front-loaded `sinh` trajectory). Each
-  works a parent order down over time, sweeping the real book with a one-tick lag, and
-  reports **implementation shortfall (bps) vs. the arrival mid** — the best-execution story.
-- **Market making (maker)** — an **Avellaneda–Stoikov** market maker: quotes are centred on
-  an **inventory-skewed reservation price** with an optimal spread, and get filled when a
-  **real trade prints through them**. Tracks inventory, spread capture and live P&L — the
-  sell-side story.
-- **Shared core** — `PnlBook` (average-cost, realized/unrealized, flip-through-zero),
-  `MarketState` (rolling volatility + recent volume), a 500 ms `StrategyRunner`, and a REST
-  API + a **"Strategies" UI tab** to launch runs and watch P&L / inventory / quotes /
-  shortfall live. 9 unit tests.
-
-Verified live: a TWAP buy filled across 14 real book levels (**−0.38 bps** shortfall); the
-Avellaneda–Stoikov maker took real fills on ETH and accrued inventory with live P&L.
+> **Honest by design.** The live strategies are simple (MA-crossover / momentum) *machinery
+> demonstrations*, not alpha — and the walk-forward correctly refuses them on real crypto because taker
+> fees eat the edge. The achievement is the pipeline that won't let you deploy an overfit strategy.
 
 ---
 
 ## Running it
 
-### Option A — Local dev (needs only a JDK 21 and Node 20)
-
-```bash
-# 1) OMS backend (in-memory H2, CLOB matching engine + market-maker on) → :8080
-cd backend && ./mvnw spring-boot:run
-
-# 2) Trader UI (Vite dev server, proxies /api to :8080) → :5173
-cd frontend && npm install && npm run dev
-```
-
-Open **http://localhost:5173** — stage an order, click **Stage → Route**, and watch the
-matching engine fill it against the market-maker's book and build your position. API docs at
-**http://localhost:8080/swagger-ui.html**.
-
-### Option B — Full stack with Docker Compose (Postgres + Kafka + risk service)
+### Full stack — Docker Compose
 
 ```bash
 docker compose up --build
@@ -303,116 +155,97 @@ docker compose up --build
 
 | Service | URL |
 |---|---|
-| Trader UI | http://localhost:8088 |
+| Landing hub / all three apps | http://localhost:8088 |
 | OMS API / Swagger | http://localhost:8080/swagger-ui.html |
-| Risk summary | http://localhost:8081/api/risk/summary |
+| Risk summary (risk-service) | http://localhost:8081/api/risk/summary |
+| Quant Desk API (research-service) | http://localhost:8082/api/research/health |
 
-### Option C — Kubernetes
+The **Quant Desk's Live tab is optional** and self-gates: with no Alpaca keys it shows a "connect
+Alpaca" state; supply paper-trading keys to light it up (see below). The Exchange (Coinbase) and
+Fixed-Income (US Treasury curve) feeds are **keyless**.
+
+**Alpaca keys (optional, for the Quant Desk live/market features):** copy `.env.example` → `.env` at the
+repo root and fill in a free **Alpaca paper** key/secret. `.env` and `alpaca-local.yml` are gitignored
+and never committed.
+
+### Kubernetes
 
 ```bash
-# build & load images (e.g. into kind/minikube), then:
-kubectl apply -f k8s/
+kubectl apply -f k8s/          # namespace, postgres, kafka, backend, risk-service, frontend
 kubectl -n bonddesk get pods
 ```
-
----
-
-## API reference (OMS backend)
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/securities` | List bonds (reference data) |
-| `GET` | `/api/securities/{cusip}/analytics` | Bond analytics: YTM, accrued, duration, convexity, DV01 |
-| `GET` | `/api/orders` | The blotter (filter by `?status=` or `?portfolio=`) |
-| `POST` | `/api/orders` | Stage a new order (runs compliance) |
-| `POST` | `/api/orders/{ref}/stage` | Release order (`NEW → STAGED`) |
-| `POST` | `/api/orders/{ref}/route` | Route to venue (`STAGED → ROUTED`) |
-| `POST` | `/api/orders/{ref}/fills` | Report a fill |
-| `POST` | `/api/orders/{ref}/cancel` | Cancel a working order |
-| `POST` | `/api/equity/rebalance` | Rebalance the equity book toward the research target (dry-run by default; disabled by default) |
-| `GET` | `/api/equity/status` | Ops status of the paper-trading loop: broker/market/positions (live-marked)/last run |
-| `GET` | `/api/portfolios/{portfolio}/positions` | Positions with mark-to-market |
-| `GET` | `/api/analytics/desk-summary` | Order counts, fill rate, filled notional (aggregate SQL) |
-| `GET` | `/api/analytics/execution-quality` | TCA: avg fill vs. benchmark, slippage (bps) by security/side |
-| `GET` | `/api/analytics/top-securities?limit=` | Highest-volume securities |
-| `GET` | `/api/analytics/daily-volume` | Daily volume + running total (window function) |
-| `GET` | `/api/market/products` | Live Coinbase quotes (best bid/ask, spread, last) |
-| `GET` | `/api/market/{product}/book` | Live depth ladder (real order book) |
-| `GET` | `/api/market/{product}/trades` | Real trade tape |
-| `GET` | `/api/market/{product}/microstructure` | Rolling signals: imbalance, microprice premium, spread |
-| `POST` | `/api/market/{product}/orders` | Paper-trade against the live book (VWAP + slippage) |
-| `GET` | `/api/market/positions` | Crypto positions with live mark-to-market |
-| `POST` | `/api/strategies` | Launch a strategy (TWAP/POV/Almgren–Chriss or Avellaneda–Stoikov) |
-| `GET` | `/api/strategies` | Strategy runs with live P&L / inventory / TCA |
-| `POST` | `/api/strategies/{id}/stop` | Stop a running strategy |
-| `GET` | `/api/risk/summary` | *(risk-service :8081)* Desk risk aggregated from events |
-
----
-
-## SQL & the reporting layer
-
-The **transactional** side (orders, fills, positions) is persisted through JPA/Hibernate.
-The **reporting** side is deliberately written in **hand-crafted SQL** via `JdbcTemplate`
-(`AnalyticsService`) — a realistic split that keeps analytical queries explicit and tunable:
-
-- **Joins + aggregation** across `orders`, `execution`, and `security` for transaction cost analysis
-- **Conditional aggregation** (`CASE WHEN …`) for the one-pass desk summary / fill-rate
-- **A CTE + window function** (`SUM(…) OVER (ORDER BY day)`) for daily volume with a running total
-- **`GROUP BY … ORDER BY … LIMIT`** for top-volume securities
-- **Flyway** owns schema evolution: `V1__schema.sql` (tables) and `V2__analytics.sql`
-  (supporting indexes + a `v_execution_quality` reporting **view**)
-
-All analytical SQL is written to run unchanged on **PostgreSQL** (prod) and **H2** in
-PostgreSQL-compatibility mode (dev/test), and is covered by integration tests.
 
 ---
 
 ## Testing
 
 ```bash
-cd backend      && ./mvnw test         # 105 tests (unit + integration; integration needs Docker)
-cd risk-service && ./mvnw test         #  3 tests
-cd frontend     && npm test            #  8 component tests (Vitest + RTL)
-cd frontend     && npm run test:e2e    #  Playwright E2E (needs the stack running)
+cd backend      && ./mvnw test        # 165 tests — matching engine (jqwik property invariants),
+                                      #   rates engine, dealer market, bond math, compliance, state
+                                      #   machine, HTTP layer (MockMvc), idempotent risk aggregation;
+                                      #   integration tests use real PostgreSQL via Testcontainers
+cd risk-service && ./mvnw test        # Kafka-consumer risk aggregation
+cd research     && python -m pytest   # 155 tests — walk-forward lab, live-engine fake-broker harness
+                                      #   (arm/kill/flatten/drawdown), risk math, microstructure, factors
+cd frontend     && npm test           # Vitest + RTL component tests
+cd frontend     && npm run test:e2e   # Playwright E2E (needs the stack running)
 ```
 
-**Backend** — the **matching engine** (unit + jqwik property invariants), the order-status
-**state machine**, the **weighted-average cost** logic, the **bond math** (YTM / duration /
-convexity / accrued), the **compliance** rules, the full **HTTP layer** (MockMvc: validation
-400s, compliance 201-REJECTED, lifecycle, 404/409/CORS), and **idempotent** risk aggregation.
-Integration tests run against a **real PostgreSQL via Testcontainers** (exercising the actual
-Flyway migrations + Hibernate `validate`), not H2 — pass `-Dtest.postgres.url=...` to target an
-existing database instead.
+**300+ automated tests** across the stack. The live-engine tests drive the money path through a
+**fake broker** (order submission, kill switch, per-sleeve stops, drawdown auto-flatten) with no live
+API; the backend integration tests run against a **real PostgreSQL via Testcontainers**.
 
-**Frontend** — **Vitest + React Testing Library** component tests (order ticket validation +
-compliance-reject banner, blotter rendering + lifecycle actions), plus a **Playwright** E2E
-that drives stage → route → fill through the real UI and API. All wired into CI.
+---
+
+## How this maps to a Fixed-Income engineering role
+
+| Requirement | Where it lives |
+|---|---|
+| **Fixed-income trading workflows** | Rates dealing desk (RFQ, curve, DV01/key-rate risk), bond order lifecycle, compliance, positions, TCA |
+| **Java** backend APIs | `backend/` — Spring Boot 3.3, Java 21; REST + WebSocket |
+| **JavaScript/TypeScript + React** | `frontend/` — React 18 + TS 5 + Vite, three routed apps |
+| **Relational databases (SQL)** | PostgreSQL, **Flyway** migrations, hand-written analytical SQL (joins, `GROUP BY`, CTEs, window functions) via `JdbcTemplate` |
+| **Kafka / event-driven / microservices** | `OrderEvent` → Kafka → independent `risk-service` consumer; a separate Python quant service |
+| **Docker & Kubernetes** | Multi-stage `Dockerfile`s, `docker-compose.yml`, `k8s/` manifests |
+| **Test automation / TDD / code review** | 300+ tests (JUnit 5, Mockito, MockMvc, jqwik, Testcontainers, pytest, Vitest, Playwright); CI on every push |
+| **Data structures & algorithms** | CLOB order book (`TreeMap` levels + FIFO queues), state machine, weighted-average cost, streaming aggregation |
+| **Numerical methods** | Newton–Raphson YTM, curve bootstrap, DV01/key-rate/convexity, covariance/portfolio-vol math |
 
 ---
 
 ## Project structure
 
 ```
-bonddesk-oms/
-├── backend/            # Spring Boot OMS
-│   └── src/main/java/com/bonddesk/oms/
-│       ├── matching/   #   CLOB matching engine, market-maker, benchmark
-│       ├── pricing/    #   bond math (YTM, duration, convexity, DV01)
-│       ├── analytics/  #   raw-SQL reporting / TCA
-│       ├── compliance/ #   pluggable pre-trade rules
-│       └── ...         #   domain, services, controllers, events, Flyway
-├── risk-service/       # Spring Boot Kafka consumer: desk-risk aggregation microservice
-├── frontend/           # React + TypeScript trader UI (Vite)
-├── k8s/                # Kubernetes manifests (namespace, pg, kafka, services, ingress)
-├── docker-compose.yml  # One-command full stack
-└── .github/workflows/  # CI: build + test all three services, build images
+├── backend/              # Spring Boot (:8080)
+│   └── src/main/java/com/bonddesk/
+│       ├── exchange/     #   standalone CLOB matching engine + market maker
+│       ├── rates/        #   curve bootstrap, bond math, dealer/RFQ market
+│       └── oms/          #   cash OMS: lifecycle, compliance, matching, market data,
+│                         #   strategy, analytics/TCA, tax, wiring for exchange + rates
+├── risk-service/         # Spring Boot Kafka consumer — desk-risk aggregation (:8081)
+├── research/             # Python quant layer
+│   ├── service/          #   FastAPI Quant Desk — Alpaca client, live engine, walk-forward lab, risk (:8082)
+│   ├── mds/              #   research modules — factors, risk model, microstructure, validation
+│   └── tests/            #   155 pytest tests
+├── frontend/             # React + TypeScript — landing hub + three apps (:8088 via nginx)
+├── k8s/                  # Kubernetes manifests
+├── docker-compose.yml    # One-command full stack
+└── .github/workflows/    # CI: build + test all services
 ```
 
 ---
 
 ## Tech stack
 
-**Backend:** Java 21 · Spring Boot 3.3 (Web, Data JPA, Validation, Actuator) · Spring Kafka ·
-Hibernate · Flyway · PostgreSQL / H2 · springdoc-openapi · JUnit 5 · Mockito · AssertJ · Maven
-**Frontend:** React 18 · TypeScript 5 · Vite 5
-**Infra:** Docker (multi-stage) · Docker Compose · Kubernetes · GitHub Actions · nginx
+**Backend:** Java 21 · Spring Boot 3.3 (Web, Data JPA, Validation, Kafka, Actuator) · Hibernate · Flyway ·
+PostgreSQL / H2 · springdoc-openapi · JUnit 5 · Mockito · jqwik · Testcontainers · Maven
+**Quant service:** Python 3.12 · FastAPI · NumPy · pandas · pytest
+**Frontend:** React 18 · TypeScript 5 · Vite · Vitest / RTL · Playwright
+**Infra:** Docker (multi-stage) · Docker Compose · Kubernetes · Apache Kafka · GitHub Actions · nginx
+
+---
+
+*Scope & honesty: the matching-engine throughput is an in-memory single-threaded microbenchmark; the
+order flow and dealer market are agent-based simulations anchored to real prices; the Quant Desk trades
+a paper account and its bundled strategies are machinery demonstrations, not validated alpha. Each is
+labeled as such in the code and docs.*
