@@ -14,6 +14,7 @@
 ![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-event--driven-231F20)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
+![Observability](https://img.shields.io/badge/observability-Prometheus%20%2B%20Grafana-E6522C)
 ![Tests](https://img.shields.io/badge/tests-320%2B%20passing-brightgreen)
 ![Matching engine](https://img.shields.io/badge/matching%20engine-~2.1M%20ord%2Fs-blueviolet)
 
@@ -159,6 +160,8 @@ docker compose up --build
 | OMS API / Swagger | http://localhost:8080/swagger-ui.html |
 | Risk summary (risk-service) | http://localhost:8081/api/risk/summary |
 | Quant Desk API (research-service) | http://localhost:8082/api/research/health |
+| Prometheus | http://localhost:9090 |
+| Grafana (admin / admin) | http://localhost:3000 |
 
 The **Quant Desk's Live tab is optional** and self-gates: with no Alpaca keys it shows a "connect
 Alpaca" state; supply paper-trading keys to light it up (see below). The Exchange (Coinbase) and
@@ -173,6 +176,33 @@ and never committed.
 ```bash
 kubectl apply -f k8s/          # namespace, postgres, kafka, backend, risk-service, frontend
 kubectl -n bonddesk get pods
+```
+
+---
+
+## Monitoring & observability
+
+Every service is instrumented for production-style monitoring, and the compose stack ships a
+**Prometheus + Grafana** pair that scrapes and visualizes them out of the box.
+
+- **Health** — Spring Boot Actuator `/actuator/health` with **custom component indicators**: a
+  `matchingEngine` check (UP only when the book is live and accepting orders — reports accepted
+  orders, trades, throughput) and a `marketDataFeed` check (UP while the Coinbase feed is fresh,
+  DOWN if it goes stale) alongside the built-in db / disk / ping checks.
+- **Metrics** — Micrometer exposes `/actuator/prometheus` (JVM, HTTP latency/throughput) plus
+  **custom domain metrics** from the matching engine: `exchange_orders_accepted_total`,
+  `exchange_trades_total`, `exchange_throughput_orders_per_second`, and `exchange_latency_p50/p99_nanos`.
+  The Python Quant Desk exposes `/metrics` too, so all services land on one dashboard.
+- **Tracing** — a `CorrelationIdFilter` tags every request (from `X-Correlation-ID` or a fresh UUID),
+  puts it in the SLF4J MDC so **every log line for a request carries the id**, and echoes it back on
+  the response — the basis for request tracing across services.
+- **Dashboards** — Grafana auto-provisions the Prometheus datasource and a **"BondDesk — Platform
+  Overview"** dashboard (engine throughput, match latency, trades/sec, JVM heap, HTTP request rate)
+  on first boot. Open http://localhost:3000 (admin / admin).
+
+```bash
+curl localhost:8080/actuator/health      # component-level UP/DOWN with details
+curl localhost:8080/actuator/prometheus  # scrape target (custom + JVM/HTTP metrics)
 ```
 
 ---
@@ -241,6 +271,7 @@ API; the backend integration tests run against a **real PostgreSQL via Testconta
 PostgreSQL / H2 · springdoc-openapi · JUnit 5 · Mockito · jqwik · Testcontainers · Maven
 **Quant service:** Python 3.12 · FastAPI · NumPy · pandas · pytest
 **Frontend:** React 18 · TypeScript 5 · Vite · Vitest / RTL · Playwright
+**Observability:** Spring Boot Actuator · Micrometer · Prometheus · Grafana
 **Infra:** Docker (multi-stage) · Docker Compose · Kubernetes · Apache Kafka · GitHub Actions · nginx
 
 ---

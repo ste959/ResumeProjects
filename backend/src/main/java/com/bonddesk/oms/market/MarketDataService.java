@@ -25,9 +25,15 @@ public class MarketDataService {
     private final Map<String, Deque<TradePrint>> tapes = new ConcurrentHashMap<>();
     private final Map<String, BigDecimal> lastPrice = new ConcurrentHashMap<>();
     private final AtomicLong tradeSeq = new AtomicLong();
+    private volatile Instant lastUpdate;   // last time the live feed delivered a trade (feed-liveness health)
 
     public MarketDataService(CoinbaseProperties props) {
         this.props = props;
+    }
+
+    /** When the live feed last delivered data (null if it has never connected — feed off/offline). */
+    public Instant lastUpdate() {
+        return lastUpdate;
     }
 
     public LiveOrderBook book(String product) {
@@ -41,6 +47,7 @@ public class MarketDataService {
     public void recordTrade(String product, BigDecimal price, BigDecimal size, String side, Instant time) {
         TradePrint print = new TradePrint(tradeSeq.incrementAndGet(), product, price, size, side, time);
         lastPrice.put(product, price);
+        lastUpdate = Instant.now();
         Deque<TradePrint> tape = tapes.computeIfAbsent(product, k -> new ArrayDeque<>());
         synchronized (tape) {
             tape.addFirst(print);

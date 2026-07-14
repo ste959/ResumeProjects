@@ -49,10 +49,25 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
+      show-components: always
+  health:
+    diskspace:
+      enabled: true
+  metrics:
+    tags:
+      application: bonddesk-oms
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: BondDesk OMS
+    description: Exchange + fixed-income desk + OMS (Spring Boot)
 
 springdoc:
   swagger-ui:
@@ -119,3 +134,6 @@ logging:
   level:
     com.bonddesk.oms: INFO
     order-events: INFO
+  # Prefix every log line with the request's correlation id (set by CorrelationIdFilter; empty off-request).
+  pattern:
+    level: "%5p [%X{correlationId:-}]"

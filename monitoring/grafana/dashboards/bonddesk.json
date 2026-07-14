@@ -1,0 +1,80 @@
+{
+  "id": null,
+  "uid": "bonddesk-overview",
+  "title": "BondDesk — Platform Overview",
+  "tags": ["bonddesk"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Matching engine — throughput (orders/sec)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "exchange_throughput_orders_per_second", "legendFormat": "orders/sec" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Matching engine — submit latency (ns)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ns" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "exchange_latency_p50_nanos", "legendFormat": "p50" },
+        { "refId": "B", "expr": "exchange_latency_p99_nanos", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Trades matched / sec",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(exchange_trades_total[1m])", "legendFormat": "trades/sec" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Orders accepted (cumulative)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "exchange_orders_accepted_total", "legendFormat": "orders" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "JVM heap used — by service",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(jvm_memory_used_bytes{area=\"heap\"}) by (application)", "legendFormat": "{{application}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "HTTP request rate — by service",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (application)", "legendFormat": "{{application}}" }
+      ]
+    }
+  ]
+}

@@ -168,6 +168,25 @@ public class ExchangeSimulation {
         }
     }
 
+    // ── observability accessors (metrics gauges + health indicator) ─────────────────────────────
+    /** Cumulative orders accepted by the book (monotonic — a benign single-long read). */
+    public long acceptedOrders() { return book.orderCount(); }
+    /** Cumulative trades matched (monotonic). */
+    public long trades() { return book.tradeCount(); }
+    public double ordersPerSec() { return ordersPerSec; }
+    public long p50LatencyNanos() { return p50LatencyNs; }
+    public long p99LatencyNanos() { return p99LatencyNs; }
+
+    /** True if the engine has a live two-sided book — read under the engine lock to avoid racing the tick. */
+    public boolean twoSided() {
+        lock.lock();
+        try {
+            return book.bestBid() != null && book.bestAsk() != null;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     // ── fair price (anchored to real BTC when the feed is live) ─────────────────────────────────
     private void evolveFair() {
         Long real = realMidTicks();

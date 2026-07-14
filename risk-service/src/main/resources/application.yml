@@ -21,7 +21,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  metrics:
+    tags:
+      application: risk-service
 
 oms:
   kafka:
@@ -30,3 +37,5 @@ oms:
 logging:
   level:
     com.bonddesk.risk: INFO
+  pattern:
+    level: "%5p [%X{correlationId:-}]"

@@ -24,6 +24,14 @@ app = FastAPI(title="BondDesk Research Service", version="1.0.0",
 # The fresh Quant Desk surface (Alpaca-backed research → backtest → live).
 app.include_router(desk_router)
 
+# Prometheus scrape endpoint (/metrics) — request rate/latency, so this service sits on the same
+# Grafana dashboard as the Java services. Optional: skipped cleanly if the instrumentator isn't present.
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+except Exception:  # noqa: BLE001 — metrics are non-essential; never block startup
+    pass
+
 
 @app.on_event("startup")
 def _start_engine() -> None:
