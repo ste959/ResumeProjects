@@ -54,11 +54,16 @@ def ewma_cov(returns: np.ndarray, halflife: float = 63.0) -> np.ndarray:
     persistent and regime-dependent, so a flat sample cov over 6 years is stale). Mean-subtracted
     with the same weights."""
     R = np.atleast_2d(np.asarray(returns, dtype=float))
-    T = R.shape[0]
+    T, k = R.shape
+    if T < 2:                                       # can't estimate covariance from <2 rows
+        return np.eye(k) * 1e-8                      # tiny PD floor rather than a NaN matrix (1 - Σw² = 0)
     w = _ewma_weights(T, halflife)
+    denom = 1.0 - np.sum(w ** 2)                     # reliability-weighted normalization
+    if denom <= 1e-12:                              # weights too concentrated to normalize — fall back
+        return np.diag(np.var(R, axis=0)) + np.eye(k) * 1e-12
     mu = w @ R
     dev = R - mu
-    return (dev * w[:, None]).T @ dev / (1.0 - np.sum(w ** 2))   # reliability-weighted normalization
+    return (dev * w[:, None]).T @ dev / denom
 
 
 def ewma_var(residuals: np.ndarray, halflife: float = 63.0, floor: float = 1e-8) -> np.ndarray:

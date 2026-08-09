@@ -81,3 +81,23 @@ def test_study_covers_all_methods_plus_benchmark():
     names = {row["method"] for row in s["results"]}
     assert {"risk_parity", "min_variance", "max_sharpe", "risk_parity_taa", "60/40"} <= names
     assert all("sharpe" in row and "max_drawdown" in row for row in s["results"])
+
+
+def test_study_runs_the_selection_aware_gauntlet():
+    g = aa.study(_synthetic_prices(), cost_bps=10.0)["gauntlet"]
+    # the study must report multiple-testing / overfitting / power stats, not just raw Sharpes
+    for k in ("best", "bonferroni_t", "deflated_sharpe", "pbo", "min_detectable_sharpe", "n_strategies"):
+        assert k in g
+    assert g["n_strategies"] == 7 and 0.0 <= g["pbo"] <= 1.0
+
+
+def test_optimizers_dont_blow_up_on_ill_conditioned_cov():
+    # Two near-duplicate assets → a near-singular covariance. Naive MVO error-maximizes into one name;
+    # the shrinkage + convergence fallback must still return valid long-only weights (sum 1, no NaN).
+    rng = np.random.default_rng(1)
+    base = rng.standard_normal((300, 1)) * 0.01
+    R = np.hstack([base, base + rng.standard_normal((300, 1)) * 1e-6, rng.standard_normal((300, 3)) * 0.01])
+    df = pd.DataFrame(R)
+    shrunk = aa._shrink_cov(df)
+    for w in (aa.min_variance(shrunk), aa.max_sharpe(df.mean().to_numpy() * aa.TRADING_DAYS, shrunk)):
+        assert np.all(np.isfinite(w)) and abs(w.sum() - 1.0) < 1e-6 and (w >= -1e-9).all()

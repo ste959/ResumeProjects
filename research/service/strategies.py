@@ -209,7 +209,10 @@ def attribute(fills_by_strategy: dict[str, dict[str, list[dict]]],
             realized += b["realized"]
             real_total = float((real_by_symbol.get(sym) or {}).get("qty", 0.0))
             s = tagged_sum.get(sym, 0.0)
-            scale = (real_total / s) if s != 0 else 0.0          # split the real position pro-rata
+            # Split the real position pro-rata by tagged qty. Guard a *near-zero* denominator (not just
+            # exact 0): if two strategies ever held offsetting tagged positions that net to ~0, dividing
+            # by it would explode every strategy's reconciled qty — treat as unattributable instead.
+            scale = (real_total / s) if abs(s) > 1e-9 else 0.0
             qty = b["qty"] * scale                                # this strategy's reconciled holding
             mark = marks.get(sym)
             # Unrealized is the *liquidation* value: mark net of the exit fee you'd pay to close, so the

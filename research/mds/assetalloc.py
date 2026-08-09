@@ -16,11 +16,28 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from scipy import stats as sstats
 from scipy.optimize import minimize
 
 from . import validation as val
 
 TRADING_DAYS = 252
+
+
+def _shrink_cov(returns: pd.DataFrame) -> np.ndarray:
+    """Annualized covariance with **Ledoit-Wolf shrinkage** — keeps the mean-variance optimizers from
+    error-maximizing on a noisy, ill-conditioned sample covariance (a short window over correlated
+    assets). Falls back to a fixed-intensity shrink toward the average-variance diagonal if sklearn
+    is unavailable."""
+    R = np.asarray(returns, dtype=float)
+    try:
+        from sklearn.covariance import LedoitWolf
+        cov = LedoitWolf().fit(R).covariance_
+    except Exception:  # noqa: BLE001 — degrade gracefully to a fixed-λ shrink
+        s = np.atleast_2d(np.cov(R, rowvar=False))
+        avg = float(np.mean(np.diag(s)))
+        cov = 0.7 * s + 0.3 * avg * np.eye(s.shape[0])
+    return np.asarray(cov) * TRADING_DAYS
 
 # A diversified asset-class proxy universe (liquid ETFs). 60/40 benchmark = SPY / IEF.
 UNIVERSE = {
@@ -65,14 +82,15 @@ def risk_parity(cov: np.ndarray, iters: int = 1000, tol: float = 1e-10) -> np.nd
 
 
 def min_variance(cov: np.ndarray) -> np.ndarray:
-    """Long-only minimum-variance portfolio (sum to 1), solved with SLSQP."""
+    """Long-only minimum-variance portfolio (sum to 1), solved with SLSQP. Falls back to inverse-vol
+    if the optimizer fails to converge (rather than trusting a non-converged `res.x`)."""
     cov = np.asarray(cov, float)
     n = len(cov)
     res = minimize(lambda w: w @ cov @ w, np.ones(n) / n, method="SLSQP",
                    bounds=[(0.0, 1.0)] * n,
                    constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1.0}],
                    options={"maxiter": 500, "ftol": 1e-12})
-    return _clean_weights(res.x, n)
+    return _clean_weights(res.x, n) if res.success else inverse_vol(cov)
 
 
 def max_sharpe(mu: np.ndarray, cov: np.ndarray) -> np.ndarray:
@@ -90,7 +108,7 @@ def max_sharpe(mu: np.ndarray, cov: np.ndarray) -> np.ndarray:
                    bounds=[(0.0, 1.0)] * n,
                    constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1.0}],
                    options={"maxiter": 500, "ftol": 1e-12})
-    return _clean_weights(res.x, n)
+    return _clean_weights(res.x, n) if res.success else inverse_vol(cov)
 
 
 def _clean_weights(w: np.ndarray, n: int) -> np.ndarray:
@@ -125,7 +143,12 @@ def momentum_tilt(base_w: np.ndarray, mom: np.ndarray, strength: float = 0.5) ->
 
 # ── Walk-forward backtest ─────────────────────────────────────────────────────────────────────────
 def _weights_for(method: str, window: pd.DataFrame, prices_to_t: pd.DataFrame, mom_lookback: int) -> np.ndarray:
-    cov = window.cov().to_numpy() * TRADING_DAYS
+    # The mean-variance solvers get a Ledoit-Wolf-shrunk covariance (they're the ones that blow up on
+    # a raw, ill-conditioned sample cov); risk parity / inverse-vol are robust to the raw estimate.
+    if method in ("min_variance", "max_sharpe"):
+        cov = _shrink_cov(window)
+    else:
+        cov = window.cov().to_numpy() * TRADING_DAYS
     n = cov.shape[0]
     if method == "equal":
         return equal_weight(n)
@@ -149,37 +172,46 @@ def backtest(prices: pd.DataFrame, method: str = "risk_parity", lookback: int = 
     rets = prices.pct_change().dropna()
     dates = rets.index
     n = rets.shape[1]
-    w_prev = np.zeros(n)
+    w_drift = np.zeros(n)                             # holdings carried in from the previous block (drifted)
     net = pd.Series(0.0, index=dates)
     for t in range(lookback, len(rets), rebalance):
         window = rets.iloc[t - lookback:t]
         w = _weights_for(method, window, prices.iloc[: t + 1], mom_lookback)
-        block = rets.iloc[t:t + rebalance]
-        port = block.to_numpy() @ w
-        turn = float(np.abs(w - w_prev).sum())
+        block = rets.iloc[t:t + rebalance].to_numpy()
+        port = block @ w
+        turn = float(np.abs(w - w_drift).sum())      # trade = new target vs. what we actually still hold
         if len(port):
             port[0] -= turn * cost_bps / 1e4         # charge turnover cost on the rebalance day
             net.iloc[t:t + len(port)] = port
-        w_prev = w
+        w_drift = _drift(w, block)                    # let the new weights drift with returns over the block
     net = net.iloc[lookback:]
     return {"method": method, **_stats(net), "net": net}
+
+
+def _drift(w: np.ndarray, block: np.ndarray) -> np.ndarray:
+    """Weights after holding through a block of returns — so the NEXT rebalance's turnover is measured
+    against what's actually held, not the stale target (a static book still pays drift-correction cost)."""
+    grown = w * np.prod(1.0 + block, axis=0)
+    s = grown.sum()
+    return grown / s if s > 0 else w
 
 
 def sixty_forty(prices: pd.DataFrame, eq: str = "SPY", bond: str = "IEF",
                 lookback: int = 252, rebalance: int = 21, cost_bps: float = 10.0) -> dict:
     """Static 60/40 (equities/bonds), rebalanced on the same schedule — the benchmark to beat."""
     sub = prices[[eq, bond]]
-    w = np.array([0.60, 0.40])
+    target = np.array([0.60, 0.40])
     rets = sub.pct_change().dropna()
     net = pd.Series(0.0, index=rets.index)
-    w_prev = np.zeros(2)
+    w_drift = np.zeros(2)
     for t in range(lookback, len(rets), rebalance):
-        block = rets.iloc[t:t + rebalance]
-        port = block.to_numpy() @ w
+        block = rets.iloc[t:t + rebalance].to_numpy()
+        port = block @ target
         if len(port):
-            port[0] -= float(np.abs(w - w_prev).sum()) * cost_bps / 1e4
+            # rebalancing back to 60/40 trades against the drifted holdings — a real, non-zero cost
+            port[0] -= float(np.abs(target - w_drift).sum()) * cost_bps / 1e4
             net.iloc[t:t + len(port)] = port
-        w_prev = w
+        w_drift = _drift(target, block)
     net = net.iloc[lookback:]
     return {"method": "60/40", **_stats(net), "net": net}
 
@@ -190,24 +222,52 @@ def _stats(net: pd.Series, ppy: int = TRADING_DAYS) -> dict:
     if len(r) < 8 or r.std() == 0:
         return {"ann_return": 0.0, "ann_vol": 0.0, "sharpe": 0.0, "hac_t": 0.0,
                 "boot_lo": 0.0, "boot_hi": 0.0, "max_drawdown": 0.0, "n_days": len(r)}
-    ann_ret = float(np.prod(1 + r) ** (ppy / len(r)) - 1)
+    prod = float(np.prod(1 + r))
+    ann_ret = float(prod ** (ppy / len(r)) - 1) if prod > 0 else -1.0   # undefined if the book is wiped out
     ann_vol = float(r.std() * np.sqrt(ppy))
     sharpe = float(r.mean() / r.std() * np.sqrt(ppy))
     hac_t = float(val.newey_west_sharpe_tstat(r))
     lo, hi = val.block_bootstrap_sharpe_ci(r, ppy=ppy)
     equity = np.cumprod(1 + r)
     peak = np.maximum.accumulate(equity)
-    max_dd = float((equity / peak - 1).min())
+    max_dd = float(np.where(peak > 0, equity / peak - 1.0, 0.0).min())
     return {"ann_return": round(ann_ret, 4), "ann_vol": round(ann_vol, 4), "sharpe": round(sharpe, 3),
             "hac_t": round(hac_t, 2), "boot_lo": round(float(lo), 2), "boot_hi": round(float(hi), 2),
             "max_drawdown": round(max_dd, 4), "n_days": len(r)}
 
 
 def study(prices: pd.DataFrame, cost_bps: float = 10.0, lookback: int = 252, rebalance: int = 21) -> dict:
-    """Run every allocator + the 60/40 benchmark and return their walk-forward stats, side by side."""
+    """Run every allocator + the 60/40 benchmark, then apply the same selection-aware gauntlet as the
+    rest of the research — because backtesting 7 strategies on one sample IS multiple testing."""
     methods = ["equal", "inverse_vol", "risk_parity", "min_variance", "max_sharpe", "risk_parity_taa"]
     rows = [backtest(prices, m, lookback, rebalance, cost_bps) for m in methods]
     rows.append(sixty_forty(prices, lookback=lookback, rebalance=rebalance, cost_bps=cost_bps))
+    nets = {r["method"]: r["net"] for r in rows}
+    gauntlet = _gauntlet(nets)
     for r in rows:
         r.pop("net", None)
-    return {"assets": list(prices.columns), "cost_bps": cost_bps, "results": rows}
+    return {"assets": list(prices.columns), "cost_bps": cost_bps, "results": rows, "gauntlet": gauntlet}
+
+
+def _gauntlet(nets: dict) -> dict:
+    """Selection-aware honesty on the strategy SET: PBO across all of them, the Deflated Sharpe of the
+    best (deflated for having tried this many), the multiple-testing t-bar, and the min-detectable
+    Sharpe — is the sample even powered to distinguish these from luck?"""
+    mat = pd.DataFrame(nets).dropna()               # T × M aligned net-return matrix
+    n, m = mat.shape
+    pp = mat.mean() / mat.std(ddof=0)               # per-period Sharpe of each strategy
+    best = str(pp.idxmax())
+    r_best = mat[best].to_numpy()
+    dsr = float(val.deflated_sharpe(float(pp[best]), n, float(sstats.skew(r_best)),
+                                    float(sstats.kurtosis(r_best, fisher=False)),  # non-excess kurtosis
+                                    m, float(np.var(pp.to_numpy(), ddof=1))))
+    return {
+        "best": best,
+        "best_sharpe_ann": round(float(pp[best]) * np.sqrt(TRADING_DAYS), 3),
+        "best_hac_t": round(float(val.newey_west_sharpe_tstat(r_best)), 2),
+        "bonferroni_t": round(float(val.bonferroni_z(m)), 2),
+        "deflated_sharpe": round(dsr, 3),
+        "pbo": round(float(val.pbo(mat.to_numpy())["pbo"]), 3),
+        "min_detectable_sharpe": round(float(val.min_detectable_sharpe(n, ppy=TRADING_DAYS)), 2),
+        "n_strategies": m, "n_days": n,
+    }

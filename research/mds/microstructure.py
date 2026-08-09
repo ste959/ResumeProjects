@@ -149,11 +149,14 @@ def study(n: int = 40_000, ic: float = 0.10, ret_vol_bps: float = 2.0,
     gross = event_driven_backtest(panel, sig, 0.0)
 
     verdict = (
-        f"Order-flow imbalance is genuinely predictive (1-step IC {realized_ic:+.3f}, gross Sharpe "
-        f"{gross['gross_sharpe']:.1f}), but it is only tradable below ~{breakeven if breakeven is not None else '>'} bps "
-        f"round-trip cost. At a realistic {rep_cost} bps the net Sharpe is {rep['net_sharpe']:.1f} "
-        f"(HAC t {hac_t:+.1f}). The signal is real; whether it is an edge depends entirely on execution "
-        f"cost — the gap between a predictive signal and a tradable one."
+        f"On a **synthetic** tape with an **assumed** 1-step IC of {realized_ic:+.3f}, the event-driven "
+        f"backtester recovers it — a plumbing check, so the high gross Sharpe ({gross['gross_sharpe']:.1f}, "
+        f"annualized at tick frequency) is true *by construction*, not a measured edge. What is informative is "
+        f"the tradability threshold: it only survives below ~{breakeven if breakeven is not None else '>'} bps "
+        f"round-trip cost — at a realistic {rep_cost} bps the net Sharpe is {rep['net_sharpe']:.1f} "
+        f"(HAC t {hac_t:+.1f}). Order-flow imbalance is well documented to predict short-horizon returns; the "
+        f"point here is methodological — whether a predictive signal is *tradable* depends entirely on execution "
+        f"cost. (Validating the IC on the project's real L2 book would make this an empirical finding, not an assumed one.)"
     )
     return {
         "params": {"n": n, "ic": ic, "ret_vol_bps": ret_vol_bps, "signal": signal_name},

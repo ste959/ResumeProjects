@@ -33,9 +33,14 @@ def optimize_weights(window: pd.DataFrame, method: str = "risk_parity", lam: flo
     n = R.shape[1]
     if method == "equal":
         w = np.ones(n)
-    elif method in ("inverse_vol", "risk_parity"):
+    elif method == "inverse_vol":
         vol = R.std(axis=0, ddof=0)
         w = np.divide(1.0, vol, out=np.zeros_like(vol), where=vol > 0)
+    elif method == "risk_parity":
+        # TRUE equal-risk-contribution (correlation-aware) — not the inverse-vol shortcut. Runs the
+        # shared ERC solver on the shrunk covariance so correlated signals are downweighted.
+        from .assetalloc import risk_parity as _erc
+        return _erc(_shrink_cov(R, lam))
     elif method == "max_sharpe":
         mu = R.mean(axis=0)
         w = np.linalg.solve(_shrink_cov(R, lam), mu)
@@ -62,16 +67,17 @@ def walk_forward_allocate(signal_returns: pd.DataFrame, method: str = "risk_pari
 
 
 def vol_target(returns: pd.Series, target_annual_vol: float = 0.10,
-               min_periods: int = 20) -> pd.Series:
+               min_periods: int = 20, max_leverage: float = 3.0) -> pd.Series:
     """Scale a return series to a target annualized volatility, CAUSALLY.
 
     The sizing at time t may only use information through t-1, otherwise it is look-ahead: a
     full-sample std peeks at the whole path. We estimate volatility with a trailing EXPANDING
     std shifted by one period, so the scale applied to return t is built from returns up to t-1.
     Days before `min_periods` of history (no reliable estimate yet) are left NaN rather than
-    sized on a guess."""
+    sized on a guess. The scale is **capped at `max_leverage`** so a quiet early regime (tiny
+    trailing vol) can't imply a runaway leveraged position."""
     trailing_ann = returns.expanding(min_periods=min_periods).std(ddof=0).shift(1) * np.sqrt(TRADING_DAYS)
-    scale = target_annual_vol / trailing_ann.where(trailing_ann > 0)
+    scale = (target_annual_vol / trailing_ann.where(trailing_ann > 0)).clip(upper=max_leverage)
     return returns * scale
 
 

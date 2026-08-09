@@ -39,11 +39,27 @@ def main() -> None:
         print(f"{m:<17}{r['ann_return']*100:>8.1f}%{r['ann_vol']*100:>8.1f}%{r['sharpe']:>8.2f}"
               f"{r['hac_t']:>7.1f}   [{r['boot_lo']:>5.2f},{r['boot_hi']:>5.2f}]{r['max_drawdown']*100:>8.1f}%")
 
-    rp, bench = by["risk_parity"], by["60/40"]
-    print(f"\nVerdict: risk parity vs. 60/40 — Sharpe {rp['sharpe']:.2f} vs {bench['sharpe']:.2f}, "
-          f"max drawdown {rp['max_drawdown']*100:.0f}% vs {bench['max_drawdown']*100:.0f}%. "
-          "The risk-based allocation earns its keep through lower drawdown and steadier risk, not a "
-          "higher headline return — the honest case for diversified, risk-managed asset allocation.")
+    g = s["gauntlet"]
+    clears = abs(g["best_hac_t"]) >= g["bonferroni_t"]
+    powered = g["best_sharpe_ann"] >= g["min_detectable_sharpe"]
+    print(f"\nSelection-aware gauntlet (across {g['n_strategies']} strategies, {g['n_days']} days — "
+          f"backtesting several allocations on one path IS multiple testing):")
+    print(f"  best by Sharpe : {g['best']}  (ann. Sharpe {g['best_sharpe_ann']}, HAC t {g['best_hac_t']})")
+    print(f"  multiple-testing bar : |t| > {g['bonferroni_t']}  ->  {'CLEARS' if clears else 'FAILS'}")
+    print(f"  Deflated Sharpe : {g['deflated_sharpe']}  (> 0.95 to be a genuine edge)")
+    print(f"  PBO : {g['pbo']}  (< 0.5 is good; prob. the best is overfit)")
+    print(f"  min-detectable Sharpe : {g['min_detectable_sharpe']}  ->  "
+          f"{'ADEQUATELY POWERED' if powered else 'UNDERPOWERED (too little data to tell)'}")
+
+    ranked = sorted(s["results"], key=lambda r: r["sharpe"], reverse=True)
+    win = ranked[0]
+    print(f"\nVerdict: on this single ~6-year path the best risk-adjusted allocation was "
+          f"**{win['method']}** (Sharpe {win['sharpe']:.2f}, max DD {win['max_drawdown']*100:.0f}%) — a reminder "
+          f"that simple diversification frequently beats optimized allocation out-of-sample (the DeMiguel 1/N "
+          f"result). But the best strategy {'clears' if clears else 'does NOT clear'} the multiple-testing bar "
+          f"and the sample is {'adequately powered' if powered else 'underpowered'}, so this is a framework and "
+          f"risk-control demonstration, not a statistically established allocation edge. Risk parity's real case "
+          f"is stability and drawdown control across regimes, which one favorable path can't prove.")
 
 
 if __name__ == "__main__":
