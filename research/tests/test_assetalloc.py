@@ -1,0 +1,83 @@
+"""Tests for the multi-asset allocation module — the allocators' defining properties and a
+walk-forward backtest sanity check."""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+from mds import assetalloc as aa
+
+
+def _cov(vols, corr):
+    d = np.diag(vols)
+    return d @ corr @ d
+
+
+def test_risk_parity_equalizes_risk_contributions():
+    # Correlated assets with different vols → equal-risk-contribution weights should give each asset
+    # the SAME share of portfolio variance (the defining property of true risk parity).
+    cov = _cov([0.10, 0.20, 0.15], np.array([[1.0, 0.5, 0.2], [0.5, 1.0, 0.3], [0.2, 0.3, 1.0]]))
+    w = aa.risk_parity(cov)
+    rc = aa.risk_contributions(w, cov)
+    assert abs(w.sum() - 1.0) < 1e-9 and (w >= 0).all()
+    assert (rc.max() - rc.min()) / rc.mean() < 0.02        # risk contributions ~equal
+
+
+def test_risk_parity_downweights_a_redundant_pair():
+    # Equal vols → inverse-vol is just equal-weight (1/3 each). But assets 0 and 1 are highly correlated
+    # (redundant), so true risk parity must DOWNWEIGHT that pair and lift the independent asset 2 —
+    # exactly the correlation-awareness inverse-vol misses.
+    cov = _cov([0.15, 0.15, 0.15], np.array([[1.0, 0.9, 0.0], [0.9, 1.0, 0.0], [0.0, 0.0, 1.0]]))
+    w = aa.risk_parity(cov)
+    assert np.abs(w - aa.inverse_vol(cov)).max() > 0.02
+    assert w[2] > w[0] and w[2] > w[1]                     # independent asset gets the most weight
+
+
+def test_inverse_vol_is_proportional_to_one_over_sigma():
+    cov = _cov([0.10, 0.20, 0.40], np.eye(3))
+    w = aa.inverse_vol(cov)
+    # ratios of weights equal ratios of 1/sigma
+    assert abs(w[0] / w[1] - (1 / 0.10) / (1 / 0.20)) < 1e-9
+
+
+def test_min_variance_overweights_the_calm_asset():
+    cov = _cov([0.05, 0.30, 0.30], np.array([[1.0, 0.2, 0.2], [0.2, 1.0, 0.2], [0.2, 0.2, 1.0]]))
+    w = aa.min_variance(cov)
+    assert abs(w.sum() - 1.0) < 1e-6 and (w >= -1e-9).all()
+    assert w[0] == max(w)                                   # the low-vol asset gets the largest weight
+
+
+def test_momentum_tilt_favors_higher_momentum():
+    base = np.array([0.25, 0.25, 0.25, 0.25])
+    mom = np.array([-0.1, 0.0, 0.1, 0.2])                   # asset 3 strongest
+    w = aa.momentum_tilt(base, mom, strength=0.5)
+    assert abs(w.sum() - 1.0) < 1e-9
+    assert w[3] > w[0]                                      # winner overweighted vs. loser
+
+
+def _synthetic_prices(seed=0, n=700):
+    rng = np.random.default_rng(seed)
+    cols = list(aa.UNIVERSE)                                # includes SPY + IEF for the 60/40 benchmark
+    k = len(cols)
+    daily = rng.normal(0.0003, 0.01, size=(n, k))
+    prices = 100 * np.cumprod(1 + daily, axis=0)
+    idx = pd.bdate_range("2021-01-01", periods=n)
+    return pd.DataFrame(prices, index=idx, columns=cols)
+
+
+def test_backtest_runs_and_is_diversified():
+    prices = _synthetic_prices()
+    r = aa.backtest(prices, method="risk_parity", lookback=252, rebalance=21)
+    assert r["n_days"] > 100
+    assert np.isfinite(r["sharpe"]) and np.isfinite(r["hac_t"])
+    # a risk-parity blend must be less volatile than the most volatile single asset
+    single_vols = prices.pct_change().dropna().std().to_numpy() * np.sqrt(aa.TRADING_DAYS)
+    assert r["ann_vol"] < single_vols.max()
+
+
+def test_study_covers_all_methods_plus_benchmark():
+    s = aa.study(_synthetic_prices(), cost_bps=10.0)
+    names = {row["method"] for row in s["results"]}
+    assert {"risk_parity", "min_variance", "max_sharpe", "risk_parity_taa", "60/40"} <= names
+    assert all("sharpe" in row and "max_drawdown" in row for row in s["results"])

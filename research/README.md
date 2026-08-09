@@ -41,6 +41,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/options.py` | **Alpaca options surface** — live ATM-IV / 25Δ-skew / IV−RV cross-section |
 | `mds/factors.py` | **multi-factor composite** — value/quality/momentum families → one standardized score (Grinold–Kahn: lift effective breadth) |
 | `mds/riskmodel.py` | **factor risk model + constrained optimizer** — Σ=BFBᵀ+D and an analytic factor-neutral mean-variance solve with box + turnover caps |
+| `mds/assetalloc.py` | **multi-asset strategic/tactical allocation** — true **equal-risk-contribution risk parity** (correlation-aware), min-variance, long-only max-Sharpe, a **momentum-tilted TAA overlay**, and a walk-forward cost-aware backtest vs. 60/40 (see [`ASSET-ALLOCATION-NOTE.md`](ASSET-ALLOCATION-NOTE.md)) |
 | `mds/factortiming.py` | **regime-conditional factor timing** — rotate the family mix & time exposure on the FRED credit/VIX state, then vol-budget the book |
 | `mds/structuring.py` | **options structuring overlay** — Black–Scholes tail hedge / covered-call / collar sized off the live IV surface |
 | `mds/taxaware.py` | **tax-aware rebalancing** — tax-lot accounting, HIFO vs FIFO, wash sales, long/short holding periods (after-tax edge) |
