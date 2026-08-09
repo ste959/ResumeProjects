@@ -1,81 +1,88 @@
 # Multi-Asset Allocation Note
-### Risk-based strategic & tactical allocation across asset classes — a diversification and risk-control study
+### Risk-based strategic & tactical allocation across asset classes — diversification, tail risk, and regime robustness
 
-*Desk research note · liquid ETF proxies · 2020-07 – 2026-07 (~5.9y, 1,490 daily observations)*
+*Desk research note · liquid ETF proxies · 2020-07 – 2026-07 (~5.9y) · excess of a BIL T-bill risk-free rate*
 
 ---
 
 ## Summary
 
-Across six asset classes, walk-forward and net of cost, the honest finding is that **simple
-diversification (equal weight) posted the best risk-adjusted return on this sample — and that *no*
-allocation method clears a selection-aware significance bar.** The sophisticated allocators (risk
-parity, min-variance, mean-variance) did **not** beat 1/N here, echoing the well-known DeMiguel–Garlappi–Uppal
-(2009) result. This is a **framework and risk-control demonstration, not a statistically established
-allocation edge** — a conclusion the pipeline reaches on its own, not a hand-picked verdict.
+Across six asset classes, walk-forward and net of cost, **no allocation method establishes a
+statistically significant edge** — not in aggregate, not in any sub-period, and not under any of 18
+parameter configurations. The interesting, honest findings are methodological and market-structural:
 
-| Strategy | Ann. return | Ann. vol | Sharpe | HAC t | Sharpe 95% CI | Max drawdown |
-|---|--:|--:|--:|--:|:--:|--:|
-| 60/40 (benchmark) | 7.3% | 10.9% | 0.70 | 1.6 | [-0.17, 1.60] | -21.0% |
-| **Equal weight (1/N)** | 8.4% | 9.4% | **0.91** | 2.1 | [0.04, 1.79] | -15.9% |
-| Inverse-vol | 5.7% | 8.0% | 0.73 | 1.6 | [-0.14, 1.65] | -17.8% |
-| Min-variance | 1.7% | 6.9% | 0.28 | 0.6 | [-0.58, 1.19] | -18.9% |
-| Max-Sharpe (MVO) | 11.9% | 14.8% | 0.83 | 1.9 | [0.02, 1.72] | **-28.7%** |
-| Risk parity (ERC) | 5.3% | 7.9% | 0.69 | 1.6 | [-0.17, 1.61] | -17.3% |
-| Risk parity + momentum (TAA) | 6.6% | 9.0% | 0.76 | 1.7 | [-0.09, 1.61] | -15.9% |
+1. **Excess of cash matters enormously here.** Over 2020–26 the T-bill went from ~0% to ~5%; measuring
+   Sharpe on *raw* returns overstated everything. On the correct excess-of-cash basis, headline Sharpes
+   roughly halve (equal-weight 0.91 → **0.55**, 60/40 0.70 → **0.37**).
+2. **The highest Sharpe carries the worst tail.** Max-Sharpe (mean-variance) posts the top excess Sharpe
+   (0.63) but the deepest drawdown (−29%), the worst expected shortfall (−2.3%/day), and **negative skew** —
+   while equal-weight wins on the *downside*-adjusted measures (Sortino 0.80, Calmar 0.54, positive skew).
+   Sharpe alone is a misleading ranking.
+3. **Diversification failed exactly when it was needed.** In 2022 *every* strategy had a negative Sharpe —
+   the stock/bond correlation flipped positive, so "diversified" books fell together.
 
-**Selection-aware gauntlet** (the same one the equity study runs — because backtesting 7 strategies on
-one path *is* multiple testing):
+| Strategy | Ann. ret | Ann. vol | **Excess Sharpe** | HAC t | Sharpe 95% CI | Max DD | Sortino | Calmar | CVaR-5% | Skew |
+|---|--:|--:|--:|--:|:--:|--:|--:|--:|--:|--:|
+| 60/40 | 7.2% | 10.9% | 0.37 | 0.8 | [-0.48, 1.21] | -21.0% | 0.53 | 0.34 | -1.55% | 0.18 |
+| **Equal weight (1/N)** | 8.6% | 9.4% | 0.55 | 1.3 | [-0.27, 1.39] | -15.9% | **0.80** | **0.54** | -1.31% | 0.11 |
+| Inverse-vol | 5.8% | 8.0% | 0.30 | 0.7 | [-0.56, 1.15] | -17.9% | 0.45 | 0.32 | -1.10% | 0.23 |
+| Min-variance | 1.8% | 7.0% | -0.21 | -0.5 | [-1.07, 0.60] | -18.7% | -0.31 | 0.10 | -0.95% | 0.18 |
+| Max-Sharpe (MVO) | 12.6% | 15.0% | **0.63** | 1.4 | [-0.14, 1.50] | **-29.0%** | 0.79 | 0.43 | **-2.29%** | **-0.73** |
+| Risk parity (ERC) | 5.5% | 8.0% | 0.27 | 0.6 | [-0.59, 1.11] | -17.4% | 0.40 | 0.31 | -1.10% | 0.21 |
+| Risk parity + momentum (TAA) | 7.0% | 9.1% | 0.40 | 0.9 | [-0.42, 1.26] | -15.9% | 0.57 | 0.44 | -1.29% | -0.09 |
 
-| Test | Value | Bar | Verdict |
-|---|--:|:--|:--|
-| Best strategy | equal weight | — | Sharpe 0.91, HAC t 2.09 |
-| Multiple-testing bar | \|t\| 2.09 | > 2.69 (Bonferroni, 7 trials) | **FAILS** |
-| Deflated Sharpe | 0.92 | > 0.95 | **not a genuine edge** |
-| PBO (CSCV) | 0.65 | < 0.5 | **probably overfit** |
-| Min-detectable Sharpe | 0.91 vs 1.26 | — | **underpowered** |
+**Selection-aware gauntlet** (across 7 strategies, 1,223 days): best is max-Sharpe (excess 0.63, HAC t 1.44),
+which **FAILS** the Bonferroni bar (\|t\| > 2.69); **Deflated Sharpe 0.71** (< 0.95), **PBO 0.48**,
+**min-detectable Sharpe 1.27 → underpowered**. The study claims no edge — correctly.
+
+**Regime robustness** (excess Sharpe by sub-period — the ranking is *not* stable):
+
+| Regime | 60/40 | Equal | Inv-vol | Min-var | Max-Sh | Risk-par | RP+TAA |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| 2020–21 zero-rate / recovery | 1.41 | 1.12 | 0.75 | -0.15 | 1.19 | 0.70 | 0.64 |
+| **2022 rate shock** | **-1.15** | **-0.69** | **-1.17** | **-1.57** | **-0.10** | **-1.13** | **-0.86** |
+| 2023–26 higher-for-longer | 1.03 | 1.04 | 0.92 | 0.40 | 0.98 | 0.86 | 0.86 |
+
+**Sensitivity sweep** (18 configs of lookback × rebalance frequency × cost): the winner is unstable
+(max-Sharpe in 11, equal-weight in 7), and **0 of 18 configurations clear the multiple-testing bar** — the
+null is robust to every arbitrary choice.
 
 ---
 
 ## Universe & method
 
-- **Asset classes (liquid ETF proxies):** US equities (SPY), international equities (EFA), US
-  Treasuries (IEF), investment-grade credit (LQD), gold (GLD), commodities (DBC) — spanning equity,
-  rates, credit, and real assets.
-- **Strategic allocation (SAA):** each month, weights are fit on the trailing 1-year covariance and held
-  out-of-sample. Methods: **risk parity (equal risk contribution)** — solved with a cyclical-coordinate
-  algorithm that uses the **full covariance** (the correlation-awareness inverse-vol lacks); **minimum-variance**
-  and long-only **max-Sharpe**, both on a **Ledoit-Wolf-shrunk covariance** with an optimizer-failure fallback
-  (naive mean-variance error-maximizes on a raw, ill-conditioned sample cov); plus inverse-vol and equal-weight.
-- **Tactical overlay (TAA):** a time-series-momentum asset-class signal (trailing 6-month return) tilts the
-  risk-parity base toward positive-momentum assets — a lightweight predictive asset-class model.
-- **Honest evaluation:** all results are **walk-forward and cost-aware** — turnover is charged against the
-  *drifted* holdings each rebalance (so even a static 60/40 pays realistic rebalancing cost) — and scored with
-  the full gauntlet above: Newey–West (HAC) t, block-bootstrap Sharpe CI, **Deflated Sharpe, PBO, and a
-  min-detectable-Sharpe power check**.
+- **Asset classes (liquid ETF proxies):** US equities (SPY), international equities (EFA), US Treasuries
+  (IEF), IG credit (LQD), gold (GLD), commodities (DBC). **Risk-free rate:** BIL (1–3m T-bill ETF).
+- **Strategic allocation (SAA):** monthly, weights fit on the trailing 1-year covariance and held
+  out-of-sample — **risk parity (equal risk contribution)** on the full covariance (correlation-aware,
+  unlike inverse-vol), **minimum-variance** and long-only **max-Sharpe** on a **Ledoit-Wolf-shrunk**
+  covariance with an optimizer-failure fallback, plus inverse-vol and equal-weight.
+- **Tactical overlay (TAA):** a time-series-momentum asset-class signal tilts the risk-parity base.
+- **Evaluation:** walk-forward; turnover charged against *drifted* holdings each rebalance; all
+  performance **in excess of the risk-free rate**; scored with HAC t, block-bootstrap CI, **Deflated
+  Sharpe, PBO, power**, plus **downside/tail metrics** (Sortino, Calmar, CVaR, skew); and re-run across
+  **regimes** and a **parameter sweep**.
 
-Pure and unit-tested (`mds/assetalloc.py`, `tests/test_assetalloc.py` — including a test that risk parity
-equalizes risk contributions and downweights redundant, correlated assets); `run_assetalloc.py` supplies the
-live ETF data.
+Pure and unit-tested (`mds/assetalloc.py`, `tests/test_assetalloc.py`); reproducible from cached data with
+fixed seeds (`run_assetalloc.py`, see [`REPRODUCE.md`](REPRODUCE.md)).
 
 ---
 
 ## What the results say
 
-1. **1/N is a hard benchmark to beat.** Equal weight matched or beat every optimized method on Sharpe and
-   drawdown. Estimation error in the optimizers' inputs — covariances and especially means — outweighs the
-   benefit of "optimizing" on a single ~6-year path. This is the DeMiguel result reproduced honestly, and it's
-   the finding a naive "risk parity wins" writeup would have buried.
-2. **Mean-variance optimization is fragile even with shrinkage.** Long-only **max-Sharpe** posted the highest
-   return but the **deepest drawdown (-29%)** and the most volatility — it concentrates into whatever looked
-   best in-sample. Ledoit-Wolf shrinkage tames it somewhat but does not fix the mean-estimation problem.
-3. **Min-variance is not low risk.** It over-weighted bonds into the 2022 rate shock and returned ~2% — low
-   *volatility* is not low *risk* when the "safe" asset is repricing.
-4. **Nothing clears the bar.** The best strategy fails the Bonferroni-corrected t-bar, has a Deflated Sharpe
-   below 0.95 and a PBO of 0.65, and the sample can't reliably detect a Sharpe below ~1.26. **Correctly, the
-   study claims no edge.**
+- **1/N is hard to beat, and it wins where it matters.** Equal weight leads every optimized method on
+  downside-adjusted return (Sortino, Calmar) with positive skew — the DeMiguel–Garlappi–Uppal (2009)
+  result. Estimation error in the optimizers' inputs outweighs the benefit of optimizing on one path.
+- **Optimization buys Sharpe with tail risk.** Max-Sharpe's higher Sharpe comes bundled with the worst
+  drawdown and a fat left tail (skew −0.73). A manager who ranked on Sharpe alone would have bought the
+  most fragile book.
+- **Correlations are not constant.** The 2022 row is the whole point: diversification is a correlation
+  bet, and when stock/bond correlation flipped positive, every allocation lost together. Static
+  risk models estimated on trailing data are blind to this until it happens.
+- **Nothing is significant, robustly.** Best HAC t 1.44 < the 2.69 bar; DSR 0.71; PBO 0.48; underpowered;
+  and 0/18 parameterizations clear the bar. This is an honest null, not a tuning failure.
 
-**Where risk parity's case actually lives:** not in this sample's Sharpe, but in **stability and drawdown
-control across regimes** — a property one favorable ~6-year path (with a single embedded bond bear market)
-cannot establish. Proving it needs multiple regimes and a longer, survivorship-free history. The ETF proxies
-also carry their own fees and tracking error, abstracted away here.
+**Where risk parity's case actually lives:** not this sample's Sharpe, but stability and drawdown control
+*across* regimes — which one ~6-year path (with a single embedded rate shock) cannot establish. Proving it
+needs multiple regimes and a longer, survivorship-free history. The ETF proxies also carry their own fees
+and tracking error, abstracted away here.

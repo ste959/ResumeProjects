@@ -166,7 +166,8 @@ def _weights_for(method: str, window: pd.DataFrame, prices_to_t: pd.DataFrame, m
 
 
 def backtest(prices: pd.DataFrame, method: str = "risk_parity", lookback: int = 252,
-             rebalance: int = 21, cost_bps: float = 10.0, mom_lookback: int = 126) -> dict:
+             rebalance: int = 21, cost_bps: float = 10.0, mom_lookback: int = 126,
+             rf: pd.Series | None = None) -> dict:
     """Walk-forward: every `rebalance` days, fit weights on the trailing `lookback` window and hold them
     out-of-sample; charge `cost_bps` on turnover. Returns the net daily series + honest stats."""
     rets = prices.pct_change().dropna()
@@ -185,7 +186,7 @@ def backtest(prices: pd.DataFrame, method: str = "risk_parity", lookback: int = 
             net.iloc[t:t + len(port)] = port
         w_drift = _drift(w, block)                    # let the new weights drift with returns over the block
     net = net.iloc[lookback:]
-    return {"method": method, **_stats(net), "net": net}
+    return {"method": method, **_stats(net, rf), "net": net}
 
 
 def _drift(w: np.ndarray, block: np.ndarray) -> np.ndarray:
@@ -197,7 +198,8 @@ def _drift(w: np.ndarray, block: np.ndarray) -> np.ndarray:
 
 
 def sixty_forty(prices: pd.DataFrame, eq: str = "SPY", bond: str = "IEF",
-                lookback: int = 252, rebalance: int = 21, cost_bps: float = 10.0) -> dict:
+                lookback: int = 252, rebalance: int = 21, cost_bps: float = 10.0,
+                rf: pd.Series | None = None) -> dict:
     """Static 60/40 (equities/bonds), rebalanced on the same schedule — the benchmark to beat."""
     sub = prices[[eq, bond]]
     target = np.array([0.60, 0.40])
@@ -213,49 +215,112 @@ def sixty_forty(prices: pd.DataFrame, eq: str = "SPY", bond: str = "IEF",
             net.iloc[t:t + len(port)] = port
         w_drift = _drift(target, block)
     net = net.iloc[lookback:]
-    return {"method": "60/40", **_stats(net), "net": net}
+    return {"method": "60/40", **_stats(net, rf), "net": net}
 
 
-def _stats(net: pd.Series, ppy: int = TRADING_DAYS) -> dict:
-    r = net.to_numpy()
-    r = r[np.isfinite(r)]
-    if len(r) < 8 or r.std() == 0:
-        return {"ann_return": 0.0, "ann_vol": 0.0, "sharpe": 0.0, "hac_t": 0.0,
-                "boot_lo": 0.0, "boot_hi": 0.0, "max_drawdown": 0.0, "n_days": len(r)}
+def _excess(net: pd.Series, rf: pd.Series | None) -> np.ndarray:
+    """Return in EXCESS of the daily risk-free rate — the correct basis for a Sharpe (a risk *premium*).
+    Over 2020-26 cash went from ~0% to ~5%, so ignoring it materially overstates every Sharpe."""
+    r = net.to_numpy(dtype=float)
+    if rf is None:
+        return r
+    rf_a = np.nan_to_num(rf.reindex(net.index).to_numpy(dtype=float))
+    return r - rf_a
+
+
+_ZERO_STATS = {"ann_return": 0.0, "ann_vol": 0.0, "sharpe": 0.0, "hac_t": 0.0, "boot_lo": 0.0,
+               "boot_hi": 0.0, "max_drawdown": 0.0, "sortino": 0.0, "calmar": 0.0, "cvar_5": 0.0,
+               "skew": 0.0, "n_days": 0}
+
+
+def _stats(net: pd.Series, rf: pd.Series | None = None, ppy: int = TRADING_DAYS) -> dict:
+    r = net.to_numpy(dtype=float)
+    ex = _excess(net, rf)                            # excess-of-cash return series
+    m = np.isfinite(r)
+    r, ex = r[m], ex[m]
+    if len(r) < 8 or ex.std() == 0:
+        return {**_ZERO_STATS, "n_days": len(r)}
     prod = float(np.prod(1 + r))
-    ann_ret = float(prod ** (ppy / len(r)) - 1) if prod > 0 else -1.0   # undefined if the book is wiped out
+    ann_ret = float(prod ** (ppy / len(r)) - 1) if prod > 0 else -1.0   # total (undefined if wiped out)
     ann_vol = float(r.std() * np.sqrt(ppy))
-    sharpe = float(r.mean() / r.std() * np.sqrt(ppy))
-    hac_t = float(val.newey_west_sharpe_tstat(r))
-    lo, hi = val.block_bootstrap_sharpe_ci(r, ppy=ppy)
+    sharpe = float(ex.mean() / ex.std() * np.sqrt(ppy))                 # EXCESS Sharpe (risk premium)
+    hac_t = float(val.newey_west_sharpe_tstat(ex))
+    lo, hi = val.block_bootstrap_sharpe_ci(ex, ppy=ppy)
     equity = np.cumprod(1 + r)
     peak = np.maximum.accumulate(equity)
     max_dd = float(np.where(peak > 0, equity / peak - 1.0, 0.0).min())
+    # tail / downside risk — Sharpe & vol treat up and down symmetrically; these don't.
+    downside = ex[ex < 0]
+    sortino = float(ex.mean() / downside.std() * np.sqrt(ppy)) if len(downside) and downside.std() > 0 else 0.0
+    calmar = float(ann_ret / abs(max_dd)) if max_dd < 0 else 0.0
+    var5 = float(np.percentile(r, 5))
+    cvar5 = float(r[r <= var5].mean()) if (r <= var5).any() else var5   # 5% expected shortfall (daily)
     return {"ann_return": round(ann_ret, 4), "ann_vol": round(ann_vol, 4), "sharpe": round(sharpe, 3),
             "hac_t": round(hac_t, 2), "boot_lo": round(float(lo), 2), "boot_hi": round(float(hi), 2),
-            "max_drawdown": round(max_dd, 4), "n_days": len(r)}
+            "max_drawdown": round(max_dd, 4), "sortino": round(sortino, 3), "calmar": round(calmar, 2),
+            "cvar_5": round(cvar5, 5), "skew": round(float(sstats.skew(r)), 3), "n_days": len(r)}
 
 
-def study(prices: pd.DataFrame, cost_bps: float = 10.0, lookback: int = 252, rebalance: int = 21) -> dict:
+METHODS = ["equal", "inverse_vol", "risk_parity", "min_variance", "max_sharpe", "risk_parity_taa"]
+
+
+def study(prices: pd.DataFrame, cost_bps: float = 10.0, lookback: int = 252, rebalance: int = 21,
+          rf: pd.Series | None = None) -> dict:
     """Run every allocator + the 60/40 benchmark, then apply the same selection-aware gauntlet as the
-    rest of the research — because backtesting 7 strategies on one sample IS multiple testing."""
-    methods = ["equal", "inverse_vol", "risk_parity", "min_variance", "max_sharpe", "risk_parity_taa"]
-    rows = [backtest(prices, m, lookback, rebalance, cost_bps) for m in methods]
-    rows.append(sixty_forty(prices, lookback=lookback, rebalance=rebalance, cost_bps=cost_bps))
+    rest of the research — because backtesting 7 strategies on one sample IS multiple testing. Stats are
+    net of cost and in EXCESS of the risk-free rate `rf` (daily)."""
+    rows = [backtest(prices, m, lookback, rebalance, cost_bps, rf=rf) for m in METHODS]
+    rows.append(sixty_forty(prices, lookback=lookback, rebalance=rebalance, cost_bps=cost_bps, rf=rf))
     nets = {r["method"]: r["net"] for r in rows}
-    gauntlet = _gauntlet(nets)
+    gauntlet = _gauntlet(nets, rf)
     for r in rows:
         r.pop("net", None)
     return {"assets": list(prices.columns), "cost_bps": cost_bps, "results": rows, "gauntlet": gauntlet}
 
 
-def _gauntlet(nets: dict) -> dict:
+def regime_study(prices: pd.DataFrame, regimes: list[tuple[str, str, str]], cost_bps: float = 10.0,
+                 lookback: int = 252, rebalance: int = 21, rf: pd.Series | None = None) -> list[dict]:
+    """Robustness across sub-periods: run the full walk-forward once, then slice each strategy's net
+    series into named calendar regimes and report the excess Sharpe of each method per regime. A mature
+    result holds (or is honestly shown not to hold) across regimes — one 6-year path proves nothing."""
+    rows = [backtest(prices, m, lookback, rebalance, cost_bps, rf=rf) for m in METHODS]
+    rows.append(sixty_forty(prices, lookback=lookback, rebalance=rebalance, cost_bps=cost_bps, rf=rf))
+    out = []
+    for name, start, end in regimes:
+        seg = {}
+        for r in rows:
+            net = r["net"].loc[start:end]
+            seg[r["method"]] = _stats(net, rf)["sharpe"] if len(net) > 30 else float("nan")
+        out.append({"regime": name, "start": start, "end": end, "sharpe": seg,
+                    "n_days": int(len(rows[0]["net"].loc[start:end]))})
+    return out
+
+
+def sensitivity(prices: pd.DataFrame, rf: pd.Series | None = None,
+                lookbacks=(126, 252, 504), rebalances=(21, 63), costs=(5.0, 10.0, 25.0)) -> list[dict]:
+    """Sweep the arbitrary choices (estimation window, rebalance frequency, cost) and report, for each,
+    which method won and whether ANYTHING cleared the multiple-testing bar. Anti-p-hacking: the
+    conclusion should be stable across the grid, not a knife-edge we happened to land on."""
+    out = []
+    for lb in lookbacks:
+        for rb in rebalances:
+            for c in costs:
+                s = study(prices, cost_bps=c, lookback=lb, rebalance=rb, rf=rf)
+                g = s["gauntlet"]
+                out.append({"lookback": lb, "rebalance": rb, "cost_bps": c, "winner": g["best"],
+                            "winner_sharpe": g["best_sharpe_ann"],
+                            "clears_bar": bool(abs(g["best_hac_t"]) >= g["bonferroni_t"])})
+    return out
+
+
+def _gauntlet(nets: dict, rf: pd.Series | None = None) -> dict:
     """Selection-aware honesty on the strategy SET: PBO across all of them, the Deflated Sharpe of the
     best (deflated for having tried this many), the multiple-testing t-bar, and the min-detectable
-    Sharpe — is the sample even powered to distinguish these from luck?"""
-    mat = pd.DataFrame(nets).dropna()               # T × M aligned net-return matrix
+    Sharpe — is the sample even powered to distinguish these from luck? All on excess-of-cash returns."""
+    raw = pd.DataFrame(nets).dropna()               # T × M aligned net-return matrix
+    mat = raw.apply(lambda col: pd.Series(_excess(col, rf), index=col.index))   # excess of cash
     n, m = mat.shape
-    pp = mat.mean() / mat.std(ddof=0)               # per-period Sharpe of each strategy
+    pp = mat.mean() / mat.std(ddof=0)               # per-period excess Sharpe of each strategy
     best = str(pp.idxmax())
     r_best = mat[best].to_numpy()
     dsr = float(val.deflated_sharpe(float(pp[best]), n, float(sstats.skew(r_best)),

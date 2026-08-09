@@ -91,6 +91,35 @@ def test_study_runs_the_selection_aware_gauntlet():
     assert g["n_strategies"] == 7 and 0.0 <= g["pbo"] <= 1.0
 
 
+def test_excess_return_lowers_sharpe():
+    # A positive constant risk-free rate must reduce a strategy's Sharpe (it's a risk *premium*).
+    prices = _synthetic_prices()
+    raw = aa.backtest(prices, "risk_parity")["sharpe"]
+    rf = pd.Series(0.0002, index=prices.index)               # ~5%/yr cash
+    net_of_cash = aa.backtest(prices, "risk_parity", rf=rf)["sharpe"]
+    assert net_of_cash < raw
+
+
+def test_stats_report_tail_metrics():
+    r = aa.backtest(_synthetic_prices(), "risk_parity")
+    for k in ("sortino", "calmar", "cvar_5", "skew"):
+        assert k in r
+
+
+def test_regime_study_slices_by_period():
+    prices = _synthetic_prices(n=800)
+    regimes = [("first", "2021-01-01", "2022-06-30"), ("second", "2022-07-01", "2024-12-31")]
+    reg = aa.regime_study(prices, regimes)
+    assert [r["regime"] for r in reg] == ["first", "second"]
+    assert "risk_parity" in reg[0]["sharpe"] and "60/40" in reg[0]["sharpe"]
+
+
+def test_sensitivity_sweep_runs():
+    grid = aa.sensitivity(_synthetic_prices(), lookbacks=(252,), rebalances=(21,), costs=(10.0,))
+    assert len(grid) == 1
+    assert {"lookback", "rebalance", "cost_bps", "winner", "clears_bar"} <= set(grid[0])
+
+
 def test_optimizers_dont_blow_up_on_ill_conditioned_cov():
     # Two near-duplicate assets → a near-singular covariance. Naive MVO error-maximizes into one name;
     # the shrinkage + convergence fallback must still return valid long-only weights (sum 1, no NaN).

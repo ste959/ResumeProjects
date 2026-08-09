@@ -139,9 +139,11 @@ Underneath sits a deeper **Python research layer** (`research/mds`): a leakage-f
 **factor pipeline** with purge/embargo CV, **Deflated Sharpe & PBO**, a **factor risk-model optimizer**
 (Σ = BFBᵀ + D, constrained MVO), regime timing, options structuring, tax-aware rebalancing, and a
 **multi-asset strategic/tactical asset-allocation** study (risk parity, min-variance, momentum-tilted
-TAA vs. 60/40, walk-forward on real ETF data) — see [`research/README.md`](research/README.md) and the
-write-ups in [`research/RESEARCH-NOTE.md`](research/RESEARCH-NOTE.md) and
-[`research/ASSET-ALLOCATION-NOTE.md`](research/ASSET-ALLOCATION-NOTE.md).
+TAA vs. 60/40; walk-forward on real ETF data, **excess of cash**, with tail-risk metrics, **regime**
+robustness, and a parameter **sensitivity** sweep) — see [`research/README.md`](research/README.md) and
+the write-ups in [`RESEARCH-NOTE.md`](research/RESEARCH-NOTE.md), [`ASSET-ALLOCATION-NOTE.md`](research/ASSET-ALLOCATION-NOTE.md),
+[`SIGNAL-RATIONALE.md`](research/SIGNAL-RATIONALE.md), and [`DECISIONS.md`](research/DECISIONS.md) (research
+integrity log).
 
 > **Honest by design.** The live strategies are simple (MA-crossover / momentum) *machinery
 > demonstrations*, not alpha — and the walk-forward correctly refuses them on real crypto because taker

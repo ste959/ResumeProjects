@@ -8,6 +8,12 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 > The `mds/` modules below are the **research library**. They're driven both by the `run_*.py` CLI
 > studies and, live, by the **Quant Desk** FastAPI service — the Alpaca-backed research→backtest→live
 > app at `/research`. See [`service/README.md`](service/README.md).
+>
+> **Research integrity docs:** [`RESEARCH-NOTE.md`](RESEARCH-NOTE.md) (equity factor null) ·
+> [`ASSET-ALLOCATION-NOTE.md`](ASSET-ALLOCATION-NOTE.md) (multi-asset, with regime & tail analysis) ·
+> [`SIGNAL-RATIONALE.md`](SIGNAL-RATIONALE.md) (economic story + failure mode + decay for each signal) ·
+> [`DECISIONS.md`](DECISIONS.md) (research log & researcher degrees of freedom) ·
+> [`REPRODUCE.md`](REPRODUCE.md) (deterministic reproduction).
 
 ## Data architecture (capture → warehouse → research)
 
