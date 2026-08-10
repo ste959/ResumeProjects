@@ -79,6 +79,9 @@ tearsheet. Adding a sixth is a subclass.
   **implementation-shortfall** ledger (execution vs. opportunity cost). See [`RISK-NOTE.md`](RISK-NOTE.md).
 - A deep validation stack (`validation.py`): Deflated Sharpe, PBO/CSCV, Newey–West, block bootstrap,
   min-detectable-Sharpe power — the platform's differentiator.
+- **Reporting** (`report.py`, `run_report.py`) — a self-contained **HTML tearsheet** (equity curve,
+  drawdown, rolling Sharpe, monthly-return heatmap, VaR/ES + risk contribution, P&L attribution — all
+  inlined SVG/CSS) and a **strategy leaderboard** ranked through the gauntlet.
 - Strategy families as components: cross-sectional factors, portfolio construction (risk model, timing,
   options, tax), multi-asset allocation, and an ablation-and-diagnostics trend study.
 

@@ -45,6 +45,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/execution.py` | **execution & cost realism** — half-spread (**Corwin–Schultz** / ADV-tier), **square-root market impact**, participation cap + **partial fills**, short-**borrow**/financing carry, and a **capacity curve** (edge vs. AUM); turns "backtest Sharpe" into "alpha under real conditions" (see [`EXECUTION-NOTE.md`](EXECUTION-NOTE.md)) |
 | `mds/riskmgmt.py`, `mds/tca.py` | **risk system + TCA** — VaR / expected shortfall (**Cornish–Fisher** fat-tail correction), **marginal risk contribution** by sleeve, **stress/scenario replay** of the current book, **limit checks** vs. a mandate, and **implementation shortfall** (execution vs. opportunity cost) (see [`RISK-NOTE.md`](RISK-NOTE.md)) |
 | `mds/dataquality.py`, `mds/universe.py` | **data integrity** — a data-quality audit (splits / stale prices / gaps / coverage, with a clean/fail gate) and a **point-in-time universe** (as-of membership + realized delisting losses, wired into the engine to kill survivorship bias) (see [`DATA-NOTE.md`](DATA-NOTE.md)) |
+| `mds/report.py` | **reporting/tooling** — a self-contained **HTML tearsheet** (equity curve, drawdown, rolling Sharpe, monthly-return heatmap, VaR/ES + risk contribution, P&L attribution — inlined SVG/CSS, no dependencies) and a gauntlet-ranked **leaderboard** (`run_report.py`) |
 | `mds/sources.py`, `mds/store.py` | Coinbase candles + recorder capture → Parquet warehouse, DuckDB queries |
 | `mds/stats.py` | **Hand-rolled econometrics** — OLS, ADF unit-root, **Engle–Granger cointegration**, **Ornstein–Uhlenbeck half-life** (no statsmodels) |
 | `mds/features.py` | log returns, realized vol, order-book **imbalance → forward-return IC** |
@@ -95,7 +96,8 @@ python run_lab.py               # ★ the platform: many strategies, ONE engine 
 python run_execution.py         # execution realism: flat vs spread+impact+borrow, and the capacity curve
 python run_risk.py              # risk system (VaR/ES, stress, limits) + implementation-shortfall TCA
 python run_data.py              # data-quality audit + point-in-time universe (survivorship handling)
-python -m pytest                # 221 tests (offline; data modules fetch lazily)
+python run_report.py            # generate self-contained HTML tearsheets + a leaderboard (research/reports/)
+python -m pytest                # 224 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests

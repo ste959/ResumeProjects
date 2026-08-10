@@ -34,3 +34,6 @@ __pycache__/
 
 # Generated target book (research -> execution handoff)
 backend/target-book/
+
+# Generated HTML reports (tearsheets / leaderboard) — reproducible via run_report.py
+research/reports/

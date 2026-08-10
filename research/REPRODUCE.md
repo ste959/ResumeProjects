@@ -33,10 +33,11 @@ python run_lab.py                 # the platform: many strategies through one en
 python run_execution.py           # execution realism + capacity curve (cached after first run)
 python run_risk.py                # risk system (VaR/ES, stress, limits) + implementation-shortfall TCA
 python run_data.py                # data-quality audit + point-in-time universe (survivorship)
+python run_report.py              # generate self-contained HTML tearsheets + leaderboard
 python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
 
-python -m pytest -q               # 221 tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 224 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here
