@@ -3,397 +3,338 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="A self-directed quant research-to-execution platform: pipeline, 11 honestly-tested strategies, and flagship proof-points.">
-<title>Quant Research Platform — Results Showcase</title>
+<meta name="description" content="A working-paper overview of a self-directed quant research platform: protocol, validation gauntlet, execution/cost model, risk framework, and honestly-reported findings.">
+<title>Quant Research Platform — Working Paper</title>
 </head>
 <body>
 <style>
   :root{
-    --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eef2f6; --line:#e0e6ed;
-    --ink:#10202b; --muted:#586773; --faint:#8a97a2;
-    --accent:#0f766e; --accent-soft:rgba(15,118,110,.10);
-    --proven:#0f766e; --proven-soft:rgba(15,118,110,.11);
-    --insight:#b45309; --insight-soft:rgba(180,83,9,.11);
-    --null:#5b6b78; --null-soft:rgba(91,107,120,.12);
-    --pos:#0f766e; --neg:#b4463b; --on-accent:#ffffff;
+    --paper:#f5f6f8; --surface:#ffffff; --box:#f0f2f5;
+    --ink:#1a1c20; --muted:#4c525b; --faint:#7c828c;
+    --rule:#d5dae1; --rule-strong:#2a2d33;
+    --accent:#21405e; --accent-soft:rgba(33,64,94,.07);
+    --confirmed:#21405e; --insight:#8a6320; --null:#6b7178;
+    --neg:#8a2f2a;
     color-scheme:light;
   }
   @media (prefers-color-scheme:dark){
     :root:not([data-theme="light"]){
-      --bg:#0a0f15; --surface:#121b24; --surface-2:#0e1720; --line:#22303c;
-      --ink:#e7eef4; --muted:#93a3b1; --faint:#6b7c8a;
-      --accent:#2dd4bf; --accent-soft:rgba(45,212,191,.12);
-      --proven:#2dd4bf; --proven-soft:rgba(45,212,191,.13);
-      --insight:#e0a35a; --insight-soft:rgba(224,163,90,.13);
-      --null:#8496a6; --null-soft:rgba(132,150,166,.14);
-      --pos:#2dd4bf; --neg:#e0736a; --on-accent:#06201d;
+      --paper:#121418; --surface:#1a1d23; --box:#15181d;
+      --ink:#e6e8ec; --muted:#a3a9b2; --faint:#727884;
+      --rule:#2b2f37; --rule-strong:#c3c8d0;
+      --accent:#86aad0; --accent-soft:rgba(134,170,208,.10);
+      --confirmed:#86aad0; --insight:#c69a54; --null:#8b929c;
+      --neg:#d08078;
       color-scheme:dark;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#0a0f15; --surface:#121b24; --surface-2:#0e1720; --line:#22303c;
-    --ink:#e7eef4; --muted:#93a3b1; --faint:#6b7c8a;
-    --accent:#2dd4bf; --accent-soft:rgba(45,212,191,.12);
-    --proven:#2dd4bf; --proven-soft:rgba(45,212,191,.13);
-    --insight:#e0a35a; --insight-soft:rgba(224,163,90,.13);
-    --null:#8496a6; --null-soft:rgba(132,150,166,.14);
-    --pos:#2dd4bf; --neg:#e0736a; --on-accent:#06201d;
+    --paper:#121418; --surface:#1a1d23; --box:#15181d;
+    --ink:#e6e8ec; --muted:#a3a9b2; --faint:#727884;
+    --rule:#2b2f37; --rule-strong:#c3c8d0;
+    --accent:#86aad0; --accent-soft:rgba(134,170,208,.10);
+    --confirmed:#86aad0; --insight:#c69a54; --null:#8b929c;
+    --neg:#d08078;
     color-scheme:dark;
   }
 
   *{box-sizing:border-box}
   body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    line-height:1.55; -webkit-font-smoothing:antialiased;
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased;
   }
   .mono{font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace}
-  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
-  a{color:var(--accent);text-decoration:none}
-  a:hover{text-decoration:underline}
-  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+  .paper{max-width:760px;margin:0 auto;padding:0 32px}
+  a{color:var(--accent)} a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  em,i,.var{font-style:italic}
+  sub,sup{font-size:.72em;line-height:0}
 
-  .eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.5px;letter-spacing:.16em;
-    text-transform:uppercase;color:var(--accent);font-weight:600}
-  h1,h2,h3{text-wrap:balance;margin:0}
+  .label{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:11px;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--faint);font-weight:600}
 
-  /* ---- hero ---- */
-  header{border-bottom:1px solid var(--line);background:
-    radial-gradient(120% 90% at 88% -20%,var(--accent-soft),transparent 60%)}
-  .hero{padding:76px 0 60px}
-  h1{font-size:clamp(30px,4.6vw,52px);line-height:1.05;letter-spacing:-.02em;font-weight:680;margin:16px 0 0}
-  h1 .fade{color:var(--muted)}
-  .lede{font-size:clamp(16px,2vw,20px);color:var(--muted);max-width:60ch;margin:20px 0 0;line-height:1.5}
-  .lede b{color:var(--ink);font-weight:600}
-  .stats{display:flex;flex-wrap:wrap;gap:10px 12px;margin-top:32px}
-  .stat{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:10px 14px;min-width:0}
-  .stat .n{font-family:ui-monospace,Menlo,monospace;font-size:19px;font-weight:600;color:var(--ink);
-    font-variant-numeric:tabular-nums}
-  .stat .k{font-size:11.5px;color:var(--muted);margin-top:2px}
-  .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px;align-items:center}
-  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);color:var(--accent);
-    background:var(--accent-soft);padding:9px 15px;border-radius:8px;font-size:14px;font-weight:600}
-  .btn:hover{text-decoration:none;background:var(--accent);color:var(--on-accent)}
-  .note{font-size:12.5px;color:var(--faint)}
+  /* title block */
+  .head{padding:72px 0 34px;border-bottom:1.5px solid var(--rule-strong)}
+  .head .label{color:var(--accent)}
+  h1{font-size:clamp(27px,3.6vw,39px);line-height:1.16;letter-spacing:-.01em;font-weight:600;
+    margin:15px 0 0;text-wrap:balance}
+  .subtitle{font-size:clamp(17px,2vw,20px);color:var(--muted);font-style:italic;margin:12px 0 0;max-width:60ch}
+  .byline{font-family:system-ui,sans-serif;font-size:13px;color:var(--faint);margin-top:22px;
+    display:flex;flex-wrap:wrap;gap:6px 20px}
+  .byline b{color:var(--muted);font-weight:600}
 
-  section{padding:56px 0;border-bottom:1px solid var(--line)}
-  .sec-head{max-width:64ch}
-  .sec-head h2{font-size:clamp(21px,2.6vw,27px);letter-spacing:-.01em;margin-top:9px;font-weight:660}
-  .sec-head p{color:var(--muted);margin:10px 0 0;font-size:15px}
+  /* abstract */
+  .abstract{margin:34px 0 0;padding:22px 26px;background:var(--surface);border:1px solid var(--rule);border-radius:3px}
+  .abstract .label{display:block;margin-bottom:9px}
+  .abstract p{margin:0;font-size:15.5px;line-height:1.62;color:var(--ink)}
 
-  /* ---- pipeline ---- */
-  .pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin-top:30px}
-  .node{border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:15px 16px;position:relative;
-    transition:border-color .18s,transform .18s}
-  .node:hover{border-color:var(--accent);transform:translateY(-2px)}
-  .node .step{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--faint);letter-spacing:.12em}
-  .node h3{font-size:15px;margin:5px 0 6px;font-weight:640}
-  .node p{margin:0;font-size:12.8px;color:var(--muted);line-height:1.45}
+  /* sections */
+  section{padding:40px 0;border-bottom:1px solid var(--rule)}
+  h2{font-size:22px;font-weight:600;letter-spacing:-.005em;margin:0 0 4px;text-wrap:balance}
+  h2 .no{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:.5em;font-weight:600}
+  h3{font-size:16px;font-weight:600;margin:26px 0 6px;color:var(--ink)}
+  p{margin:14px 0 0;max-width:68ch}
+  p:first-of-type{margin-top:12px}
+  .term{font-weight:600}
+  strong{font-weight:600}
 
-  /* ---- research journey ---- */
-  .tally{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
-  .chip{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
-    display:inline-flex;align-items:center;gap:7px;border:1px solid transparent}
-  .chip::before{content:"";width:7px;height:7px;border-radius:50%}
-  .chip.proven{color:var(--proven);background:var(--proven-soft)} .chip.proven::before{background:var(--proven)}
-  .chip.insight{color:var(--insight);background:var(--insight-soft)} .chip.insight::before{background:var(--insight)}
-  .chip.null{color:var(--null);background:var(--null-soft)} .chip.null::before{background:var(--null)}
+  ol.proto{margin:16px 0 0;padding-left:0;counter-reset:p;list-style:none;max-width:68ch}
+  ol.proto li{position:relative;padding:9px 0 9px 42px;border-top:1px solid var(--rule)}
+  ol.proto li:first-child{border-top:none}
+  ol.proto li::before{counter-increment:p;content:"§" counter(p);position:absolute;left:0;top:9px;
+    font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--accent);font-weight:600}
+  ol.proto li b{font-weight:600}
+  ol.proto li span{color:var(--muted);font-size:15px}
 
-  .studies{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:22px}
-  .study{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:17px 18px;
-    display:flex;flex-direction:column;gap:9px;border-left:3px solid var(--stripe,var(--null))}
-  .study.p{--stripe:var(--proven)} .study.i{--stripe:var(--insight)} .study.n{--stripe:var(--null)}
-  .study .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
-  .study h3{font-size:15.5px;font-weight:650;letter-spacing:-.005em}
-  .study .idea{font-size:12.5px;color:var(--faint);font-family:ui-monospace,Menlo,monospace}
-  .study p{margin:0;font-size:13.4px;color:var(--muted);line-height:1.5}
-  .study p b{color:var(--ink);font-weight:600}
+  /* equation */
+  .eq{margin:22px 0;padding:16px 20px;background:var(--box);border-left:2px solid var(--accent);border-radius:2px;
+    display:flex;align-items:center;justify-content:space-between;gap:20px;overflow-x:auto}
+  .eq .expr{font-size:18px;white-space:nowrap}
+  .eq .num{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--faint);flex:none}
+  .eq .var{font-style:italic}
+  .rad{font-style:normal}
 
-  /* ---- flagship ---- */
-  .flags{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
-  .flag{border:1px solid var(--line);background:var(--surface);border-radius:13px;padding:22px}
-  .flag .tag{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
-    color:var(--accent);font-weight:600}
-  .flag h3{font-size:18px;margin:8px 0 8px;font-weight:660;letter-spacing:-.01em}
-  .flag p{margin:0;font-size:13.6px;color:var(--muted);line-height:1.55}
-  .flag p b{color:var(--ink);font-weight:600}
-  .metrics{display:flex;flex-direction:column;gap:11px;margin:16px 0 4px}
-  .metric{display:grid;grid-template-columns:96px 1fr auto;gap:11px;align-items:center}
-  .metric .ml{font-size:12px;color:var(--muted)}
-  .bar{height:8px;border-radius:5px;background:var(--surface-2);position:relative;overflow:hidden}
-  .bar>span{position:absolute;inset:0 auto 0 0;border-radius:5px}
-  .bar .b0{background:var(--faint);opacity:.5}
-  .bar .b1{background:var(--accent)}
-  .metric .mv{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-variant-numeric:tabular-nums;
-    color:var(--ink);white-space:nowrap}
-  .metric .mv .arr{color:var(--faint)}
-  .metric .mv .good{color:var(--pos);font-weight:600}
+  /* tables — booktabs */
+  .tw{overflow-x:auto;margin:22px 0 8px}
+  table{border-collapse:collapse;width:100%;font-size:14px;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  caption{caption-side:bottom;text-align:left;font-size:13px;color:var(--muted);font-style:italic;
+    padding-top:12px;line-height:1.5;font-family:"Iowan Old Style",Georgia,serif}
+  caption b{font-style:normal;font-weight:600;color:var(--ink)}
+  thead th{border-top:1.5px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong);
+    padding:9px 12px;text-align:left;font-weight:600;font-size:12px;letter-spacing:.02em;color:var(--ink);vertical-align:bottom}
+  tbody td{border-bottom:1px solid var(--rule);padding:9px 12px;vertical-align:top;color:var(--muted)}
+  tbody tr:last-child td{border-bottom:1.5px solid var(--rule-strong)}
+  td.name{color:var(--ink);font-weight:600;white-space:nowrap}
+  td.num,th.num{text-align:right;font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;
+    white-space:nowrap;color:var(--ink)}
+  .v{font-family:system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .v.c{color:var(--confirmed)} .v.i{color:var(--insight)} .v.n{color:var(--null)}
+  .pos{color:var(--confirmed)} .bad{color:var(--neg)}
 
-  /* ---- quote ---- */
-  .quote{padding:60px 0}
-  blockquote{margin:0;max-width:44ch}
-  blockquote p{font-size:clamp(20px,2.9vw,29px);line-height:1.3;letter-spacing:-.015em;font-weight:560;margin:0}
-  blockquote .hl{color:var(--accent)}
-  blockquote cite{display:block;margin-top:18px;font-style:normal;font-size:13.5px;color:var(--muted);
-    font-family:ui-monospace,Menlo,monospace}
+  blockquote{margin:26px 0;padding:0 0 0 22px;border-left:2px solid var(--accent);
+    font-style:italic;font-size:18px;line-height:1.5;color:var(--ink);max-width:60ch}
+  blockquote span{font-style:normal}
 
-  /* ---- stack ---- */
-  .stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;margin-top:26px}
-  .stack h3{font-size:12px;font-family:ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--faint);font-weight:600;margin-bottom:11px}
-  .tags{display:flex;flex-wrap:wrap;gap:7px}
-  .t{font-size:12.3px;font-family:ui-monospace,Menlo,monospace;border:1px solid var(--line);background:var(--surface);
-    border-radius:7px;padding:4px 9px;color:var(--ink)}
+  .disc{display:grid;grid-template-columns:1fr 1fr;gap:0 30px}
+  .disc dt{font-weight:600;font-size:15px;margin-top:16px}
+  .disc dd{margin:3px 0 0;font-size:14.5px;color:var(--muted);line-height:1.5}
+  @media (max-width:640px){.disc{grid-template-columns:1fr}}
 
-  footer{padding:52px 0 64px}
-  footer p{color:var(--muted);max-width:62ch;font-size:14.5px}
-  footer p b{color:var(--ink);font-weight:600}
-  .foot-row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;align-items:center;margin-top:24px}
-  .sig{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--faint)}
+  footer{padding:38px 0 60px}
+  footer .label{color:var(--accent)}
+  footer p{font-size:15px;color:var(--muted);max-width:66ch}
+  footer .refs{font-family:system-ui,sans-serif;font-size:12.5px;color:var(--faint);margin-top:20px;line-height:1.7}
+  .btn{display:inline-block;margin-top:20px;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;
+    color:var(--accent);border-bottom:1px solid var(--accent);padding-bottom:1px}
+  .btn:hover{border-bottom-width:2px}
 
-  .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
-  .reveal.in{opacity:1;transform:none}
-  @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}
-    .node:hover{transform:none}}
-  @media (max-width:720px){ .flags{grid-template-columns:1fr} section{padding:44px 0} .hero{padding:56px 0 44px} }
+  @media (max-width:640px){ .paper{padding:0 22px} section{padding:32px 0} .head{padding:52px 0 28px} body{font-size:16px} }
 </style>
 
-<header>
-  <div class="wrap hero">
-    <div class="eyebrow">Quantitative research &middot; self-directed platform</div>
-    <h1>A research-to-execution quant platform<br><span class="fade">— built to prove what works, and prove when it doesn't.</span></h1>
-    <p class="lede">One system takes a strategy from idea to execution: realistic backtest, an overfitting-aware
-      validation gauntlet, a full risk &amp; transaction-cost layer, and a decay monitor. The through-line isn't a
-      unicorn alpha — it's <b>the discipline to generate ideas, triage them at scale, and report the null every
-      time it's a null.</b></p>
-    <div class="stats">
-      <div class="stat"><div class="n">276</div><div class="k">passing unit tests</div></div>
-      <div class="stat"><div class="n">20&nbsp;yrs</div><div class="k">backtest history (2006–2026)</div></div>
-      <div class="stat"><div class="n">11</div><div class="k">strategies tested &amp; diagnosed</div></div>
-      <div class="stat"><div class="n">live</div><div class="k">execution validated vs real fills</div></div>
-      <div class="stat"><div class="n">~35</div><div class="k">Python research modules</div></div>
+<div class="head">
+  <div class="paper">
+    <div class="label">Systematic strategy research &middot; methods &amp; selected findings</div>
+    <h1>A Platform for Honest Backtesting, Execution Modeling, and the Alpha Lifecycle</h1>
+    <p class="subtitle">An end-to-end apparatus for evaluating trading strategies under realistic frictions — and a discipline for reporting what does <em>not</em> work.</p>
+    <div class="byline">
+      <span><b>Author</b>&ensp;self-directed quant research project</span>
+      <span><b>Stack</b>&ensp;Python · NumPy/SciPy/pandas · 276 unit tests</span>
+      <span><b>Data</b>&ensp;20 yr, 2006–2026 · US equities &amp; ETFs</span>
     </div>
-    <div class="cta">
-      <a class="btn" href="https://github.com/ste959/FixedIncomeTradingPlatform" target="_blank" rel="noopener">View the repository →</a>
-      <span class="note">Python · NumPy/pandas/SciPy · FastAPI · Java/Spring · React/TS</span>
+    <div class="abstract">
+      <span class="label">Abstract</span>
+      <p>We present a self-directed research platform for systematic trading strategies that privileges
+        methodological honesty over headline performance. Candidate strategies are evaluated under a
+        walk-forward protocol behind an overfitting-aware validation gauntlet — a deflated Sharpe ratio, the
+        probability of backtest overfitting, Newey–West standard errors, and a minimum-detectable-Sharpe power
+        analysis — and priced through an execution model (spread, square-root market impact, borrow, and
+        capacity) <em>calibrated against live paper fills</em>. Across eleven candidate strategies spanning
+        cross-sectional factors, statistical arbitrage, and structural order-flow, none establishes a
+        statistically significant edge on liquid, survivorship-constrained data; each null is reported and its
+        cause diagnosed. The platform's contribution is the apparatus itself, together with an implementation
+        framework — the Grinold–Kahn transfer coefficient — for maximizing the fraction of a signal that
+        survives to realized P&amp;L. All headline results are checked on a <em>pre-registered</em> twenty-year
+        out-of-sample hold-out.</p>
     </div>
   </div>
-</header>
+</div>
 
-<section class="reveal">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="eyebrow">The platform</div>
-      <h2>Concept → execution, as one pipeline</h2>
-      <p>A strategy plugs into a single interface and inherits every stage. Each stage is a real, tested module — not a slide.</p>
+<section>
+  <div class="paper">
+    <h2><span class="no">§1</span>Research protocol</h2>
+    <p>Every strategy is expressed against one interface and evaluated by an identical engine, so results are
+      comparable and no study can quietly relax the rules. The protocol fixes the assumptions that most often
+      manufacture false alpha:</p>
+    <ol class="proto">
+      <li><b>Walk-forward, out-of-sample by construction.</b> <span>Parameters are fit on a trailing window and traded on the next block; signals at time <span class="var">t</span> use only data through <span class="var">t</span>−1, with a one-period execution lag. The no-look-ahead property is asserted by a unit test, not assumed.</span></li>
+      <li><b>Excess of the risk-free rate.</b> <span>Sharpe ratios are computed on returns net of a T-bill, because a "Sharpe" is compensation for risk above cash — over 2006–2026 the short rate moved 0%→5%, and ignoring it overstates every ratio.</span></li>
+      <li><b>Point-in-time data &amp; survivorship control.</b> <span>A data-quality audit gates on clean inputs; a point-in-time universe masks names to their as-of membership and realizes delisting losses. (Free data remains survivorship-constrained — see §7.)</span></li>
+      <li><b>Pre-registration.</b> <span>For the flagship study the out-of-sample window and the hypothesis are recorded <em>before</em> the test is run; the result is reported once, whether or not it agrees with the guess (§6).</span></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="paper">
+    <h2><span class="no">§2</span>The validation gauntlet</h2>
+    <p>Backtesting <span class="var">N</span> configurations on one history is a multiple-comparisons problem:
+      the best of many random strategies looks good by construction. Each candidate therefore passes a battery
+      of overfitting-aware statistics before any claim is entertained.</p>
+    <div class="tw">
+      <table>
+        <caption><b>Table 1.</b> The validation gauntlet. Each component corrects a distinct failure mode of naïve backtesting.</caption>
+        <thead><tr><th>Statistic</th><th>Corrects for</th><th>Threshold</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Newey–West <span class="var">t</span></td><td>autocorrelated, heteroskedastic returns inflating significance</td><td class="num">|t| &gt; 2</td></tr>
+          <tr><td class="name">Block-bootstrap CI</td><td>a point Sharpe indistinguishable from zero</td><td class="num">CI excl. 0</td></tr>
+          <tr><td class="name">Deflated Sharpe</td><td>trials tried, plus skew &amp; kurtosis of returns</td><td class="num">&gt; 0.95</td></tr>
+          <tr><td class="name">PBO (CSCV)</td><td>probability the selected strategy is overfit</td><td class="num">&lt; 0.5</td></tr>
+          <tr><td class="name">Bonferroni bar</td><td>selecting the best of many strategies</td><td class="num">|t| &gt; 2.6</td></tr>
+          <tr><td class="name">Min-detectable SR</td><td>whether the sample is even powered to detect an edge</td><td class="num">≤ best SR</td></tr>
+        </tbody>
+      </table>
     </div>
-    <div class="pipe">
-      <div class="node"><div class="step mono">01 · DATA</div><h3>Long-history &amp; integrity</h3><p>20-year data, a data-quality audit, and a point-in-time universe to kill survivorship bias.</p></div>
-      <div class="node"><div class="step mono">02 · SIGNAL</div><h3>Signal library</h3><p>Cross-sectional factors, trend, statistical-arbitrage residuals, structural-flow signals.</p></div>
-      <div class="node"><div class="step mono">03 · BACKTEST</div><h3>Walk-forward engine</h3><p>One-day lag, no look-ahead — enforced by a unit test, not a promise.</p></div>
-      <div class="node"><div class="step mono">04 · VALIDATION</div><h3>Overfitting gauntlet</h3><p>Deflated Sharpe · PBO · Newey–West t · bootstrap CI · min-detectable-Sharpe power.</p></div>
-      <div class="node"><div class="step mono">05 · RISK &amp; TCA</div><h3>Risk system</h3><p>VaR/ES (Cornish–Fisher), stress replay, limits, and implementation-shortfall analysis.</p></div>
-      <div class="node"><div class="step mono">06 · EXECUTION</div><h3>Realistic + validated</h3><p>Spread, square-root impact, borrow, capacity — calibrated against real Alpaca fills.</p></div>
-      <div class="node"><div class="step mono">07 · LIFECYCLE</div><h3>Alpha-decay monitor</h3><p>Is the edge decaying or crowding? Is it beta wearing an alpha costume?</p></div>
-      <div class="node"><div class="step mono">08 · REPORT</div><h3>Tearsheets</h3><p>Self-contained HTML reports and a gauntlet-ranked strategy leaderboard.</p></div>
+    <p>The power analysis is decisive. The smallest Sharpe distinguishable from zero at a fixed confidence
+      scales inversely with the square root of the sample length,</p>
+    <div class="eq"><span class="expr mono">SR<sub>min</sub> &nbsp;∝&nbsp; T<sup>−1/2</sup></span><span class="num">(1)</span></div>
+    <p>so extending the record from six to twenty years lowers the detectable threshold from ≈ 1.3 to ≈ 0.64.
+      Much of what a short sample calls a "null" is not evidence of no edge — it is an <em>underpowered</em>
+      test, a distinction §6 makes concrete.</p>
+  </div>
+</section>
+
+<section>
+  <div class="paper">
+    <h2><span class="no">§3</span>Execution &amp; cost model</h2>
+    <p>A frictionless backtest answers the wrong question. The realized cost of a trade decomposes into the
+      half-spread paid to cross, temporary market impact, and — for short or levered books — a financing
+      carry. Impact follows the empirical square-root law,</p>
+    <div class="eq"><span class="expr">c &nbsp;=&nbsp; <span class="var">s</span>/2 &nbsp;+&nbsp; <span class="var">κ&thinsp;σ</span> <span class="rad">√</span><span style="border-top:1px solid currentColor;padding:0 .15em"><span class="var">Q</span>/ADV</span> &nbsp;+&nbsp; <span class="var">b</span>&thinsp;·&thinsp;(short notional)</span><span class="num">(2)</span></div>
+    <p>with impact coefficient <span class="var">κ</span> in the empirical equity range [0.1, 0.5] (Almgren et
+      al.). A participation cap converts an over-large order into a <em>partial</em> fill, which makes the
+      backtest capacity-aware: sweeping assets under management traces the AUM at which a strategy's own
+      trading erodes its edge. The gap between the frictionless and realistic runs is Perold's implementation
+      shortfall, itself decomposed into execution and opportunity cost.</p>
+    <h3>Calibration against live fills</h3>
+    <p>The model is not left as an assumption. Real orders were submitted to a live paper-trading account and
+      the fills compared to the modeled spread.</p>
+    <div class="tw">
+      <table>
+        <caption><b>Table 2.</b> Modeled spread vs. real quoted spread (basis points), measured live. The model is accurate for deep names and conservatively under-prices a thinner one — a calibration finding, not a guess. Paper fills themselves are an optimistic lower bound (no market impact).</caption>
+        <thead><tr><th>Instrument</th><th class="num">Model</th><th class="num">Real quote</th><th class="num">Ratio</th></tr></thead>
+        <tbody>
+          <tr><td class="name">SPY</td><td class="num">0.5</td><td class="num">0.5</td><td class="num pos">1.0×</td></tr>
+          <tr><td class="name">IWM</td><td class="num">1.0</td><td class="num">1.0</td><td class="num pos">1.0×</td></tr>
+          <tr><td class="name">XLE</td><td class="num">1.5</td><td class="num">1.7</td><td class="num">1.1×</td></tr>
+          <tr><td class="name">XLF</td><td class="num">1.5</td><td class="num">3.5</td><td class="num bad">2.3×</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
 
-<section class="reveal">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="eyebrow">The research journey</div>
-      <h2>Eleven ideas, honestly tested — and honestly killed</h2>
-      <p>The rare skill isn't finding alpha; it's qualifying which ideas are worth capital and diagnosing exactly why the rest aren't. Every study below reports its real verdict.</p>
-    </div>
-    <div class="tally">
-      <span class="chip proven">Proven capability</span>
-      <span class="chip insight">Real insight / mixed</span>
-      <span class="chip null">Honest null</span>
-    </div>
-    <div class="studies">
-      <div class="study p">
-        <div class="top"><h3>Transfer coefficient</h3><span class="chip proven">proven</span></div>
-        <div class="idea mono">make a signal deployable</div>
-        <p>Caught that <b>57% of momentum's Sharpe was a hidden factor tilt</b>; the implementation stack made it market-neutral and cut the tail.</p>
-      </div>
-      <div class="study p">
-        <div class="top"><h3>Live fill validation</h3><span class="chip proven">proven</span></div>
-        <div class="idea mono">model vs real paper fills</div>
-        <p>Submitted real Alpaca paper orders. The cost model was <b>spot-on for SPY &amp; IWM</b> — every capacity/TCA number now anchored to a real fill.</p>
-      </div>
-      <div class="study p">
-        <div class="top"><h3>Pre-registered OOS</h3><span class="chip proven">proven</span></div>
-        <div class="idea mono">20-year never-touched hold-out</div>
-        <p>A registered out-of-sample test that <b>falsified my own hypothesis</b> — 2022 hit 60/40 harder than 2008, and I reported it.</p>
-      </div>
-      <div class="study i">
-        <div class="top"><h3>Shadow of the Machines</h3><span class="chip insight">insight</span></div>
-        <div class="idea mono">leveraged-ETF forced flow</div>
-        <p>Invented it myself. Mechanism <b>confirmed (corr +0.47)</b>; then the decay monitor <b>refuted my own durability thesis.</b></p>
-      </div>
-      <div class="study i">
-        <div class="top"><h3>Enhanced trend-following</h3><span class="chip insight">insight</span></div>
-        <div class="idea mono">ablation + factor attribution</div>
-        <p>Diagnosed the "edge" as <b>vol-timing plus a short-duration beta</b> — not signal alpha. Knowing that is the finding.</p>
-      </div>
-      <div class="study i">
-        <div class="top"><h3>OPEX / dealer gamma</h3><span class="chip insight">insight</span></div>
-        <div class="idea mono">options-expiration effect</div>
-        <p>The textbook effect had reversed; the crowding detector flagged the overlay as <b>beta in an alpha costume.</b></p>
-      </div>
-      <div class="study i">
-        <div class="top"><h3>Multi-factor book</h3><span class="chip insight">insight</span></div>
-        <div class="idea mono">institutional market-neutral</div>
-        <p>Survivorship <b>distorts factors in opposite directions</b> — it destroys low-vol and flatters momentum. Diagnosed, not reported as a win.</p>
-      </div>
-      <div class="study n">
-        <div class="top"><h3>Cross-sectional stat-arb</h3><span class="chip null">null</span></div>
-        <div class="idea mono">Avellaneda–Lee reversal</div>
-        <p>Built the canonical desk strategy on breadth. The daily reversal is <b>arbitraged out of liquid names</b> — the literature-correct result.</p>
-      </div>
-      <div class="study n">
-        <div class="top"><h3>The Absent Buyer</h3><span class="chip null">null</span></div>
-        <div class="idea mono">buyback-blackout regulation</div>
-        <p>Refuted — the blackout window is <b>confounded with the pre-earnings run-up</b>, which dominates. A specific, named cause.</p>
-      </div>
-      <div class="study n">
-        <div class="top"><h3>The Forced Seller</h3><span class="chip null">null</span></div>
-        <div class="idea mono">vol-control deleveraging</div>
-        <p>Wrong sign: after a vol spike the market <b>front-runs and bounces</b>, so riding the forced flow loses.</p>
-      </div>
-      <div class="study n">
-        <div class="top"><h3>Multi-asset allocation</h3><span class="chip null">null</span></div>
-        <div class="idea mono">risk parity vs 60/40, 20y</div>
-        <p>Over 20 years the premium is real — but <b>it's beta, not skill</b>; every allocator clusters, none establishes alpha.</p>
-      </div>
-    </div>
+<section>
+  <div class="paper">
+    <h2><span class="no">§4</span>Risk framework</h2>
+    <p>Risk is modeled structurally rather than as a single volatility number. The asset covariance is built
+      from a factor risk model,</p>
+    <div class="eq"><span class="expr">Σ &nbsp;=&nbsp; <span class="var">B F B</span><sup>⊤</sup> &nbsp;+&nbsp; <span class="var">D</span></span><span class="num">(3)</span></div>
+    <p>with factor loadings <span class="var">B</span>, factor covariance <span class="var">F</span>, and
+      specific variance <span class="var">D</span>; the same Σ drives a constrained mean-variance optimizer
+      (factor- and dollar-neutral, with box and turnover caps). Tail risk is measured with a Cornish–Fisher
+      expansion that corrects the Gaussian quantile for the skew <span class="var">S</span> and excess
+      kurtosis <span class="var">K</span> of realized returns,</p>
+    <div class="eq"><span class="expr">z<sub>cf</sub> = z + <span style="white-space:nowrap">(z²−1)</span><span class="var">S</span>/6 + <span style="white-space:nowrap">(z³−3z)</span><span class="var">K</span>/24 − <span style="white-space:nowrap">(2z³−5z)</span><span class="var">S</span>²/36</span><span class="num">(4)</span></div>
+    <p>so reported VaR and expected shortfall reflect fat tails rather than a normal approximation. The layer
+      also produces marginal risk contributions (where the risk actually sits), historical stress replay of
+      the current book, and mandate limit checks.</p>
   </div>
 </section>
 
-<section class="reveal">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="eyebrow">Flagship results</div>
-      <h2>Four things that make the honesty <em>provable</em></h2>
+<section>
+  <div class="paper">
+    <h2><span class="no">§5</span>Findings</h2>
+    <p>Eleven strategies were taken through the full apparatus. Consistent with an efficient-market prior on
+      liquid, survivorship-constrained data, <strong>none establishes a statistically significant edge.</strong>
+      The value is in the diagnosis: every result is reported honestly, and every failure is attributed to a
+      specific cause.</p>
+    <div class="tw">
+      <table>
+        <caption><b>Table 3.</b> Candidate strategies and verdicts. <span class="v c">proven</span> = a demonstrated platform capability; <span class="v i">insight</span> = a mechanism confirmed or a specific cause diagnosed; <span class="v n">null</span> = an honest no-result, reported as such.</caption>
+        <thead><tr><th>Strategy</th><th>Class</th><th>Finding</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Transfer coefficient</td><td>implementation</td><td>Isolated that 57% of momentum's Sharpe was a latent factor tilt; made the book market-neutral.</td><td><span class="v c">proven</span></td></tr>
+          <tr><td class="name">Live fill validation</td><td>execution</td><td>Cost model matched real paper fills for deep names; every capacity/TCA figure now anchored to reality.</td><td><span class="v c">proven</span></td></tr>
+          <tr><td class="name">Pre-registered OOS</td><td>protocol</td><td>A 20-year hold-out that falsified the analyst's own hypothesis — and it was reported.</td><td><span class="v c">proven</span></td></tr>
+          <tr><td class="name">Leveraged-ETF flow</td><td>structural</td><td>Overnight-reversal mechanism confirmed (ρ = +0.47); the decay monitor then refuted its durability thesis.</td><td><span class="v i">insight</span></td></tr>
+          <tr><td class="name">Trend-following</td><td>time-series</td><td>Attribution showed the "edge" is volatility-timing plus a short-duration beta, not signal alpha.</td><td><span class="v i">insight</span></td></tr>
+          <tr><td class="name">Options-expiration</td><td>structural</td><td>Textbook effect had reversed; crowding detector flagged the overlay as beta in disguise.</td><td><span class="v i">insight</span></td></tr>
+          <tr><td class="name">Multi-factor book</td><td>cross-sectional</td><td>Survivorship distorts factors in opposite directions — destroying low-vol, flattering momentum.</td><td><span class="v i">insight</span></td></tr>
+          <tr><td class="name">Statistical arbitrage</td><td>cross-sectional</td><td>Avellaneda–Lee residual reversal is arbitraged out of liquid names — the literature-correct result.</td><td><span class="v n">null</span></td></tr>
+          <tr><td class="name">Buyback blackout</td><td>event / regulation</td><td>Refuted: the blackout window is confounded with the pre-earnings drift, which dominates.</td><td><span class="v n">null</span></td></tr>
+          <tr><td class="name">Vol-control flow</td><td>structural</td><td>Wrong sign — post-spike the market front-runs and reverses, so riding the forced flow loses.</td><td><span class="v n">null</span></td></tr>
+          <tr><td class="name">Multi-asset allocation</td><td>allocation</td><td>Over 20y the premium is real but it is beta, not skill; every allocator clusters, none adds alpha.</td><td><span class="v n">null</span></td></tr>
+        </tbody>
+      </table>
     </div>
-    <div class="flags">
-      <div class="flag">
-        <div class="tag">Implementation alpha</div>
-        <h3>I make a signal deployable — and catch the fakes</h3>
-        <p>Grinold–Kahn's <b>transfer coefficient</b>: I don't need a signal you don't have, I make the ones you trust survive to the book. On plain momentum, the stack neutralized a hidden factor bet and de-risked the tail.</p>
-        <div class="metrics">
-          <div class="metric"><span class="ml">Market β</span><div class="bar"><span class="b0" style="width:60%"></span><span class="b1" style="width:7%"></span></div><span class="mv">+0.09 <span class="arr">→</span> <span class="good">+0.01</span></span></div>
-          <div class="metric"><span class="ml">Max drawdown</span><div class="bar"><span class="b0" style="width:82%"></span><span class="b1" style="width:62%"></span></div><span class="mv">−16% <span class="arr">→</span> <span class="good">−12%</span></span></div>
-          <div class="metric"><span class="ml">"Alpha" that was factor tilt</span><div class="bar"><span class="b1" style="width:57%;background:var(--insight)"></span></div><span class="mv" style="color:var(--insight)">57%</span></div>
-        </div>
-      </div>
-
-      <div class="flag">
-        <div class="tag">Measured, not modeled</div>
-        <h3>Cost model validated on real fills</h3>
-        <p>Submitted live Alpaca paper orders and compared the fills to the modeled spread — with the honest caveat that paper fills are an <b>optimistic lower bound</b> (no market impact). The model brackets reality.</p>
-        <div class="metrics">
-          <div class="metric"><span class="ml">SPY spread</span><div class="bar"><span class="b0" style="width:50%"></span><span class="b1" style="width:50%"></span></div><span class="mv">model 0.5 <span class="arr">≈</span> <span class="good">real 0.5 bp</span></span></div>
-          <div class="metric"><span class="ml">IWM spread</span><div class="bar"><span class="b0" style="width:60%"></span><span class="b1" style="width:60%"></span></div><span class="mv">model 1.0 <span class="arr">≈</span> <span class="good">real 1.0 bp</span></span></div>
-          <div class="metric"><span class="ml">XLF (thinner)</span><div class="bar"><span class="b0" style="width:43%"></span><span class="b1" style="width:100%"></span></div><span class="mv">model 1.5 <span class="arr">→</span> real 3.5 bp</span></div>
-        </div>
-      </div>
-
-      <div class="flag">
-        <div class="tag">Pre-registered out-of-sample</div>
-        <h3>A test that falsified my own hypothesis</h3>
-        <p>Extended to 20 years of free data and pre-registered a never-touched 2006–2019 hold-out. I predicted 2008 would be the worst regime for 60/40 — a pre-registered test <b>proved me wrong.</b></p>
-        <div class="metrics">
-          <div class="metric"><span class="ml">60/40 · 2008 GFC</span><div class="bar"><span class="b1" style="width:63%;background:var(--null)"></span></div><span class="mv">−0.75 Sharpe</span></div>
-          <div class="metric"><span class="ml">60/40 · 2022 shock</span><div class="bar"><span class="b1" style="width:100%;background:var(--neg)"></span></div><span class="mv" style="color:var(--neg)">−1.19 Sharpe</span></div>
-        </div>
-        <p style="margin-top:10px">In 2008 bonds rallied and cushioned the book; in 2022 stocks and bonds fell together. That correlation flip is invisible in 6 years and obvious in 20.</p>
-      </div>
-
-      <div class="flag">
-        <div class="tag">Alpha lifecycle</div>
-        <h3>A decay &amp; crowding monitor</h3>
-        <p>No edge is permanent; a desk runs a factory of decaying edges and retires them before they bleed. The monitor tracks decay slope, half-life, and crowding — and repeatedly caught <b>market exposure masquerading as alpha.</b></p>
-        <div class="metrics">
-          <div class="metric"><span class="ml">Verdicts issued</span><div class="bar"><span class="b1" style="width:100%"></span></div><span class="mv">DECAYING · ROBUST · BETA-DOMINATED</span></div>
-          <div class="metric"><span class="ml">Min-detectable Sharpe</span><div class="bar"><span class="b0" style="width:100%"></span><span class="b1" style="width:48%"></span></div><span class="mv">1.3 (6y) <span class="arr">→</span> <span class="good">0.64 (20y)</span></span></div>
-        </div>
-      </div>
-    </div>
+    <blockquote>Mechanical flows are real, but the edge is not: the forced trade is the most predictable event in the market, so it is compensated to the liquidity provider, not the taker.<span> — the common thread across the structural-flow studies.</span></blockquote>
   </div>
 </section>
 
-<section class="quote reveal">
-  <div class="wrap">
-    <div class="eyebrow" style="margin-bottom:22px">The one thing ten dead strategies taught</div>
-    <blockquote>
-      <p>Mechanical flows are real, but the edge isn't — <span class="hl">the forced trade is the most predictable thing in the market, so it pays the liquidity provider, not the taker.</span></p>
-      <cite>— recorded in the project's research log, after building and killing several structural-flow strategies</cite>
-    </blockquote>
+<section>
+  <div class="paper">
+    <h2><span class="no">§6</span>A worked example: the transfer coefficient</h2>
+    <p>The realistic path to added value for a researcher without latency infrastructure is not signal
+      discovery but <em>implementation</em>. In the Grinold–Kahn decomposition of the information ratio,</p>
+    <div class="eq"><span class="expr">IR &nbsp;=&nbsp; IC &nbsp;·&nbsp; <span class="rad">√</span><span style="border-top:1px solid currentColor;padding:0 .15em"><span class="var">breadth</span></span> &nbsp;·&nbsp; TC</span><span class="num">(5)</span></div>
+    <p>the <span class="term">transfer coefficient</span> TC is the fraction of a signal's theoretical
+      performance that survives risk limits, costs, turnover, and unintended factor bets. Discovery moves IC;
+      implementation moves TC. Applying the deployment stack to a standard momentum signal — the signal held
+      fixed — neutralizes hidden bets and controls the tail:</p>
+    <div class="tw">
+      <table>
+        <caption><b>Table 4.</b> Momentum before and after the implementation stack (signal unchanged). Neutralizing a latent beta/volatility tilt removes a bet that was never intended and shrinks the drawdown; it cannot manufacture return where a signal is exhausted — and the analysis says so.</caption>
+        <thead><tr><th>Property</th><th class="num">Raw signal</th><th class="num">Implemented</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Market β</td><td class="num">+0.09</td><td class="num pos">+0.01</td></tr>
+          <tr><td class="name">Maximum drawdown</td><td class="num">−16%</td><td class="num pos">−12%</td></tr>
+          <tr><td class="name">"Alpha" that was factor tilt</td><td class="num" colspan="2" style="text-align:center">57%, exposed by neutralization</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The corollary is the discipline the platform most cares about: an honest transfer analysis also
+      <em>refuses</em> to size a signal that only looks like alpha — catching market exposure in an alpha
+      costume before it reaches the book.</p>
   </div>
 </section>
 
-<section class="reveal">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="eyebrow">Under the hood</div>
-      <h2>The statistics &amp; the stack</h2>
-      <p>Hand-rolled where it teaches something; industry-standard everywhere it matters.</p>
-    </div>
-    <div class="stack">
-      <div>
-        <h3>Statistical rigor</h3>
-        <div class="tags">
-          <span class="t">Deflated Sharpe</span><span class="t">PBO / CSCV</span><span class="t">Newey–West HAC</span>
-          <span class="t">block bootstrap CI</span><span class="t">min-detectable power</span><span class="t">Cornish–Fisher VaR</span>
-          <span class="t">Ledoit–Wolf shrinkage</span><span class="t">pre-registered OOS</span>
-        </div>
-      </div>
-      <div>
-        <h3>Methods</h3>
-        <div class="tags">
-          <span class="t">Grinold–Kahn transfer coeff.</span><span class="t">factor risk model Σ=BFᵀB+D</span>
-          <span class="t">constrained MVO</span><span class="t">Avellaneda–Lee stat-arb</span>
-          <span class="t">√-law market impact</span><span class="t">implementation shortfall</span>
-          <span class="t">point-in-time universe</span><span class="t">capacity curves</span>
-        </div>
-      </div>
-      <div>
-        <h3>Engineering</h3>
-        <div class="tags">
-          <span class="t">Python</span><span class="t">NumPy</span><span class="t">pandas</span><span class="t">SciPy</span>
-          <span class="t">scikit-learn</span><span class="t">FastAPI</span><span class="t">Java / Spring</span>
-          <span class="t">React / TypeScript</span><span class="t">Docker / K8s</span><span class="t">276 unit tests</span>
-        </div>
-      </div>
-    </div>
+<section>
+  <div class="paper">
+    <h2><span class="no">§7</span>Limitations &amp; disclosures</h2>
+    <p>The results are bounded by the data available to a self-funded researcher, and are reported with those
+      bounds explicit rather than obscured.</p>
+    <dl class="disc">
+      <dt>Survivorship bias</dt><dd>The free universe contains only surviving names, which distorts factor tests (§5); the point-in-time machinery is built for a survivorship-free feed.</dd>
+      <dt>Paper-fill optimism</dt><dd>Live paper fills carry no market impact or queue position, so the measured cost (§3) is a lower bound on true execution cost.</dd>
+      <dt>Single macro cluster</dt><dd>Even 20 years is ≈ 1–2 independent macro cycles; statistical claims remain modest, and are stated as such.</dd>
+      <dt>Calibrated, not measured</dt><dd>Impact and borrow coefficients are sourced to the literature and stress-tested for sensitivity; the qualitative conclusions hold across the plausible band.</dd>
+    </dl>
   </div>
 </section>
 
 <footer>
-  <div class="wrap">
-    <div class="eyebrow">The take-away</div>
-    <p style="font-size:16.5px;line-height:1.5;margin-top:12px"><b>I didn't set out to find a golden goose.</b>
-      I built the factory: generate an idea, triage it cheaply, backtest it under real costs, validate it against
-      the live broker, and — the part almost no one demonstrates — <b>prove what <em>isn't</em> an edge before it
-      costs the desk money.</b></p>
-    <div class="foot-row">
-      <a class="btn" href="https://github.com/ste959/FixedIncomeTradingPlatform" target="_blank" rel="noopener">Explore the code &amp; research notes →</a>
-      <span class="sig">Self-directed quant research project · Python + real market data</span>
-    </div>
+  <div class="paper">
+    <div class="label">Contribution</div>
+    <p>The deliverable is not a strategy but a <strong>process</strong>: generate a hypothesis, triage it
+      cheaply, backtest it under real frictions, validate it against a live broker, and — the part rarely
+      demonstrated — establish what is <em>not</em> an edge before capital is committed to it.</p>
+    <a class="btn" href="https://github.com/ste959/FixedIncomeTradingPlatform" target="_blank" rel="noopener">Full source, tests &amp; research notes →</a>
+    <p class="refs">Selected methods: Grinold &amp; Kahn, <i>Active Portfolio Management</i> · Bailey &amp; López de
+      Prado, <i>The Deflated Sharpe Ratio</i> &amp; <i>PBO / CSCV</i> · Almgren et&nbsp;al., <i>Direct Estimation of
+      Equity Market Impact</i> · Frazzini &amp; Pedersen, <i>Betting Against Beta</i> · Avellaneda &amp; Lee,
+      <i>Statistical Arbitrage in the U.S. Equities Market</i> · Perold, <i>The Implementation Shortfall</i>.</p>
   </div>
 </footer>
-
-<script>
-  (function(){
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var io = new IntersectionObserver(function(es){
-      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
-    }, {rootMargin:'0px 0px -8% 0px', threshold:.06});
-    document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
-  })();
-</script>
 </body>
 </html>
