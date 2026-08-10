@@ -38,10 +38,11 @@ python run_xstatarb.py            # cross-sectional stat-arb (PCA factors -> OU 
 python run_opex.py                # OPEX structural effect + alpha-decay/crowding monitor
 python run_mechflow.py            # leveraged-ETF forced-flow overnight reversal
 python run_buyback.py             # buyback-blackout regulatory edge (needs EDGAR; cached)
+python run_forcedseller.py        # vol-control deleveraging flow anticipation
 python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
 
-python -m pytest -q               # 250 tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 256 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here

@@ -101,6 +101,23 @@ exists to keep that day honest.
   window and move to mid-caps. Inventing a regulatory edge is rare; diagnosing why the naive test fails is
   the job.
 
+**Vol-control deleveraging ("The Forced Seller", `run_forcedseller.py`)**
+- Anticipate the mechanical flow of vol-target funds: exposure = target/realized-vol, so a vol spike forces
+  multi-day selling. Built a directional signal from Δexposure and rode it, benchmarked against generic
+  vol-timing (Moreira–Muir) and buy-hold.
+- **Result: refuted — riding the flow is the WRONG SIGN.** Forced-seller is significantly negative (−0.96,
+  HAC t −2.5) and decaying; the forward-return regression is ≈0. After a vol spike the market front-runs and
+  **bounces** (mean-reversion + the forced selling being anticipated/absorbed), and that dominates the
+  continued deleveraging — you'd fade, not ride. And vol-target-hold (0.80) ≈ buy-hold (0.85) in the bull.
+
+**The cross-study theme (mechflow + buyback + forcedseller) — the real insight:** every self-invented
+mechanical-flow edge came back the same way. The *flow* is real and mechanical; the *edge* is not, because
+the mechanical actor's trade is the most predictable thing in the market, so it's the most competed-for —
+the impact is anticipated, absorbed, and usually reversed before a taker can capture it. A "structural,
+can't-be-arbitraged" story still isn't a free lunch: the forced flow pays only the **liquidity provider**
+(a maker earning the spread), not a taker riding it. That conclusion is only reachable by building and
+honestly testing several — which is what the platform is for.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).
