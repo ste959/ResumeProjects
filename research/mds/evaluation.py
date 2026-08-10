@@ -66,6 +66,39 @@ def stats(net: pd.Series, rf: pd.Series | None = None, ppy: int = TRADING_DAYS) 
             "cvar_5": round(cvar5, 5), "skew": round(float(sstats.skew(r)), 3), "n_days": len(r)}
 
 
+def paired_sharpe_diff_ci(net_a: pd.Series, net_b: pd.Series, rf: pd.Series | None = None,
+                          n_boot: int = 2000, block: int | None = None, ppy: int = TRADING_DAYS,
+                          seed: int = 0) -> dict:
+    """Block-bootstrap CI for the DIFFERENCE in excess Sharpe between two strategies, **paired** on the
+    same dates (each resample draws the same time blocks for both series, so the common market moves
+    cancel). Answers 'is strategy A really better than B, or is the gap sampling noise?' — the question a
+    table of point estimates can't. Deterministic (fixed seed). Returns diff and a 95% CI; a CI spanning
+    0 means the improvement is not distinguishable from luck on this sample."""
+    common = net_a.index.intersection(net_b.index)
+    a, b = excess(net_a.reindex(common), rf), excess(net_b.reindex(common), rf)
+    m = np.isfinite(a) & np.isfinite(b)
+    a, b = a[m], b[m]
+    n = len(a)
+    if n < 30:
+        return {"diff": 0.0, "lo": 0.0, "hi": 0.0, "n": n}
+
+    def sr(x: np.ndarray) -> float:
+        sd = x.std()
+        return float(x.mean() / sd * np.sqrt(ppy)) if sd > 0 else 0.0
+
+    diff = sr(a) - sr(b)
+    block = block or max(5, int(round(n ** (1 / 3))))
+    rng = np.random.default_rng(seed)
+    n_blocks = int(np.ceil(n / block))
+    diffs = np.empty(n_boot)
+    for i in range(n_boot):
+        starts = rng.integers(0, n - block + 1, size=n_blocks)
+        idx = np.concatenate([np.arange(s, s + block) for s in starts])[:n]   # same idx for both = paired
+        diffs[i] = sr(a[idx]) - sr(b[idx])
+    lo, hi = np.percentile(diffs, [2.5, 97.5])
+    return {"diff": round(diff, 3), "lo": round(float(lo), 3), "hi": round(float(hi), 3), "n": n}
+
+
 def gauntlet(nets: dict, rf: pd.Series | None = None) -> dict:
     """Selection-aware honesty on a strategy SET: PBO across all of them, the Deflated Sharpe of the
     best (deflated for having tried this many), the multiple-testing t-bar, and the min-detectable

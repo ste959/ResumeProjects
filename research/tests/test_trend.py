@@ -6,6 +6,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from mds import evaluation as ev
 from mds import trend
 
 
@@ -121,3 +122,45 @@ def test_ablation_runs_through_the_gauntlet():
 def test_xs_momentum_is_cross_sectionally_neutral():
     xs = trend.xs_momentum(_panel()).dropna()
     assert xs.mean(axis=1).abs().max() < 1e-9      # z-scored across assets → each date sums to ~0
+
+
+# ── diagnostics ───────────────────────────────────────────────────────────────────────────────────
+def test_voltarget_decomposition_isolates_three_modes():
+    out = trend.voltarget_decomposition(_panel())
+    assert [d["mode"] for d in out] == ["none", "diag", "cov"]
+    # constant-gross runs at ~1x gross; the vol-target modes scale gross away from 1.
+    none = next(d for d in out if d["mode"] == "none")
+    assert abs(none["avg_gross"] - 1.0) < 0.2
+
+
+def test_loo_ablation_reports_full_plus_each_removal():
+    prices = _panel()
+    rows = trend.loo_ablation(prices, prices * 1.02)
+    assert rows[0]["variant"] == "full system" and rows[0]["delta"] == 0.0
+    assert {r["removed"] for r in rows[1:]} == set(trend.ALL_ENH)   # one row per enhancement removed
+
+
+def test_attribution_contributions_reconcile_to_net():
+    prices = _panel().rename(columns=dict(zip("ABCDE", ["SPY", "IEF", "LQD", "GLD", "UUP"])))  # real tickers
+    # With zero cost, per-asset contributions (wᵢ·rᵢ) sum EXACTLY to the net return — the only gap
+    # otherwise is the turnover charge, which is real, not a bookkeeping error.
+    at = trend.attribution(prices, prices * 1.02, enh=frozenset({"voltarget", "multiscale", "portvol"}),
+                           cost_bps=0.0, regimes=[("all", "2021-01-01", "2025-01-01")])
+    assert abs(at["per_sleeve"].sum() - at["net"].sum()) < 1e-9
+    assert set(at["net_exposure"].index).issubset({"Equity", "Rates", "Credit", "Commodity", "USD"})
+
+
+def test_paired_sharpe_diff_ci_is_zero_for_identical_series():
+    net = trend.backtest(_panel(), enh=frozenset({"voltarget", "multiscale"}))["net"]
+    d = ev.paired_sharpe_diff_ci(net, net)
+    assert abs(d["diff"]) < 1e-9 and d["lo"] <= 0 <= d["hi"]     # a series vs itself → no difference
+
+
+def test_factor_betas_recovers_a_known_beta():
+    # Construct a book that is exactly 0.5·factor + noise → regression should recover β≈0.5.
+    rng = np.random.default_rng(3)
+    dates = pd.date_range("2021-01-01", periods=500, freq="B")
+    fac = pd.Series(rng.normal(0, 0.01, 500), index=dates)
+    book = pd.Series(0.5 * fac.to_numpy() + rng.normal(0, 0.001, 500), index=dates)
+    fb = trend.factor_betas(book, fac.to_frame("F"))
+    assert abs(fb["betas"]["F"] - 0.5) < 0.05

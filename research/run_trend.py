@@ -22,6 +22,7 @@ import sys
 import pandas as pd
 
 from mds import alpaca_data as ad
+from mds import evaluation as ev
 from mds import trend as tr
 
 START, END = "2020-07-27", "2026-07-02"          # the max window the free IEX feed provides
@@ -94,21 +95,75 @@ def main() -> None:
     print(f"  full-system exSharpe range [{sh.min():.2f}, {sh.max():.2f}], median {sh.median():.2f}")
     print(f"  configs with positive Sharpe: {pos}/{len(grid)}   |   with |HAC t|≥1.96: {sig}/{len(grid)}")
 
-    stages = ab["stages"]
-    base = stages[0]
-    peak = max(stages, key=lambda r: r["sharpe"])                # the enhancement that actually won
-    crisis = next((r for r in reg if "2022" in r["regime"]), None)
-    crisis_sh = f"{crisis['sharpe']:.2f}" if crisis else "n/a"
-    print(f"\nVerdict: the single real lever is **{peak['stage'].strip('+ ')}** — it lifts excess Sharpe "
-          f"from {base['sharpe']:.2f} (vanilla) to {peak['sharpe']:.2f}; the extra *signal* blends on top "
-          f"of it (carry, crash-protection) did NOT improve this sample — an honest 'more knobs ≠ more "
-          f"alpha' result. Nothing clears the multiple-testing bar and the sample is "
-          f"{'powered' if powered else 'underpowered'} (min-detectable {g['min_detectable_sharpe']}), so "
-          f"the point estimate is not a statistically established edge. The result a single Sharpe hides "
-          f"is the regime row: the book earned Sharpe {crisis_sh} in 2022 — the rate-shock year where "
-          f"every allocation strategy in ASSET-ALLOCATION-NOTE lost together. That crisis convexity, not "
-          f"a big headline Sharpe, is trend's actual contribution: a diversifying premium that pays when "
-          f"diversification-by-correlation fails.")
+    # ── Diagnostics: attribute the numbers instead of just reporting them ──────────────────────────
+    stages, nets = ab["stages"], ab["nets"]
+    print("\n" + "=" * 78 + "\nDIAGNOSTICS — what is actually happening\n" + "=" * 78)
+
+    print("\n[1] Vol-target decomposition (signal fixed) — attributing the big ablation jump:")
+    decomp = tr.voltarget_decomposition(tp, pp, rf=rf)
+    for d in decomp:
+        print(f"  {d['label']:<40} exSharpe {d['sharpe']:>6.2f}   ann vol {d['ann_vol']*100:>5.1f}%   "
+              f"avg gross {d['avg_gross']:>4.2f}x")
+
+    print("\n[2] Leave-one-out (remove ONE enhancement from the full system; Δ vs full):")
+    loo = tr.loo_ablation(tp, pp, rf=rf)
+    loo_carry = next(r for r in loo if r["removed"] == "carry")
+    for r in loo:
+        tag = "" if r["removed"] == "—" else ("  helps" if r["delta"] < 0 else "  HURTS" if r["delta"] > 0 else "  neutral")
+        print(f"  {r['variant']:<20} exSharpe {r['sharpe']:>6.2f}   Δ {r['delta']:>+6.3f}{tag}")
+
+    print("\n[3] Sleeve attribution of the full system (which markets drove the P&L):")
+    at = tr.attribution(tp, pp, rf=rf, regimes=REGIMES)
+    print(f"  avg gross {at['avg_gross']:.2f}x, annual turnover ~{at['turnover_ann']:.0f}x")
+    print("  net exposure (avg signed weight):  " +
+          "  ".join(f"{k} {v:+.2f}" for k, v in at["net_exposure"].items()))
+    print("  total P&L contribution by sleeve:  " +
+          "  ".join(f"{k} {v*100:+.1f}%" for k, v in at["per_sleeve"].items()))
+    crisis_attr = at["regime_sleeve"].get(next(k for k in at["regime_sleeve"] if "2022" in k))
+    print("  2022 P&L by sleeve:                " +
+          "  ".join(f"{k} {v*100:+.1f}%" for k, v in crisis_attr.items()))
+
+    print("\n[4] Are the ablation gains real? Paired block-bootstrap of the Sharpe DIFFERENCE:")
+    peak_stage = max(stages, key=lambda r: r["sharpe"])["stage"]
+    pv_paired = None
+    for a_name, b_name, desc in [(peak_stage, stages[0]["stage"], "peak vs vanilla"),
+                                 (stages[-1]["stage"], peak_stage, "full vs peak")]:
+        d = ev.paired_sharpe_diff_ci(nets[a_name], nets[b_name], rf=rf)
+        if desc == "peak vs vanilla":
+            pv_paired = d
+        real = "distinguishable" if (d["lo"] > 0 or d["hi"] < 0) else "NOT distinguishable from 0"
+        print(f"  {desc:<16} ΔSharpe {d['diff']:>+6.2f}  95% CI [{d['lo']:>+5.2f}, {d['hi']:>+5.2f}]  → {real}")
+
+    print("\n[5] Factor exposure — is the 'premium' just disguised beta?")
+    fac = pd.DataFrame({"eq(SPY)": tp["SPY"].pct_change(), "dur(TLT)": tp["TLT"].pct_change()}).dropna()
+    full_net = nets[stages[-1]["stage"]]
+    fb = tr.factor_betas(full_net, fac, rf=rf)
+    fb22 = tr.factor_betas(full_net.loc["2022-01-01":"2022-12-31"], fac, rf=rf)
+    print(f"  full sample: alpha {fb['alpha_ann']*100:+.1f}%/yr (t {fb['alpha_t']:+.1f}), "
+          f"β_eq {fb['betas']['eq(SPY)']:+.2f} (t {fb['beta_t']['eq(SPY)']:+.1f}), "
+          f"β_dur {fb['betas']['dur(TLT)']:+.2f} (t {fb['beta_t']['dur(TLT)']:+.1f}), R² {fb['r2']:.2f}")
+    print(f"  2022 only:   β_eq {fb22['betas']['eq(SPY)']:+.2f}, β_dur {fb22['betas']['dur(TLT)']:+.2f}  "
+          f"(crisis convexity should show as LOW/negative duration beta, not a static short)")
+
+    sig_only, timing = decomp[0]["sharpe"], decomp[1]["sharpe"]
+    dur_b, dur_t = fb["betas"]["dur(TLT)"], fb["beta_t"]["dur(TLT)"]
+    print(f"\nVerdict (revised BY the diagnostics — this is the point of running them):")
+    print(f"  • It isn't the trend signal. Constant-gross, the signal alone Sharpes {sig_only:.2f}; nearly all "
+          f"of the {decomp[2]['sharpe']:.2f} comes from **volatility-timing** (scaling exposure by inverse vol "
+          f"over time — a Moreira–Muir effect), with correlation-aware sizing adding a little.")
+    print(f"  • Carry is a real detractor, not an ordering artifact: leave-one-out shows removing it LIFTS the "
+          f"full system {stages[-1]['sharpe']:.2f} → {loo_carry['sharpe']:.2f}.")
+    print(f"  • None of it is statistically established: peak-vs-vanilla ΔSharpe {pv_paired['diff']:+.2f} has a "
+          f"95% CI [{pv_paired['lo']:+.2f}, {pv_paired['hi']:+.2f}] — indistinguishable from noise; nothing "
+          f"clears the multiple-testing bar; the sample is underpowered.")
+    print(f"  • The '2022 crisis convexity' is largely a factor bet: the book is equity-neutral (β_eq≈0) but "
+          f"carries a big, highly-significant **short-duration beta {dur_b:+.2f} (t {dur_t:+.1f})**, and the "
+          f"sleeve attribution shows 2022 was short credit/rates + long commodities/dollar — a *static* "
+          f"short-bond tilt cashing in during a bond bear market, more than pure convexity.")
+    print(f"  Honest bottom line: what looks like 'enhanced trend alpha' is mostly **vol-timing plus a "
+          f"short-duration factor tilt** — a useful, equity-neutral, diversifying return stream, but not "
+          f"signal-driven alpha and not statistically proven on ~6 years. The diagnostics turned a murky "
+          f"Sharpe into a mechanism you can name, argue with, and size honestly.")
 
 
 if __name__ == "__main__":

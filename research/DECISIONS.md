@@ -43,13 +43,19 @@ exists to keep that day honest.
 
 **Enhanced trend-following (`run_trend.py`)**
 - A 7-stage ablation (vol-targeting, multi-timescale signal, portfolio vol overlay, carry, crash-
-  protection, cross-sectional overlay) over a 13-market universe; 18-config rebalance × cost × vol-target
-  sweep; 3 regimes.
-- **Result:** the risk-management overlay (portfolio vol-target) drives the only real Sharpe gain
-  (0.24 → 0.60); **carry and crash-protection did NOT help this sample** (carry lowered Sharpe) — added
-  complexity reported as not earning its keep, not quietly dropped. Nothing clears the multiple-testing
-  bar. The signal is in the *regime* table: excess Sharpe 1.77 in 2022, the year every allocator lost —
-  trend's contribution is crisis convexity, not a headline Sharpe.
+  protection, cross-sectional overlay) over a 13-market universe; 18-config sweep; 3 regimes; then a
+  **diagnostics pass** (vol-target decomposition, leave-one-out, sleeve attribution, paired Sharpe-diff
+  bootstrap, factor-beta regression) to attribute every number.
+- **Result (as revised BY the diagnostics — the important part):** the trend *signal* is worth ~nothing
+  (constant-gross Sharpe 0.03); nearly all of the 0.60 is **vol-timing** (Moreira–Muir), not direction.
+  Leave-one-out confirms **carry hurts** (removing it lifts the full system 0.38 → 0.54) order-
+  independently. A paired bootstrap says the ablation gains are **not distinguishable from noise**
+  (peak-vs-vanilla ΔSharpe +0.36, CI [−0.28, +1.01]). And the factor regression caught that the headline
+  "2022 crisis convexity" is largely a **static short-duration beta (−0.29, t −16.7)** cashing in during a
+  bond bear market — the book is equity-neutral but is really vol-timing + a duration tilt, not signal alpha.
+- **The lesson this logs:** the first-pass narrative ("risk-management lever + crisis convexity") was
+  half-right and half-artifact; only the diagnostics separated the mechanism from the story. Decompose the
+  book into its factor bets before believing your own summary.
 
 ## Dead ends (things that did not work, kept visible)
 

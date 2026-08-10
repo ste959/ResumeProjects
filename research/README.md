@@ -79,7 +79,7 @@ python run_options.py           # live Alpaca options surface: ATM-IV / skew / I
 python run_construction.py      # 5-layer portfolio construction: composite → risk model → timing → options → tax
 python run_assetalloc.py        # multi-asset risk-based allocation vs 60/40 (excess-of-cash, tail, regime)
 python run_trend.py             # enhanced trend-following, by ablation (what each enhancement adds)
-python -m pytest                # 179 tests (offline; data modules fetch lazily)
+python -m pytest                # 184 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests
