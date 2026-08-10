@@ -88,6 +88,19 @@ exists to keep that day honest.
   to −0.91 in 2023-26 (slope t −2.0). Crowding outran the growing source. Inventing an edge is easy; using
   your own tool to disprove it is the job.
 
+**Buyback-blackout regulatory edge ("The Absent Buyer", `run_buyback.py`)**
+- A differentiated, self-invented idea: buybacks are the dominant price-insensitive buyer; firms are
+  blacked out from repurchasing before earnings, so a stock loses its biggest buyer on a recurring
+  schedule. Built point-in-time from SEC-EDGAR (blackout anchored to 10-Q/10-K filing dates; intensity
+  from XBRL repurchase facts ÷ market cap).
+- **Result: REFUTED, with the confound diagnosed.** The short-in-blackout book is significantly *negative*
+  gross (−1.04, HAC t −2.7) and the tercile drag isn't monotonic. The diagnosis is the value: the blackout
+  window overlaps the **pre-earnings-announcement drift** (stocks drift up into earnings), which dominates
+  and flips the sign; mega-caps are too liquid for buyback absence to move (the same flow÷liquidity gate);
+  and the annual-only XBRL intensity read is weak. The refinement it points to: neutralize the earnings
+  window and move to mid-caps. Inventing a regulatory edge is rare; diagnosing why the naive test fails is
+  the job.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).
