@@ -22,6 +22,7 @@ import pandas as pd
 
 from . import evaluation as ev
 from . import execution as ex
+from . import universe as un
 
 TRADING_DAYS = 252
 
@@ -69,14 +70,17 @@ class StrategyResult:
 
 
 def run(strategy: Strategy, prices: pd.DataFrame, config: BacktestConfig | None = None,
-        liquidity: ex.Liquidity | None = None) -> StrategyResult:
+        liquidity: ex.Liquidity | None = None, universe: un.PointInTimeUniverse | None = None) -> StrategyResult:
     """Walk-forward backtest of one strategy through the shared engine. Costs come from `config.execution`
     (defaults to a flat-bps model); pass `liquidity` when using `RealisticExecution` so spread/impact/
-    participation are priced off real ADV, vol, and spread."""
+    participation are priced off real ADV, vol, and spread. Pass `universe` for point-in-time membership:
+    weights are masked to names listed-and-not-delisted as of each date, and a delisting loss is realized
+    when a held name exits — the fix for survivorship bias."""
     cfg = config or BacktestConfig()
     exec_model = cfg.execution or ex.FlatBps(cfg.cost_bps)
     syms = strategy.symbols()
-    px = prices[syms].dropna()
+    px = prices[syms]
+    px = px if universe is not None else px.dropna()          # PIT keeps NaN history (names not yet listed)
     rets = px.pct_change()
     strategy.prepare(px)
 
@@ -86,6 +90,8 @@ def run(strategy: Strategy, prices: pd.DataFrame, config: BacktestConfig | None 
         adv = liquidity.adv_usd.reindex(index=rets.index, columns=syms)
         vol = liquidity.daily_vol.reindex(index=rets.index, columns=syms)
         spr = liquidity.spread_frac.reindex(index=rets.index, columns=syms)
+    membership = universe.membership_mask().reindex(index=rets.index, columns=syms).fillna(False) \
+        if universe is not None else None
 
     n = len(syms)
     net = pd.Series(0.0, index=rets.index)
@@ -99,15 +105,22 @@ def run(strategy: Strategy, prices: pd.DataFrame, config: BacktestConfig | None 
         g = float(np.abs(w).sum())
         if g > cfg.max_leverage:
             w = w * (cfg.max_leverage / g)                    # honest gross-leverage cap
+        delist_pnl = 0.0
+        if membership is not None:                            # point-in-time membership as of the prior close
+            mask = membership.iloc[t - 1].to_numpy()
+            delisted = (np.abs(w_prev) > 0) & (~mask)         # held, but no longer listed → it delisted
+            delist_pnl = float(np.sum(w_prev[delisted]) * universe.delisting_return)
+            w = w * mask                                      # can't hold what isn't listed
         liq = None
         if liquidity is not None:
             liq = {"adv": adv.iloc[t - 1].to_numpy(), "vol": vol.iloc[t - 1].to_numpy(),
                    "spread": spr.iloc[t - 1].to_numpy()}
         w_ach, cost = exec_model.rebalance(w_prev, w, cfg.aum, liq)   # partial fills → achieved ≠ target
-        block = rets.iloc[t:t + cfg.rebalance].to_numpy()
+        block = np.nan_to_num(rets.iloc[t:t + cfg.rebalance].to_numpy())
         port = block @ w_ach - exec_model.carry(w_ach, days=1)        # daily borrow/financing drag
         if len(port):
             port[0] -= cost                                   # one-off spread + impact on the rebalance day
+            port[0] += delist_pnl                             # realize any delisting loss (return is negative)
             net.iloc[t:t + len(port)] = port
             W.iloc[t:t + len(port)] = w_ach
         grosses.append(float(np.abs(w_ach).sum()))

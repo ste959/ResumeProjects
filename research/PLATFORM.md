@@ -62,9 +62,13 @@ tearsheet. Adding a sixth is a subclass.
 
 ## What's built vs. the roadmap
 
-**Built (sprints 1–3 + the existing studies):**
+**Built (sprints 1–4 + the existing studies):**
 - The Strategy SDK + engine + shared evaluation/gauntlet + attribution + tearsheet (`engine.py`,
   `strategies_lib.py`, `run_lab.py`).
+- **Data integrity** (`dataquality.py`, `universe.py`, `run_data.py`) — a data-quality audit gate
+  (splits/stale/gaps/coverage) and a **point-in-time universe**: the engine masks weights to
+  listed-as-of-date names and realizes delisting losses, so no strategy trades hindsight-selected
+  survivors. See [`DATA-NOTE.md`](DATA-NOTE.md).
 - **Execution & cost realism** (`execution.py`, `run_execution.py`) — half-spread (ADV-tier or
   Corwin–Schultz), **square-root market impact**, a **participation cap with partial fills**, and
   short-**borrow**/financing carry; plus a **capacity curve** that sweeps AUM to find where the edge
@@ -79,13 +83,11 @@ tearsheet. Adding a sixth is a subclass.
   options, tax), multi-asset allocation, and an ablation-and-diagnostics trend study.
 
 **Roadmap (the sprints that make it a *production* research desk):**
-1. **Data integrity** — point-in-time, **survivorship-free** universe (today's equity backtests are
-   optimistic; this is the biggest data hole, disclosed in [`ALPHA-DATA-ROADMAP.md`](ALPHA-DATA-ROADMAP.md)).
+1. **Delisted-name data** — the point-in-time *mechanism* is built; the *exit* side needs a paid
+   point-in-time source to populate delisted names (disclosed in [`ALPHA-DATA-ROADMAP.md`](ALPHA-DATA-ROADMAP.md)).
 2. **Live TCA loop** — extend the implementation-shortfall ledger to *actual* paper-trade fills from the
    live Alpaca engine, so modeled cost is checked against realized cost.
-3. **Tooling** — strategy registry/leaderboard and a richer tearsheet (rolling Sharpe, factor-exposure
-   time series).
-4. **LOB-backed fills** — plug the exchange's order-book engine in as the fill model for the highest-
+3. **LOB-backed fills** — plug the exchange's order-book engine in as the fill model for the highest-
    fidelity impact simulation (collapsing app #1 into the platform).
 
 ## Why this design
