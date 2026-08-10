@@ -30,6 +30,13 @@ own product with its own identity — not one mashed dashboard:
 They share a backbone — **Java 21 + Spring Boot** services, a **Python + FastAPI** quant service, a
 **React + TypeScript** front end, **Kafka** event streaming, **PostgreSQL**, and **Docker / Kubernetes**.
 
+> **Where the depth is.** The **Quant Desk** is the finance flagship — a full **research-to-execution
+> quant platform** with a Strategy SDK, a shared walk-forward engine, and an overfitting-aware validation
+> gauntlet that takes a strategy from *concept → backtest → validation → risk → execution → attribution*.
+> See **[`research/PLATFORM.md`](research/PLATFORM.md)**. The Exchange and Fixed-Income desks are
+> **systems/SWE** showcases (matching-engine throughput, event-driven architecture); the exchange's
+> order-book work also feeds the platform's execution-realism layer.
+
 ---
 
 ## Architecture

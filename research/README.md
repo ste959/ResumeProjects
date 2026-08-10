@@ -5,6 +5,11 @@ how quant desks are actually organised: the **Java/Spring system** handles low-l
 trading (matching, execution, feed handling); this **Python layer** does research and
 backtesting over a columnar data warehouse. Two languages, each for the job it's best at.
 
+> **▶ The platform:** these modules are unified behind one **Strategy SDK** — one interface, one
+> walk-forward engine, one validation gauntlet, for every strategy. Start at
+> **[`PLATFORM.md`](PLATFORM.md)** (concept → backtest → validation → risk → execution → attribution),
+> then run `python run_lab.py`.
+>
 > The `mds/` modules below are the **research library**. They're driven both by the `run_*.py` CLI
 > studies and, live, by the **Quant Desk** FastAPI service — the Alpaca-backed research→backtest→live
 > app at `/research`. See [`service/README.md`](service/README.md).
@@ -33,6 +38,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 
 | Module | Purpose |
 |---|---|
+| `mds/engine.py`, `mds/strategies_lib.py` | **Strategy SDK + engine (the platform spine)** — one `Strategy` interface + walk-forward engine, `compare()` (shared selection-aware gauntlet), P&L/sleeve **attribution**, and a standardized **tearsheet**; allocation, trend and factor strategies all run through the *same* pipeline (see [`PLATFORM.md`](PLATFORM.md)) |
 | `mds/sources.py`, `mds/store.py` | Coinbase candles + recorder capture → Parquet warehouse, DuckDB queries |
 | `mds/stats.py` | **Hand-rolled econometrics** — OLS, ADF unit-root, **Engle–Granger cointegration**, **Ornstein–Uhlenbeck half-life** (no statsmodels) |
 | `mds/features.py` | log returns, realized vol, order-book **imbalance → forward-return IC** |
@@ -79,7 +85,8 @@ python run_options.py           # live Alpaca options surface: ATM-IV / skew / I
 python run_construction.py      # 5-layer portfolio construction: composite → risk model → timing → options → tax
 python run_assetalloc.py        # multi-asset risk-based allocation vs 60/40 (excess-of-cash, tail, regime)
 python run_trend.py             # enhanced trend-following, by ablation (what each enhancement adds)
-python -m pytest                # 184 tests (offline; data modules fetch lazily)
+python run_lab.py               # ★ the platform: many strategies, ONE engine + gauntlet + tearsheet
+python -m pytest                # 192 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests

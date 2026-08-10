@@ -32,7 +32,7 @@ python run_trend.py               # enhanced trend-following ablation (cached af
 python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
 
-python -m pytest -q               # 184 tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 192 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here
