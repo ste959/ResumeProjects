@@ -25,6 +25,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 > [`TRANSFER-NOTE.md`](TRANSFER-NOTE.md) (**capstone**: implementation alpha / the transfer coefficient) ·
 > [`PAPER-NOTE.md`](PAPER-NOTE.md) (modeled cost vs. REAL paper fills — closing the loop) ·
 > [`LONGTEST-NOTE.md`](LONGTEST-NOTE.md) (20-year re-test + pre-registered out-of-sample) ·
+> [`MULTIFACTOR-NOTE.md`](MULTIFACTOR-NOTE.md) (multi-factor book; null + the survivorship-distortion insight) ·
 > [`EXECUTION-NOTE.md`](EXECUTION-NOTE.md) (cost realism + capacity curve) ·
 > [`RISK-NOTE.md`](RISK-NOTE.md) (risk system + implementation-shortfall TCA) ·
 > [`DATA-NOTE.md`](DATA-NOTE.md) (data-quality audit + point-in-time universe) ·
@@ -56,6 +57,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/report.py` | **reporting/tooling** — a self-contained **HTML tearsheet** (equity curve, drawdown, rolling Sharpe, monthly-return heatmap, VaR/ES + risk contribution, P&L attribution — inlined SVG/CSS, no dependencies) and a gauntlet-ranked **leaderboard** (`run_report.py`) |
 | `mds/xstatarb.py` | **cross-sectional statistical arbitrage** — the canonical desk strategy: **PCA statistical factors** (eigenportfolios) → residualize (factor-neutral by construction) → **Ornstein–Uhlenbeck s-scores** (Avellaneda–Lee) → dollar-neutral residual reversal on a broad universe (see [`XSTATARB-NOTE.md`](XSTATARB-NOTE.md)) |
 | `mds/opex.py` | **options-expiration structural effect** — the OPEX calendar (3rd-Friday expiries, phase classification), a phase-return study, a timing strategy, and the **Black–Scholes gamma** methodology (dealer-gamma concentration; OI-limited, disclosed) (see [`ALPHA-LIFECYCLE-NOTE.md`](ALPHA-LIFECYCLE-NOTE.md)) |
+| `mds/multifactor.py` | **diversified market-neutral multi-factor book** — momentum + low-vol + reversal blended, market-neutral, capacity-aware, on a broad 20y universe; the honest institutional shot at a real factor edge (null, with the survivorship-distorts-factors-in-opposite-directions insight — see [`MULTIFACTOR-NOTE.md`](MULTIFACTOR-NOTE.md)) |
 | `mds/longdata.py` | **long-history data (yfinance)** — 20+ years of free daily bars (back through the 2008 GFC) + a T-bill risk-free, in the same panel shape as the Alpaca layer, to escape the 2020 floor and enable a **pre-registered out-of-sample** test (see [`LONGTEST-NOTE.md`](LONGTEST-NOTE.md)) |
 | `mds/fillcheck.py` | **paper-fill validation** — closes the modeled-vs-measured loop: real Alpaca **quotes + paper fills** vs. the modeled spread, with a calibration factor (model is spot-on for SPY/IWM, under-charges thinner ETFs; paper fills disclosed as an optimistic lower bound). `run_paper.py [--trade]` (see [`PAPER-NOTE.md`](PAPER-NOTE.md)) |
 | `mds/implement.py` | **implementation alpha (the transfer coefficient)** — take a signal you already trust (cross-sectional momentum) and layer the industry-standard stack (winsorize/z-score, **β+vol neutralization**, vol-targeting, **market-beta hedge**, turnover control, and a **PCA factor-risk-model constrained optimizer** — `riskmodel.optimize`, factor+dollar-neutral, box+turnover caps); measures how much more survives to deployable, net-of-cost, market-neutral P&L (see [`TRANSFER-NOTE.md`](TRANSFER-NOTE.md)) |
@@ -123,7 +125,8 @@ python run_transfer.py          # ★ implementation alpha: raise a signal's tra
 python run_paper.py [--trade]   # validate the cost model against REAL Alpaca quotes + paper fills
 python run_longtest.py          # 20y flagship study + PRE-REGISTERED out-of-sample (free yfinance data)
 python run_calibration.py       # cost-model sensitivity: are capacity/TCA robust to the assumptions?
-python -m pytest                # 271 tests (offline; data modules fetch lazily)
+python run_multifactor.py       # diversified market-neutral multi-factor book on a broad 20y universe
+python -m pytest                # 276 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests
