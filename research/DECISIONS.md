@@ -76,6 +76,18 @@ exists to keep that day honest.
   wearing an alpha costume, not an independent edge.** The deliverable is the monitor (catch a false
   positive; know when an edge is dying), not the edge.
 
+**Mechanical-flow overnight reversal ("Shadow of the Machines", `run_mechflow.py`)**
+- A *novel, self-invented* structural idea: leveraged/inverse ETFs must rebalance toward the day's move at
+  the close (`k(k-1)·AUM·r`, same direction for all k∉{0,1}); the non-informational overshoot should revert
+  overnight, scaling with forced flow ÷ underlying liquidity. Durability thesis: the source (mechanical flow)
+  *grows* as markets get passive, so it should resist crowding.
+- **Result: mechanism CONFIRMED, thesis REFUTED — the ideal honest arc.** The reversal does scale with
+  flow÷liquidity (corr +0.47) and SPY shows ~zero reversal exactly as predicted (too deep to move). But the
+  tradable dollar-neutral book is null gross (−0.18, CI includes 0) and dies to 336×/yr cost, and — the key
+  find — the decay monitor **disproved my own durability thesis**: the edge worked 2020-22 (+0.61) and decayed
+  to −0.91 in 2023-26 (slope t −2.0). Crowding outran the growing source. Inventing an edge is easy; using
+  your own tool to disprove it is the job.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).

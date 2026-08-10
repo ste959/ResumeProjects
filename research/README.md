@@ -19,6 +19,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 > [`TREND-NOTE.md`](TREND-NOTE.md) (enhanced trend-following, by ablation) ·
 > [`XSTATARB-NOTE.md`](XSTATARB-NOTE.md) (cross-sectional stat-arb; PCA factors + OU s-scores) ·
 > [`ALPHA-LIFECYCLE-NOTE.md`](ALPHA-LIFECYCLE-NOTE.md) (structural OPEX edge + alpha-decay/crowding monitor) ·
+> [`MECHFLOW-NOTE.md`](MECHFLOW-NOTE.md) (novel leveraged-ETF forced-flow edge; mechanism confirmed, thesis refuted) ·
 > [`EXECUTION-NOTE.md`](EXECUTION-NOTE.md) (cost realism + capacity curve) ·
 > [`RISK-NOTE.md`](RISK-NOTE.md) (risk system + implementation-shortfall TCA) ·
 > [`DATA-NOTE.md`](DATA-NOTE.md) (data-quality audit + point-in-time universe) ·
@@ -50,6 +51,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/report.py` | **reporting/tooling** — a self-contained **HTML tearsheet** (equity curve, drawdown, rolling Sharpe, monthly-return heatmap, VaR/ES + risk contribution, P&L attribution — inlined SVG/CSS, no dependencies) and a gauntlet-ranked **leaderboard** (`run_report.py`) |
 | `mds/xstatarb.py` | **cross-sectional statistical arbitrage** — the canonical desk strategy: **PCA statistical factors** (eigenportfolios) → residualize (factor-neutral by construction) → **Ornstein–Uhlenbeck s-scores** (Avellaneda–Lee) → dollar-neutral residual reversal on a broad universe (see [`XSTATARB-NOTE.md`](XSTATARB-NOTE.md)) |
 | `mds/opex.py` | **options-expiration structural effect** — the OPEX calendar (3rd-Friday expiries, phase classification), a phase-return study, a timing strategy, and the **Black–Scholes gamma** methodology (dealer-gamma concentration; OI-limited, disclosed) (see [`ALPHA-LIFECYCLE-NOTE.md`](ALPHA-LIFECYCLE-NOTE.md)) |
+| `mds/mechflow.py` | **mechanical-flow reversal ('Shadow of the Machines')** — a *novel structural* edge: leveraged/inverse ETFs must rebalance toward the day's move at the close; the overshoot reverts overnight, scaling with **forced flow ÷ liquidity**. Mechanism confirmed (SPY null as predicted), edge honestly refuted by the decay monitor (see [`MECHFLOW-NOTE.md`](MECHFLOW-NOTE.md)) |
 | `mds/decaymonitor.py` | **alpha-decay / crowding monitor** — the alpha *lifecycle* control system: bucketed-Sharpe **decay slope** + half-life, IC decay, and a **crowding** detector (rising correlation to a factor → "beta wearing an alpha costume") that answers *"will this edge still be here in six months?"* (see [`ALPHA-LIFECYCLE-NOTE.md`](ALPHA-LIFECYCLE-NOTE.md)) |
 | `mds/sources.py`, `mds/store.py` | Coinbase candles + recorder capture → Parquet warehouse, DuckDB queries |
 | `mds/stats.py` | **Hand-rolled econometrics** — OLS, ADF unit-root, **Engle–Granger cointegration**, **Ornstein–Uhlenbeck half-life** (no statsmodels) |
@@ -104,7 +106,8 @@ python run_data.py              # data-quality audit + point-in-time universe (s
 python run_report.py            # generate self-contained HTML tearsheets + a leaderboard (research/reports/)
 python run_xstatarb.py          # cross-sectional stat-arb (PCA factors → OU s-scores) on ~90 names
 python run_opex.py              # OPEX structural effect + the alpha-decay/crowding monitor
-python -m pytest                # 240 tests (offline; data modules fetch lazily)
+python run_mechflow.py          # 'Shadow of the Machines': leveraged-ETF forced-flow overnight reversal
+python -m pytest                # 245 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests
