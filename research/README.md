@@ -18,6 +18,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 > [`ASSET-ALLOCATION-NOTE.md`](ASSET-ALLOCATION-NOTE.md) (multi-asset, with regime & tail analysis) ·
 > [`TREND-NOTE.md`](TREND-NOTE.md) (enhanced trend-following, by ablation) ·
 > [`EXECUTION-NOTE.md`](EXECUTION-NOTE.md) (cost realism + capacity curve) ·
+> [`RISK-NOTE.md`](RISK-NOTE.md) (risk system + implementation-shortfall TCA) ·
 > [`SIGNAL-RATIONALE.md`](SIGNAL-RATIONALE.md) (economic story + failure mode + decay for each signal) ·
 > [`DECISIONS.md`](DECISIONS.md) (research log & researcher degrees of freedom) ·
 > [`REPRODUCE.md`](REPRODUCE.md) (deterministic reproduction).
@@ -41,6 +42,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 |---|---|
 | `mds/engine.py`, `mds/strategies_lib.py` | **Strategy SDK + engine (the platform spine)** — one `Strategy` interface + walk-forward engine, `compare()` (shared selection-aware gauntlet), P&L/sleeve **attribution**, and a standardized **tearsheet**; allocation, trend and factor strategies all run through the *same* pipeline (see [`PLATFORM.md`](PLATFORM.md)) |
 | `mds/execution.py` | **execution & cost realism** — half-spread (**Corwin–Schultz** / ADV-tier), **square-root market impact**, participation cap + **partial fills**, short-**borrow**/financing carry, and a **capacity curve** (edge vs. AUM); turns "backtest Sharpe" into "alpha under real conditions" (see [`EXECUTION-NOTE.md`](EXECUTION-NOTE.md)) |
+| `mds/riskmgmt.py`, `mds/tca.py` | **risk system + TCA** — VaR / expected shortfall (**Cornish–Fisher** fat-tail correction), **marginal risk contribution** by sleeve, **stress/scenario replay** of the current book, **limit checks** vs. a mandate, and **implementation shortfall** (execution vs. opportunity cost) (see [`RISK-NOTE.md`](RISK-NOTE.md)) |
 | `mds/sources.py`, `mds/store.py` | Coinbase candles + recorder capture → Parquet warehouse, DuckDB queries |
 | `mds/stats.py` | **Hand-rolled econometrics** — OLS, ADF unit-root, **Engle–Granger cointegration**, **Ornstein–Uhlenbeck half-life** (no statsmodels) |
 | `mds/features.py` | log returns, realized vol, order-book **imbalance → forward-return IC** |
@@ -89,7 +91,8 @@ python run_assetalloc.py        # multi-asset risk-based allocation vs 60/40 (ex
 python run_trend.py             # enhanced trend-following, by ablation (what each enhancement adds)
 python run_lab.py               # ★ the platform: many strategies, ONE engine + gauntlet + tearsheet
 python run_execution.py         # execution realism: flat vs spread+impact+borrow, and the capacity curve
-python -m pytest                # 203 tests (offline; data modules fetch lazily)
+python run_risk.py              # risk system (VaR/ES, stress, limits) + implementation-shortfall TCA
+python -m pytest                # 211 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests

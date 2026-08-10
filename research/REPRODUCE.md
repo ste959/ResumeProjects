@@ -31,10 +31,11 @@ python run_assetalloc.py --refresh  # force a re-fetch from Alpaca
 python run_trend.py               # enhanced trend-following ablation (cached after first run)
 python run_lab.py                 # the platform: many strategies through one engine + gauntlet
 python run_execution.py           # execution realism + capacity curve (cached after first run)
+python run_risk.py                # risk system (VaR/ES, stress, limits) + implementation-shortfall TCA
 python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
 
-python -m pytest -q               # 203 tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 211 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here
