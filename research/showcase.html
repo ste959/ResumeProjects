@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A self-directed quant research-to-execution platform: pipeline, 11 honestly-tested strategies, and flagship proof-points.">
+<title>Quant Research Platform — Results Showcase</title>
+</head>
+<body>
+<style>
+  :root{
+    --bg:#f6f8fa; --surface:#ffffff; --surface-2:#eef2f6; --line:#e0e6ed;
+    --ink:#10202b; --muted:#586773; --faint:#8a97a2;
+    --accent:#0f766e; --accent-soft:rgba(15,118,110,.10);
+    --proven:#0f766e; --proven-soft:rgba(15,118,110,.11);
+    --insight:#b45309; --insight-soft:rgba(180,83,9,.11);
+    --null:#5b6b78; --null-soft:rgba(91,107,120,.12);
+    --pos:#0f766e; --neg:#b4463b; --on-accent:#ffffff;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0a0f15; --surface:#121b24; --surface-2:#0e1720; --line:#22303c;
+      --ink:#e7eef4; --muted:#93a3b1; --faint:#6b7c8a;
+      --accent:#2dd4bf; --accent-soft:rgba(45,212,191,.12);
+      --proven:#2dd4bf; --proven-soft:rgba(45,212,191,.13);
+      --insight:#e0a35a; --insight-soft:rgba(224,163,90,.13);
+      --null:#8496a6; --null-soft:rgba(132,150,166,.14);
+      --pos:#2dd4bf; --neg:#e0736a; --on-accent:#06201d;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0a0f15; --surface:#121b24; --surface-2:#0e1720; --line:#22303c;
+    --ink:#e7eef4; --muted:#93a3b1; --faint:#6b7c8a;
+    --accent:#2dd4bf; --accent-soft:rgba(45,212,191,.12);
+    --proven:#2dd4bf; --proven-soft:rgba(45,212,191,.13);
+    --insight:#e0a35a; --insight-soft:rgba(224,163,90,.13);
+    --null:#8496a6; --null-soft:rgba(132,150,166,.14);
+    --pos:#2dd4bf; --neg:#e0736a; --on-accent:#06201d;
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+  .eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent);font-weight:600}
+  h1,h2,h3{text-wrap:balance;margin:0}
+
+  /* ---- hero ---- */
+  header{border-bottom:1px solid var(--line);background:
+    radial-gradient(120% 90% at 88% -20%,var(--accent-soft),transparent 60%)}
+  .hero{padding:76px 0 60px}
+  h1{font-size:clamp(30px,4.6vw,52px);line-height:1.05;letter-spacing:-.02em;font-weight:680;margin:16px 0 0}
+  h1 .fade{color:var(--muted)}
+  .lede{font-size:clamp(16px,2vw,20px);color:var(--muted);max-width:60ch;margin:20px 0 0;line-height:1.5}
+  .lede b{color:var(--ink);font-weight:600}
+  .stats{display:flex;flex-wrap:wrap;gap:10px 12px;margin-top:32px}
+  .stat{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:10px 14px;min-width:0}
+  .stat .n{font-family:ui-monospace,Menlo,monospace;font-size:19px;font-weight:600;color:var(--ink);
+    font-variant-numeric:tabular-nums}
+  .stat .k{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);color:var(--accent);
+    background:var(--accent-soft);padding:9px 15px;border-radius:8px;font-size:14px;font-weight:600}
+  .btn:hover{text-decoration:none;background:var(--accent);color:var(--on-accent)}
+  .note{font-size:12.5px;color:var(--faint)}
+
+  section{padding:56px 0;border-bottom:1px solid var(--line)}
+  .sec-head{max-width:64ch}
+  .sec-head h2{font-size:clamp(21px,2.6vw,27px);letter-spacing:-.01em;margin-top:9px;font-weight:660}
+  .sec-head p{color:var(--muted);margin:10px 0 0;font-size:15px}
+
+  /* ---- pipeline ---- */
+  .pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin-top:30px}
+  .node{border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:15px 16px;position:relative;
+    transition:border-color .18s,transform .18s}
+  .node:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .node .step{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--faint);letter-spacing:.12em}
+  .node h3{font-size:15px;margin:5px 0 6px;font-weight:640}
+  .node p{margin:0;font-size:12.8px;color:var(--muted);line-height:1.45}
+
+  /* ---- research journey ---- */
+  .tally{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+  .chip{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
+    display:inline-flex;align-items:center;gap:7px;border:1px solid transparent}
+  .chip::before{content:"";width:7px;height:7px;border-radius:50%}
+  .chip.proven{color:var(--proven);background:var(--proven-soft)} .chip.proven::before{background:var(--proven)}
+  .chip.insight{color:var(--insight);background:var(--insight-soft)} .chip.insight::before{background:var(--insight)}
+  .chip.null{color:var(--null);background:var(--null-soft)} .chip.null::before{background:var(--null)}
+
+  .studies{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:22px}
+  .study{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:17px 18px;
+    display:flex;flex-direction:column;gap:9px;border-left:3px solid var(--stripe,var(--null))}
+  .study.p{--stripe:var(--proven)} .study.i{--stripe:var(--insight)} .study.n{--stripe:var(--null)}
+  .study .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .study h3{font-size:15.5px;font-weight:650;letter-spacing:-.005em}
+  .study .idea{font-size:12.5px;color:var(--faint);font-family:ui-monospace,Menlo,monospace}
+  .study p{margin:0;font-size:13.4px;color:var(--muted);line-height:1.5}
+  .study p b{color:var(--ink);font-weight:600}
+
+  /* ---- flagship ---- */
+  .flags{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
+  .flag{border:1px solid var(--line);background:var(--surface);border-radius:13px;padding:22px}
+  .flag .tag{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--accent);font-weight:600}
+  .flag h3{font-size:18px;margin:8px 0 8px;font-weight:660;letter-spacing:-.01em}
+  .flag p{margin:0;font-size:13.6px;color:var(--muted);line-height:1.55}
+  .flag p b{color:var(--ink);font-weight:600}
+  .metrics{display:flex;flex-direction:column;gap:11px;margin:16px 0 4px}
+  .metric{display:grid;grid-template-columns:96px 1fr auto;gap:11px;align-items:center}
+  .metric .ml{font-size:12px;color:var(--muted)}
+  .bar{height:8px;border-radius:5px;background:var(--surface-2);position:relative;overflow:hidden}
+  .bar>span{position:absolute;inset:0 auto 0 0;border-radius:5px}
+  .bar .b0{background:var(--faint);opacity:.5}
+  .bar .b1{background:var(--accent)}
+  .metric .mv{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-variant-numeric:tabular-nums;
+    color:var(--ink);white-space:nowrap}
+  .metric .mv .arr{color:var(--faint)}
+  .metric .mv .good{color:var(--pos);font-weight:600}
+
+  /* ---- quote ---- */
+  .quote{padding:60px 0}
+  blockquote{margin:0;max-width:44ch}
+  blockquote p{font-size:clamp(20px,2.9vw,29px);line-height:1.3;letter-spacing:-.015em;font-weight:560;margin:0}
+  blockquote .hl{color:var(--accent)}
+  blockquote cite{display:block;margin-top:18px;font-style:normal;font-size:13.5px;color:var(--muted);
+    font-family:ui-monospace,Menlo,monospace}
+
+  /* ---- stack ---- */
+  .stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;margin-top:26px}
+  .stack h3{font-size:12px;font-family:ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);font-weight:600;margin-bottom:11px}
+  .tags{display:flex;flex-wrap:wrap;gap:7px}
+  .t{font-size:12.3px;font-family:ui-monospace,Menlo,monospace;border:1px solid var(--line);background:var(--surface);
+    border-radius:7px;padding:4px 9px;color:var(--ink)}
+
+  footer{padding:52px 0 64px}
+  footer p{color:var(--muted);max-width:62ch;font-size:14.5px}
+  footer p b{color:var(--ink);font-weight:600}
+  .foot-row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;align-items:center;margin-top:24px}
+  .sig{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--faint)}
+
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}
+    .node:hover{transform:none}}
+  @media (max-width:720px){ .flags{grid-template-columns:1fr} section{padding:44px 0} .hero{padding:56px 0 44px} }
+</style>
+
+<header>
+  <div class="wrap hero">
+    <div class="eyebrow">Quantitative research &middot; self-directed platform</div>
+    <h1>A research-to-execution quant platform<br><span class="fade">— built to prove what works, and prove when it doesn't.</span></h1>
+    <p class="lede">One system takes a strategy from idea to execution: realistic backtest, an overfitting-aware
+      validation gauntlet, a full risk &amp; transaction-cost layer, and a decay monitor. The through-line isn't a
+      unicorn alpha — it's <b>the discipline to generate ideas, triage them at scale, and report the null every
+      time it's a null.</b></p>
+    <div class="stats">
+      <div class="stat"><div class="n">276</div><div class="k">passing unit tests</div></div>
+      <div class="stat"><div class="n">20&nbsp;yrs</div><div class="k">backtest history (2006–2026)</div></div>
+      <div class="stat"><div class="n">11</div><div class="k">strategies tested &amp; diagnosed</div></div>
+      <div class="stat"><div class="n">live</div><div class="k">execution validated vs real fills</div></div>
+      <div class="stat"><div class="n">~35</div><div class="k">Python research modules</div></div>
+    </div>
+    <div class="cta">
+      <a class="btn" href="https://github.com/ste959/FixedIncomeTradingPlatform" target="_blank" rel="noopener">View the repository →</a>
+      <span class="note">Python · NumPy/pandas/SciPy · FastAPI · Java/Spring · React/TS</span>
+    </div>
+  </div>
+</header>
+
+<section class="reveal">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">The platform</div>
+      <h2>Concept → execution, as one pipeline</h2>
+      <p>A strategy plugs into a single interface and inherits every stage. Each stage is a real, tested module — not a slide.</p>
+    </div>
+    <div class="pipe">
+      <div class="node"><div class="step mono">01 · DATA</div><h3>Long-history &amp; integrity</h3><p>20-year data, a data-quality audit, and a point-in-time universe to kill survivorship bias.</p></div>
+      <div class="node"><div class="step mono">02 · SIGNAL</div><h3>Signal library</h3><p>Cross-sectional factors, trend, statistical-arbitrage residuals, structural-flow signals.</p></div>
+      <div class="node"><div class="step mono">03 · BACKTEST</div><h3>Walk-forward engine</h3><p>One-day lag, no look-ahead — enforced by a unit test, not a promise.</p></div>
+      <div class="node"><div class="step mono">04 · VALIDATION</div><h3>Overfitting gauntlet</h3><p>Deflated Sharpe · PBO · Newey–West t · bootstrap CI · min-detectable-Sharpe power.</p></div>
+      <div class="node"><div class="step mono">05 · RISK &amp; TCA</div><h3>Risk system</h3><p>VaR/ES (Cornish–Fisher), stress replay, limits, and implementation-shortfall analysis.</p></div>
+      <div class="node"><div class="step mono">06 · EXECUTION</div><h3>Realistic + validated</h3><p>Spread, square-root impact, borrow, capacity — calibrated against real Alpaca fills.</p></div>
+      <div class="node"><div class="step mono">07 · LIFECYCLE</div><h3>Alpha-decay monitor</h3><p>Is the edge decaying or crowding? Is it beta wearing an alpha costume?</p></div>
+      <div class="node"><div class="step mono">08 · REPORT</div><h3>Tearsheets</h3><p>Self-contained HTML reports and a gauntlet-ranked strategy leaderboard.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">The research journey</div>
+      <h2>Eleven ideas, honestly tested — and honestly killed</h2>
+      <p>The rare skill isn't finding alpha; it's qualifying which ideas are worth capital and diagnosing exactly why the rest aren't. Every study below reports its real verdict.</p>
+    </div>
+    <div class="tally">
+      <span class="chip proven">Proven capability</span>
+      <span class="chip insight">Real insight / mixed</span>
+      <span class="chip null">Honest null</span>
+    </div>
+    <div class="studies">
+      <div class="study p">
+        <div class="top"><h3>Transfer coefficient</h3><span class="chip proven">proven</span></div>
+        <div class="idea mono">make a signal deployable</div>
+        <p>Caught that <b>57% of momentum's Sharpe was a hidden factor tilt</b>; the implementation stack made it market-neutral and cut the tail.</p>
+      </div>
+      <div class="study p">
+        <div class="top"><h3>Live fill validation</h3><span class="chip proven">proven</span></div>
+        <div class="idea mono">model vs real paper fills</div>
+        <p>Submitted real Alpaca paper orders. The cost model was <b>spot-on for SPY &amp; IWM</b> — every capacity/TCA number now anchored to a real fill.</p>
+      </div>
+      <div class="study p">
+        <div class="top"><h3>Pre-registered OOS</h3><span class="chip proven">proven</span></div>
+        <div class="idea mono">20-year never-touched hold-out</div>
+        <p>A registered out-of-sample test that <b>falsified my own hypothesis</b> — 2022 hit 60/40 harder than 2008, and I reported it.</p>
+      </div>
+      <div class="study i">
+        <div class="top"><h3>Shadow of the Machines</h3><span class="chip insight">insight</span></div>
+        <div class="idea mono">leveraged-ETF forced flow</div>
+        <p>Invented it myself. Mechanism <b>confirmed (corr +0.47)</b>; then the decay monitor <b>refuted my own durability thesis.</b></p>
+      </div>
+      <div class="study i">
+        <div class="top"><h3>Enhanced trend-following</h3><span class="chip insight">insight</span></div>
+        <div class="idea mono">ablation + factor attribution</div>
+        <p>Diagnosed the "edge" as <b>vol-timing plus a short-duration beta</b> — not signal alpha. Knowing that is the finding.</p>
+      </div>
+      <div class="study i">
+        <div class="top"><h3>OPEX / dealer gamma</h3><span class="chip insight">insight</span></div>
+        <div class="idea mono">options-expiration effect</div>
+        <p>The textbook effect had reversed; the crowding detector flagged the overlay as <b>beta in an alpha costume.</b></p>
+      </div>
+      <div class="study i">
+        <div class="top"><h3>Multi-factor book</h3><span class="chip insight">insight</span></div>
+        <div class="idea mono">institutional market-neutral</div>
+        <p>Survivorship <b>distorts factors in opposite directions</b> — it destroys low-vol and flatters momentum. Diagnosed, not reported as a win.</p>
+      </div>
+      <div class="study n">
+        <div class="top"><h3>Cross-sectional stat-arb</h3><span class="chip null">null</span></div>
+        <div class="idea mono">Avellaneda–Lee reversal</div>
+        <p>Built the canonical desk strategy on breadth. The daily reversal is <b>arbitraged out of liquid names</b> — the literature-correct result.</p>
+      </div>
+      <div class="study n">
+        <div class="top"><h3>The Absent Buyer</h3><span class="chip null">null</span></div>
+        <div class="idea mono">buyback-blackout regulation</div>
+        <p>Refuted — the blackout window is <b>confounded with the pre-earnings run-up</b>, which dominates. A specific, named cause.</p>
+      </div>
+      <div class="study n">
+        <div class="top"><h3>The Forced Seller</h3><span class="chip null">null</span></div>
+        <div class="idea mono">vol-control deleveraging</div>
+        <p>Wrong sign: after a vol spike the market <b>front-runs and bounces</b>, so riding the forced flow loses.</p>
+      </div>
+      <div class="study n">
+        <div class="top"><h3>Multi-asset allocation</h3><span class="chip null">null</span></div>
+        <div class="idea mono">risk parity vs 60/40, 20y</div>
+        <p>Over 20 years the premium is real — but <b>it's beta, not skill</b>; every allocator clusters, none establishes alpha.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Flagship results</div>
+      <h2>Four things that make the honesty <em>provable</em></h2>
+    </div>
+    <div class="flags">
+      <div class="flag">
+        <div class="tag">Implementation alpha</div>
+        <h3>I make a signal deployable — and catch the fakes</h3>
+        <p>Grinold–Kahn's <b>transfer coefficient</b>: I don't need a signal you don't have, I make the ones you trust survive to the book. On plain momentum, the stack neutralized a hidden factor bet and de-risked the tail.</p>
+        <div class="metrics">
+          <div class="metric"><span class="ml">Market β</span><div class="bar"><span class="b0" style="width:60%"></span><span class="b1" style="width:7%"></span></div><span class="mv">+0.09 <span class="arr">→</span> <span class="good">+0.01</span></span></div>
+          <div class="metric"><span class="ml">Max drawdown</span><div class="bar"><span class="b0" style="width:82%"></span><span class="b1" style="width:62%"></span></div><span class="mv">−16% <span class="arr">→</span> <span class="good">−12%</span></span></div>
+          <div class="metric"><span class="ml">"Alpha" that was factor tilt</span><div class="bar"><span class="b1" style="width:57%;background:var(--insight)"></span></div><span class="mv" style="color:var(--insight)">57%</span></div>
+        </div>
+      </div>
+
+      <div class="flag">
+        <div class="tag">Measured, not modeled</div>
+        <h3>Cost model validated on real fills</h3>
+        <p>Submitted live Alpaca paper orders and compared the fills to the modeled spread — with the honest caveat that paper fills are an <b>optimistic lower bound</b> (no market impact). The model brackets reality.</p>
+        <div class="metrics">
+          <div class="metric"><span class="ml">SPY spread</span><div class="bar"><span class="b0" style="width:50%"></span><span class="b1" style="width:50%"></span></div><span class="mv">model 0.5 <span class="arr">≈</span> <span class="good">real 0.5 bp</span></span></div>
+          <div class="metric"><span class="ml">IWM spread</span><div class="bar"><span class="b0" style="width:60%"></span><span class="b1" style="width:60%"></span></div><span class="mv">model 1.0 <span class="arr">≈</span> <span class="good">real 1.0 bp</span></span></div>
+          <div class="metric"><span class="ml">XLF (thinner)</span><div class="bar"><span class="b0" style="width:43%"></span><span class="b1" style="width:100%"></span></div><span class="mv">model 1.5 <span class="arr">→</span> real 3.5 bp</span></div>
+        </div>
+      </div>
+
+      <div class="flag">
+        <div class="tag">Pre-registered out-of-sample</div>
+        <h3>A test that falsified my own hypothesis</h3>
+        <p>Extended to 20 years of free data and pre-registered a never-touched 2006–2019 hold-out. I predicted 2008 would be the worst regime for 60/40 — a pre-registered test <b>proved me wrong.</b></p>
+        <div class="metrics">
+          <div class="metric"><span class="ml">60/40 · 2008 GFC</span><div class="bar"><span class="b1" style="width:63%;background:var(--null)"></span></div><span class="mv">−0.75 Sharpe</span></div>
+          <div class="metric"><span class="ml">60/40 · 2022 shock</span><div class="bar"><span class="b1" style="width:100%;background:var(--neg)"></span></div><span class="mv" style="color:var(--neg)">−1.19 Sharpe</span></div>
+        </div>
+        <p style="margin-top:10px">In 2008 bonds rallied and cushioned the book; in 2022 stocks and bonds fell together. That correlation flip is invisible in 6 years and obvious in 20.</p>
+      </div>
+
+      <div class="flag">
+        <div class="tag">Alpha lifecycle</div>
+        <h3>A decay &amp; crowding monitor</h3>
+        <p>No edge is permanent; a desk runs a factory of decaying edges and retires them before they bleed. The monitor tracks decay slope, half-life, and crowding — and repeatedly caught <b>market exposure masquerading as alpha.</b></p>
+        <div class="metrics">
+          <div class="metric"><span class="ml">Verdicts issued</span><div class="bar"><span class="b1" style="width:100%"></span></div><span class="mv">DECAYING · ROBUST · BETA-DOMINATED</span></div>
+          <div class="metric"><span class="ml">Min-detectable Sharpe</span><div class="bar"><span class="b0" style="width:100%"></span><span class="b1" style="width:48%"></span></div><span class="mv">1.3 (6y) <span class="arr">→</span> <span class="good">0.64 (20y)</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="quote reveal">
+  <div class="wrap">
+    <div class="eyebrow" style="margin-bottom:22px">The one thing ten dead strategies taught</div>
+    <blockquote>
+      <p>Mechanical flows are real, but the edge isn't — <span class="hl">the forced trade is the most predictable thing in the market, so it pays the liquidity provider, not the taker.</span></p>
+      <cite>— recorded in the project's research log, after building and killing several structural-flow strategies</cite>
+    </blockquote>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Under the hood</div>
+      <h2>The statistics &amp; the stack</h2>
+      <p>Hand-rolled where it teaches something; industry-standard everywhere it matters.</p>
+    </div>
+    <div class="stack">
+      <div>
+        <h3>Statistical rigor</h3>
+        <div class="tags">
+          <span class="t">Deflated Sharpe</span><span class="t">PBO / CSCV</span><span class="t">Newey–West HAC</span>
+          <span class="t">block bootstrap CI</span><span class="t">min-detectable power</span><span class="t">Cornish–Fisher VaR</span>
+          <span class="t">Ledoit–Wolf shrinkage</span><span class="t">pre-registered OOS</span>
+        </div>
+      </div>
+      <div>
+        <h3>Methods</h3>
+        <div class="tags">
+          <span class="t">Grinold–Kahn transfer coeff.</span><span class="t">factor risk model Σ=BFᵀB+D</span>
+          <span class="t">constrained MVO</span><span class="t">Avellaneda–Lee stat-arb</span>
+          <span class="t">√-law market impact</span><span class="t">implementation shortfall</span>
+          <span class="t">point-in-time universe</span><span class="t">capacity curves</span>
+        </div>
+      </div>
+      <div>
+        <h3>Engineering</h3>
+        <div class="tags">
+          <span class="t">Python</span><span class="t">NumPy</span><span class="t">pandas</span><span class="t">SciPy</span>
+          <span class="t">scikit-learn</span><span class="t">FastAPI</span><span class="t">Java / Spring</span>
+          <span class="t">React / TypeScript</span><span class="t">Docker / K8s</span><span class="t">276 unit tests</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="eyebrow">The take-away</div>
+    <p style="font-size:16.5px;line-height:1.5;margin-top:12px"><b>I didn't set out to find a golden goose.</b>
+      I built the factory: generate an idea, triage it cheaply, backtest it under real costs, validate it against
+      the live broker, and — the part almost no one demonstrates — <b>prove what <em>isn't</em> an edge before it
+      costs the desk money.</b></p>
+    <div class="foot-row">
+      <a class="btn" href="https://github.com/ste959/FixedIncomeTradingPlatform" target="_blank" rel="noopener">Explore the code &amp; research notes →</a>
+      <span class="sig">Self-directed quant research project · Python + real market data</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var io = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:.06});
+    document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+  })();
+</script>
+</body>
+</html>

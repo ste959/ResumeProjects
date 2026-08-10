@@ -30,6 +30,10 @@ own product with its own identity — not one mashed dashboard:
 They share a backbone — **Java 21 + Spring Boot** services, a **Python + FastAPI** quant service, a
 **React + TypeScript** front end, **Kafka** event streaming, **PostgreSQL**, and **Docker / Kubernetes**.
 
+> **📈 60-second visual overview:** open **[`research/showcase.html`](research/showcase.html)** in a browser
+> (self-contained, no build) — the platform pipeline, all 11 honestly-tested strategies with their verdicts,
+> and the flagship results, at a glance.
+
 > **Where the depth is.** The **Quant Desk** is the finance flagship — a full **research-to-execution
 > quant platform** with a Strategy SDK, a shared walk-forward engine, and an overfitting-aware validation
 > gauntlet that takes a strategy from *concept → backtest → validation → risk → execution → attribution*.
