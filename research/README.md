@@ -22,6 +22,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 > [`MECHFLOW-NOTE.md`](MECHFLOW-NOTE.md) (novel leveraged-ETF forced-flow edge; mechanism confirmed, thesis refuted) ·
 > [`BUYBACK-NOTE.md`](BUYBACK-NOTE.md) (buyback-blackout regulatory edge; refuted, confound diagnosed) ·
 > [`FORCEDSELLER-NOTE.md`](FORCEDSELLER-NOTE.md) (vol-control deleveraging; refuted + the cross-study theme) ·
+> [`TRANSFER-NOTE.md`](TRANSFER-NOTE.md) (**capstone**: implementation alpha / the transfer coefficient) ·
 > [`EXECUTION-NOTE.md`](EXECUTION-NOTE.md) (cost realism + capacity curve) ·
 > [`RISK-NOTE.md`](RISK-NOTE.md) (risk system + implementation-shortfall TCA) ·
 > [`DATA-NOTE.md`](DATA-NOTE.md) (data-quality audit + point-in-time universe) ·
@@ -53,6 +54,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/report.py` | **reporting/tooling** — a self-contained **HTML tearsheet** (equity curve, drawdown, rolling Sharpe, monthly-return heatmap, VaR/ES + risk contribution, P&L attribution — inlined SVG/CSS, no dependencies) and a gauntlet-ranked **leaderboard** (`run_report.py`) |
 | `mds/xstatarb.py` | **cross-sectional statistical arbitrage** — the canonical desk strategy: **PCA statistical factors** (eigenportfolios) → residualize (factor-neutral by construction) → **Ornstein–Uhlenbeck s-scores** (Avellaneda–Lee) → dollar-neutral residual reversal on a broad universe (see [`XSTATARB-NOTE.md`](XSTATARB-NOTE.md)) |
 | `mds/opex.py` | **options-expiration structural effect** — the OPEX calendar (3rd-Friday expiries, phase classification), a phase-return study, a timing strategy, and the **Black–Scholes gamma** methodology (dealer-gamma concentration; OI-limited, disclosed) (see [`ALPHA-LIFECYCLE-NOTE.md`](ALPHA-LIFECYCLE-NOTE.md)) |
+| `mds/implement.py` | **implementation alpha (the transfer coefficient)** — take a signal you already trust (cross-sectional momentum) and layer the industry-standard stack (winsorize/z-score, **β+vol neutralization**, vol-targeting, **market-beta hedge**, turnover control); measures how much more survives to deployable, net-of-cost, market-neutral P&L (see [`TRANSFER-NOTE.md`](TRANSFER-NOTE.md)) |
 | `mds/forcedseller.py` | **'The Forced Seller' — vol-control deleveraging** — front-run the mechanical `Δ(target/realized-vol)` flow of vol-target funds; benchmarked against generic vol-timing. Refuted (ride is the wrong sign — the post-spike bounce dominates) (see [`FORCEDSELLER-NOTE.md`](FORCEDSELLER-NOTE.md)) |
 | `mds/buyback.py` | **'The Absent Buyer' — buyback-blackout regulatory edge** — blackout windows anchored to **SEC 10-Q/10-K filing dates**, buyback intensity from XBRL repurchase facts (point-in-time); a mechanism test + dollar-neutral book. Refuted here, with the pre-earnings-drift confound diagnosed (see [`BUYBACK-NOTE.md`](BUYBACK-NOTE.md)) |
 | `mds/mechflow.py` | **mechanical-flow reversal ('Shadow of the Machines')** — a *novel structural* edge: leveraged/inverse ETFs must rebalance toward the day's move at the close; the overshoot reverts overnight, scaling with **forced flow ÷ liquidity**. Mechanism confirmed (SPY null as predicted), edge honestly refuted by the decay monitor (see [`MECHFLOW-NOTE.md`](MECHFLOW-NOTE.md)) |
@@ -113,7 +115,8 @@ python run_opex.py              # OPEX structural effect + the alpha-decay/crowd
 python run_mechflow.py          # 'Shadow of the Machines': leveraged-ETF forced-flow overnight reversal
 python run_buyback.py           # 'The Absent Buyer': buyback-blackout regulatory edge (SEC EDGAR)
 python run_forcedseller.py      # 'The Forced Seller': vol-control deleveraging flow anticipation
-python -m pytest                # 256 tests (offline; data modules fetch lazily)
+python run_transfer.py          # ★ implementation alpha: raise a signal's transfer coefficient (capstone)
+python -m pytest                # 262 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests

@@ -39,10 +39,11 @@ python run_opex.py                # OPEX structural effect + alpha-decay/crowdin
 python run_mechflow.py            # leveraged-ETF forced-flow overnight reversal
 python run_buyback.py             # buyback-blackout regulatory edge (needs EDGAR; cached)
 python run_forcedseller.py        # vol-control deleveraging flow anticipation
+python run_transfer.py            # implementation alpha / transfer coefficient (capstone)
 python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
 
-python -m pytest -q               # 256 tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 262 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here

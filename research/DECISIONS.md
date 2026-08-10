@@ -118,6 +118,18 @@ can't-be-arbitraged" story still isn't a free lunch: the forced flow pays only t
 (a maker earning the spread), not a taker riding it. That conclusion is only reachable by building and
 honestly testing several — which is what the platform is for.
 
+**Implementation alpha / transfer coefficient ("the capstone", `run_transfer.py`)**
+- The thesis the whole project builds toward: the realistic, defensible edge for a junior is raising the
+  *transfer coefficient* (Grinold–Kahn: IR = IC·√breadth·TC) — making a signal a desk already trusts
+  deployable — not discovering a unicorn. Took cross-sectional 12–1 momentum and layered the industry-
+  standard stack (winsor/z, β+vol neutralization, vol-targeting, market-beta hedge, turnover control).
+- **Result (honest and strong): implementation is diagnosis + deployability, not Sharpe-manufacturing.**
+  Neutralizing β/vol cut the GROSS Sharpe 0.24 → 0.10 — **57% of the raw "alpha" was a hidden factor tilt**,
+  the mirage caught before capital is committed. The stack delivered the real wins (market-neutral β
+  0.09→0.01, drawdown −16%→−12%) but net Sharpe went 0.20→0.01 because mega-cap momentum (IC 0.02) has no
+  real idiosyncratic alpha to transfer — and an honest analysis SAYS SO. The pitch, quantified: make good
+  signals better AND catch the fakes; the same stack on a live signal preserves the alpha.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).
