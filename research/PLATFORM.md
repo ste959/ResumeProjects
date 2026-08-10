@@ -79,6 +79,10 @@ tearsheet. Adding a sixth is a subclass.
   **implementation-shortfall** ledger (execution vs. opportunity cost). See [`RISK-NOTE.md`](RISK-NOTE.md).
 - A deep validation stack (`validation.py`): Deflated Sharpe, PBO/CSCV, Newey–West, block bootstrap,
   min-detectable-Sharpe power — the platform's differentiator.
+- **Alpha-lifecycle monitor** (`decaymonitor.py`) — the control system institutions actually run on:
+  bucketed-Sharpe **decay slope** + half-life, IC decay, and a **crowding** detector that catches "beta
+  wearing an alpha costume." Answers *"will this edge still be here in six months?"* See
+  [`ALPHA-LIFECYCLE-NOTE.md`](ALPHA-LIFECYCLE-NOTE.md).
 - **Reporting** (`report.py`, `run_report.py`) — a self-contained **HTML tearsheet** (equity curve,
   drawdown, rolling Sharpe, monthly-return heatmap, VaR/ES + risk contribution, P&L attribution — all
   inlined SVG/CSS) and a **strategy leaderboard** ranked through the gauntlet.

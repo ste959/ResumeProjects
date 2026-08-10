@@ -67,6 +67,15 @@ exists to keep that day honest.
   factor-neutral residuals), built correctly, and the honest measurement shows the taker edge is gone;
   what remains is a market-making / intraday / small-cap phenomenon free daily data can't reach.
 
+**OPEX structural effect + alpha-decay monitor (`run_opex.py`)**
+- Hypothesis: the dealer-gamma cycle leaves the week after monthly expiry weak (a *structural*, mechanical
+  effect). Tested on SPY/QQQ/IWM; built the alpha-decay/crowding monitor to judge the lifecycle.
+- **Result: the textbook sign REVERSED** — post-OPEX was the *strongest* phase this sample (t≈+2.8), not
+  the weakest, so the published trade (flat post-OPEX) *underperforms* buy-and-hold. And the crowding
+  detector made the decisive catch: the timing overlay is +0.90 correlated to SPY and rising — **beta
+  wearing an alpha costume, not an independent edge.** The deliverable is the monitor (catch a false
+  positive; know when an edge is dying), not the edge.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).
