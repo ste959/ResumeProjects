@@ -130,6 +130,17 @@ honestly testing several — which is what the platform is for.
   real idiosyncratic alpha to transfer — and an honest analysis SAYS SO. The pitch, quantified: make good
   signals better AND catch the fakes; the same stack on a live signal preserves the alpha.
 
+**Paper-fill validation ("closing the loop", `run_paper.py`)**
+- Direct answer to both audits' sharpest criticism ("modeled, not measured"): submit real Alpaca paper
+  orders, capture the actual fills, and calibrate the modeled cost to reality.
+- **Result: the loop is closed and the model is validated (with an honest caveat).** Against real QUOTED
+  spreads the ADV-tier model is spot-on for deep names (SPY/IWM/XLE) and under-charges the thinner XLF
+  (real 3.5bp vs modeled 1.5). Real paper FILLS came in at 0.83bp round-trip vs 1.07 modeled — but paper
+  fills are OPTIMISTIC (fill near mid, no impact/queue; SPY/QQQ filled at ~0), so that's a lower bound; the
+  true live cost sits between the quoted spread and the paper fill, and the model brackets it. Positions
+  flattened cleanly. Disclosing the paper-fill-optimism caveat is the point — it's the execution-cost
+  literacy a desk hires for.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).
