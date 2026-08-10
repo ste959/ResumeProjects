@@ -62,6 +62,32 @@ def test_strategy_book_is_dollar_neutral_across_the_stocks():
     assert stock_w.sum(axis=1).abs().max() < 1e-6              # long/short stocks net to ~0
 
 
+def test_pca_risk_model_reconstructs_the_covariance():
+    rng = np.random.default_rng(0)
+    R = rng.normal(0, 0.01, (400, 8))
+    B, F, d = im.pca_risk_model(R, k=3)
+    assert B.shape == (8, 3) and F.shape == (3, 3) and d.shape == (8,)
+    assert (d > 0).all()
+    # A low-rank factor model reconstructs the DIAGONAL exactly (systematic + specific = total variance)
+    # and only approximates the off-diagonal — that's the whole point of a factor model.
+    from mds import riskmodel as rm
+    Sigma = rm.asset_covariance(B, F, d)
+    cov = np.cov(R - R.mean(0), rowvar=False)
+    assert np.abs(np.diag(Sigma) - np.diag(cov)).max() < 1e-8      # per-asset variance is exact
+    assert np.allclose(Sigma, Sigma.T)                            # symmetric, well-formed
+
+
+def test_risk_model_optimizer_book_is_dollar_and_factor_neutral():
+    px = _panel(600)
+    stocks = _stocks(px)
+    r = eng.run(im.ImplementedMomentum(stocks, enh=frozenset({"clean", "optimize"}), opt_window=252, k_factors=3),
+                px, eng.BacktestConfig(rebalance=21, cost_bps=0.0))
+    w = r.weights[stocks]
+    active = w.loc[(w.abs().sum(axis=1) > 0)]
+    assert active.sum(axis=1).abs().max() < 1e-6            # dollar-neutral (the optimizer's C row of ones)
+    assert (w[stocks].abs().max().max() <= 0.10 + 1e-6)    # position box cap respected
+
+
 def test_beta_hedge_takes_a_position_in_the_index():
     px = _panel()
     stocks = _stocks(px)

@@ -89,6 +89,19 @@ def main() -> None:
         print(f"  {label:<26}{s_g['sharpe']:>9.2f}{s_n['sharpe']:>8.2f}{s_n['ann_return']*100:>8.1f}%"
               f"{s_n['max_drawdown']*100:>7.1f}%{net.turnover_ann:>9.0f}x{beta:>+8.2f}")
 
+    # The principled deployment path: the factor-risk-model constrained optimizer (Σ=BFBᵀ+D, factor+dollar
+    # neutral, box + turnover caps) — riskmodel.py wired into the deployment engine, replacing the ad-hoc stack.
+    ostrat = lambda: im.ImplementedMomentum(stocks, hedge=HEDGE, enh=frozenset({"clean", "optimize"}))
+    og = eng.run(ostrat(), close, eng.BacktestConfig(rebalance=21, cost_bps=0.0, rf=rf))
+    on = eng.run(ostrat(), close, eng.BacktestConfig(rebalance=21, execution=ex.RealisticExecution(), aum=1e8, rf=rf),
+                 liquidity=liq)
+    ob = _market_beta(on.net, mkt)
+    print(f"  {'risk-model optimizer':<26}{og.stats['sharpe']:>9.2f}{on.stats['sharpe']:>8.2f}"
+          f"{on.stats['ann_return']*100:>8.1f}%{on.stats['max_drawdown']*100:>7.1f}%{on.turnover_ann:>9.0f}x{ob:>+8.2f}")
+    print(f"  (Σ=BFBᵀ+D factor risk model + constrained optimizer: factor- & dollar-neutral, box + turnover caps —")
+    print(f"   the principled deployment tool; note the LOWEST drawdown ({on.stats['max_drawdown']*100:.0f}%) and "
+          f"β {ob:+.2f}. On a dead signal it still can't make alpha — w ∝ Σ⁻¹α faithfully expresses a dead α.)")
+
     raw, neut, full = rows[0], rows[2], rows[-1]
     mirage = (1 - neut["gross"] / raw["gross"]) * 100 if raw["gross"] else 0.0
     dd_cut = (1 - full["dd"] / raw["dd"]) * 100 if raw["dd"] else 0.0

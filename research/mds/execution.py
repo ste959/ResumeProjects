@@ -113,10 +113,19 @@ class RealisticExecution(ExecutionModel):
     """Spread + square-root market impact + a participation cap (partial fills) + short-borrow/financing.
 
     impact_coef · σ · √(participation) is the temporary impact per unit traded; `max_participation` is the
-    fraction of ADV tradable per rebalance (the rest carries to next time — capacity made explicit)."""
+    fraction of ADV tradable per rebalance (the rest carries to next time — capacity made explicit).
+
+    Parameter sources (each a documented default, not a free guess — `run_calibration.py` shows the headline
+    conclusions are robust across the plausible band):
+      • impact_coef ≈ 0.3 — the square-root-law coefficient; empirical equity estimates run ~0.1–1
+        (Almgren et al. 2005; Kissell). Band swept: [0.1, 0.5].
+      • borrow_bps = 50 — general-collateral stock-loan fee for liquid names is ~25–50 bps/yr (hard-to-borrow
+        much higher, but our universes are liquid). Band swept: [0, 100].
+      • financing_bps = 100 — ~overnight rate + a spread on leverage above 1× gross.
+      • max_participation = 0.10 — a ~10% of-ADV cap is a standard execution constraint (Almgren)."""
     impact_coef: float = 0.3
     max_participation: float = 0.10
-    borrow_bps: float = 50.0        # annual borrow on short notional
+    borrow_bps: float = 50.0        # annual borrow on short notional (GC ~25–50 bps for liquid names)
     financing_bps: float = 100.0    # annual financing on leverage above 1x gross
 
     def rebalance(self, w_prev, w_target, aum, liq):

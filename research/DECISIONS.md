@@ -156,6 +156,18 @@ honestly testing several — which is what the platform is for.
 - Caveat disclosed: yfinance is survivorship-biased; the point-in-time universe machinery is ready for a
   paid feed.
 
+**Cost-model calibration + sensitivity + factor-risk-model wiring (audit fixes, `run_calibration.py`, `implement.py`)**
+- Two more audit items closed. (a) The three cost assumptions (impact_coef, borrow, IEX-volume factor) are
+  now DOCUMENTED with sources (Almgren square-root coefficient; general-collateral borrow; IEX consolidated
+  share) and swept across their bands: impact & borrow are robust (net Sharpe moves <0.06); the IEX-volume
+  factor is the sensitive one (spread ~0.19, since it drives both spread and the capacity cap) — reported
+  honestly, with the real-quote/paper-fill validation as its empirical anchor. The qualitative conclusion
+  (marginal, near-breakeven, cost-sensitive book at $1B) holds across every band. (b) The Barra-style factor
+  risk model + constrained optimizer (`riskmodel.optimize`, Σ=BFBᵀ+D, factor+dollar-neutral, box+turnover
+  caps) is now WIRED into the deployment path (`implement.py` "optimize" layer) — the best tool no longer
+  sits unused. It produces the cleanest book (lowest drawdown, market-neutral) but, faithful to w ∝ Σ⁻¹α,
+  can't manufacture alpha from a dead signal — consistent with the transfer study.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).
