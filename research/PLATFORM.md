@@ -15,8 +15,8 @@ in `mds/` are now components of a single pipeline behind one **Strategy SDK**.
   Data              Signal            Backtest           Validation        Risk & Execution     Report
   ─────             ──────            ────────           ──────────        ────────────────     ──────
   Alpaca / FRED  →  factors,       →  walk-forward,   →  Deflated Sharpe,  →  factor risk,     →  tearsheet,
-  EDGAR, cache      trend, carry,     cost & lag,        PBO, HAC t,          vol-target,          P&L & factor
-  (point-in-time)   cross-section     leverage cap       bootstrap CI         paper (Alpaca)       attribution
+  EDGAR, cache      trend, carry,     spread+impact,     PBO, HAC t,          vol-target,          P&L & factor
+  (point-in-time)   cross-section     borrow, capacity   bootstrap CI         paper (Alpaca)       attribution
 ```
 
 Every stage is shared. A strategy plugs into it once and inherits all of it.
@@ -62,25 +62,28 @@ tearsheet. Adding a sixth is a subclass.
 
 ## What's built vs. the roadmap
 
-**Built (this sprint + the existing studies):**
+**Built (sprints 1–2 + the existing studies):**
 - The Strategy SDK + engine + shared evaluation/gauntlet + attribution + tearsheet (`engine.py`,
   `strategies_lib.py`, `run_lab.py`).
+- **Execution & cost realism** (`execution.py`, `run_execution.py`) — half-spread (ADV-tier or
+  Corwin–Schultz), **square-root market impact**, a **participation cap with partial fills**, and
+  short-**borrow**/financing carry; plus a **capacity curve** that sweeps AUM to find where the edge
+  decays. See [`EXECUTION-NOTE.md`](EXECUTION-NOTE.md).
 - A deep validation stack (`validation.py`): Deflated Sharpe, PBO/CSCV, Newey–West, block bootstrap,
   min-detectable-Sharpe power — the platform's differentiator.
 - Strategy families as components: cross-sectional factors, portfolio construction (risk model, timing,
   options, tax), multi-asset allocation, and an ablation-and-diagnostics trend study.
 
 **Roadmap (the sprints that make it a *production* research desk):**
-1. **Execution & cost realism** — replace flat-bps with spread/slippage, square-root **market impact**,
-   short **borrow** cost, partial fills and participation caps (optionally backed by the exchange's LOB
-   engine). This is what makes "alpha under *real* conditions" a claim, not a hope.
-2. **Data integrity** — point-in-time, **survivorship-free** universe (today's equity backtests are
+1. **Data integrity** — point-in-time, **survivorship-free** universe (today's equity backtests are
    optimistic; this is the biggest data hole, disclosed in [`ALPHA-DATA-ROADMAP.md`](ALPHA-DATA-ROADMAP.md)).
-3. **Risk & execution loop** — live exposures, VaR/CVaR, **stress/scenario replay**, limit checks; and a
+2. **Risk & execution loop** — live exposures, VaR/CVaR, **stress/scenario replay**, limit checks; and a
    paper-trade → **implementation-shortfall (TCA)** loop that measures whether live fills match the
    backtest's assumptions.
-4. **Tooling** — strategy registry/leaderboard and a richer tearsheet (rolling Sharpe, factor-exposure
+3. **Tooling** — strategy registry/leaderboard and a richer tearsheet (rolling Sharpe, factor-exposure
    time series).
+4. **LOB-backed fills** — plug the exchange's order-book engine in as the fill model for the highest-
+   fidelity impact simulation (collapsing app #1 into the platform).
 
 ## Why this design
 
