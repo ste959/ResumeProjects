@@ -83,7 +83,9 @@ tearsheet. Adding a sixth is a subclass.
   drawdown, rolling Sharpe, monthly-return heatmap, VaR/ES + risk contribution, P&L attribution — all
   inlined SVG/CSS) and a **strategy leaderboard** ranked through the gauntlet.
 - Strategy families as components: cross-sectional factors, portfolio construction (risk model, timing,
-  options, tax), multi-asset allocation, and an ablation-and-diagnostics trend study.
+  options, tax), multi-asset allocation, an ablation-and-diagnostics trend study, and a **cross-sectional
+  statistical-arbitrage** book (PCA statistical factors → residualize → Ornstein–Uhlenbeck s-scores,
+  Avellaneda–Lee; `xstatarb.py`, see [`XSTATARB-NOTE.md`](XSTATARB-NOTE.md)).
 
 **Roadmap (the sprints that make it a *production* research desk):**
 1. **Delisted-name data** — the point-in-time *mechanism* is built; the *exit* side needs a paid

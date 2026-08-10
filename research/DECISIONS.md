@@ -57,6 +57,16 @@ exists to keep that day honest.
   half-right and half-artifact; only the diagnostics separated the mechanism from the story. Decompose the
   book into its factor bets before believing your own summary.
 
+**Cross-sectional statistical arbitrage (`run_xstatarb.py`)**
+- The canonical desk build — Avellaneda–Lee residual reversal: top-15 PCA eigenportfolio factors →
+  residualize (factor-neutral) → OU s-scores → dollar-neutral, on 92 liquid large-caps, daily.
+- **Result: an *informative* null.** Even gross, excess Sharpe ≈ −0.44 with a 95% CI of [−1.28, +0.41]
+  (includes zero) and near-zero across every window×k — the daily reversal is **arbitraged out of the
+  liquid cross-section**, exactly as Avellaneda–Lee's own post-2007 decay documents. This is a *different*
+  and stronger null than the mega-cap factor one: the methods were pointed where alpha can live (breadth,
+  factor-neutral residuals), built correctly, and the honest measurement shows the taker edge is gone;
+  what remains is a market-making / intraday / small-cap phenomenon free daily data can't reach.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).
