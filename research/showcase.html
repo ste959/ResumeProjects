@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="A working-paper overview of a self-directed quant research platform: protocol, validation gauntlet, execution/cost model, risk framework, and honestly-reported findings.">
+<meta name="description" content="A quant-developer working paper: the engineered platform, method, findings, transferable lessons, and a prioritized roadmap.">
 <title>Quant Research Platform — Working Paper</title>
 </head>
 <body>
@@ -14,7 +14,7 @@
     --rule:#d5dae1; --rule-strong:#2a2d33;
     --accent:#21405e; --accent-soft:rgba(33,64,94,.07);
     --confirmed:#21405e; --insight:#8a6320; --null:#6b7178;
-    --neg:#8a2f2a;
+    --neg:#8a2f2a; --p1:#21405e;
     color-scheme:light;
   }
   @media (prefers-color-scheme:dark){
@@ -24,7 +24,7 @@
       --rule:#2b2f37; --rule-strong:#c3c8d0;
       --accent:#86aad0; --accent-soft:rgba(134,170,208,.10);
       --confirmed:#86aad0; --insight:#c69a54; --null:#8b929c;
-      --neg:#d08078;
+      --neg:#d08078; --p1:#86aad0;
       color-scheme:dark;
     }
   }
@@ -34,7 +34,7 @@
     --rule:#2b2f37; --rule-strong:#c3c8d0;
     --accent:#86aad0; --accent-soft:rgba(134,170,208,.10);
     --confirmed:#86aad0; --insight:#c69a54; --null:#8b929c;
-    --neg:#d08078;
+    --neg:#d08078; --p1:#86aad0;
     color-scheme:dark;
   }
 
@@ -45,7 +45,7 @@
     font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased;
   }
   .mono{font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace}
-  .paper{max-width:760px;margin:0 auto;padding:0 32px}
+  .paper{max-width:768px;margin:0 auto;padding:0 32px}
   a{color:var(--accent)} a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   em,i,.var{font-style:italic}
   sub,sup{font-size:.72em;line-height:0}
@@ -53,56 +53,66 @@
   .label{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:11px;letter-spacing:.15em;
     text-transform:uppercase;color:var(--faint);font-weight:600}
 
-  /* title block */
-  .head{padding:72px 0 34px;border-bottom:1.5px solid var(--rule-strong)}
+  .head{padding:70px 0 32px;border-bottom:1.5px solid var(--rule-strong)}
   .head .label{color:var(--accent)}
-  h1{font-size:clamp(27px,3.6vw,39px);line-height:1.16;letter-spacing:-.01em;font-weight:600;
+  h1{font-size:clamp(26px,3.5vw,38px);line-height:1.16;letter-spacing:-.01em;font-weight:600;
     margin:15px 0 0;text-wrap:balance}
   .subtitle{font-size:clamp(17px,2vw,20px);color:var(--muted);font-style:italic;margin:12px 0 0;max-width:60ch}
   .byline{font-family:system-ui,sans-serif;font-size:13px;color:var(--faint);margin-top:22px;
     display:flex;flex-wrap:wrap;gap:6px 20px}
   .byline b{color:var(--muted);font-weight:600}
-
-  /* abstract */
-  .abstract{margin:34px 0 0;padding:22px 26px;background:var(--surface);border:1px solid var(--rule);border-radius:3px}
+  .abstract{margin:32px 0 0;padding:22px 26px;background:var(--surface);border:1px solid var(--rule);border-radius:3px}
   .abstract .label{display:block;margin-bottom:9px}
   .abstract p{margin:0;font-size:15.5px;line-height:1.62;color:var(--ink)}
 
-  /* sections */
   section{padding:40px 0;border-bottom:1px solid var(--rule)}
-  h2{font-size:22px;font-weight:600;letter-spacing:-.005em;margin:0 0 4px;text-wrap:balance}
+  h2{font-size:22px;font-weight:600;letter-spacing:-.005em;margin:0;text-wrap:balance}
   h2 .no{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:.5em;font-weight:600}
-  h3{font-size:16px;font-weight:600;margin:26px 0 6px;color:var(--ink)}
+  h3{font-size:15.5px;font-weight:600;margin:24px 0 4px;color:var(--ink)}
   p{margin:14px 0 0;max-width:68ch}
-  p:first-of-type{margin-top:12px}
-  .term{font-weight:600}
-  strong{font-weight:600}
+  .lead{margin-top:10px}
+  .term{font-weight:600} strong{font-weight:600}
 
-  ol.proto{margin:16px 0 0;padding-left:0;counter-reset:p;list-style:none;max-width:68ch}
+  /* system map */
+  .sysmap{margin:22px 0 0;display:flex;flex-direction:column;gap:9px;font-family:system-ui,sans-serif}
+  .tier{border:1px solid var(--rule);background:var(--surface);border-radius:5px;padding:12px 15px}
+  .tier.hi{border-color:var(--accent);background:var(--accent-soft)}
+  .tier .tt{font-size:13px;font-weight:700;color:var(--ink)}
+  .tier .td{font-size:12px;color:var(--muted);margin-top:2px}
+  .tier .tag{float:right;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--accent);
+    letter-spacing:.06em;font-weight:600}
+  .svc{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+  .svc .tier{text-align:center;padding:11px 8px}
+  .svc .tt{font-size:12.5px} .svc .td{font-size:11px;margin-top:3px}
+  @media(max-width:600px){.svc{grid-template-columns:1fr 1fr}}
+  .caption{caption-side:bottom;text-align:left;font-size:13px;color:var(--muted);font-style:italic;
+    margin-top:12px;line-height:1.5}
+  .caption b{font-style:normal;font-weight:600;color:var(--ink)}
+  .sysstats{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:20px;font-family:ui-monospace,Menlo,monospace;
+    font-size:12.5px;color:var(--muted)}
+  .sysstats b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+  /* protocol / numbered lists */
+  ol.proto{margin:16px 0 0;padding-left:0;counter-reset:p;list-style:none;max-width:70ch}
   ol.proto li{position:relative;padding:9px 0 9px 42px;border-top:1px solid var(--rule)}
   ol.proto li:first-child{border-top:none}
   ol.proto li::before{counter-increment:p;content:"§" counter(p);position:absolute;left:0;top:9px;
     font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--accent);font-weight:600}
-  ol.proto li b{font-weight:600}
-  ol.proto li span{color:var(--muted);font-size:15px}
+  ol.proto li b{font-weight:600} ol.proto li span{color:var(--muted);font-size:14.5px}
 
-  /* equation */
-  .eq{margin:22px 0;padding:16px 20px;background:var(--box);border-left:2px solid var(--accent);border-radius:2px;
+  .eq{margin:20px 0;padding:15px 20px;background:var(--box);border-left:2px solid var(--accent);border-radius:2px;
     display:flex;align-items:center;justify-content:space-between;gap:20px;overflow-x:auto}
-  .eq .expr{font-size:18px;white-space:nowrap}
+  .eq .expr{font-size:17.5px;white-space:nowrap}
   .eq .num{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--faint);flex:none}
-  .eq .var{font-style:italic}
-  .rad{font-style:normal}
+  .rad{font-style:normal} .ovl{border-top:1px solid currentColor;padding:0 .15em}
 
-  /* tables — booktabs */
   .tw{overflow-x:auto;margin:22px 0 8px}
-  table{border-collapse:collapse;width:100%;font-size:14px;
-    font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  table{border-collapse:collapse;width:100%;font-size:14px;font-family:system-ui,-apple-system,sans-serif}
   caption{caption-side:bottom;text-align:left;font-size:13px;color:var(--muted);font-style:italic;
     padding-top:12px;line-height:1.5;font-family:"Iowan Old Style",Georgia,serif}
   caption b{font-style:normal;font-weight:600;color:var(--ink)}
   thead th{border-top:1.5px solid var(--rule-strong);border-bottom:1px solid var(--rule-strong);
-    padding:9px 12px;text-align:left;font-weight:600;font-size:12px;letter-spacing:.02em;color:var(--ink);vertical-align:bottom}
+    padding:9px 12px;text-align:left;font-weight:600;font-size:12px;color:var(--ink);vertical-align:bottom}
   tbody td{border-bottom:1px solid var(--rule);padding:9px 12px;vertical-align:top;color:var(--muted)}
   tbody tr:last-child td{border-bottom:1.5px solid var(--rule-strong)}
   td.name{color:var(--ink);font-weight:600;white-space:nowrap}
@@ -112,9 +122,27 @@
   .v.c{color:var(--confirmed)} .v.i{color:var(--insight)} .v.n{color:var(--null)}
   .pos{color:var(--confirmed)} .bad{color:var(--neg)}
 
-  blockquote{margin:26px 0;padding:0 0 0 22px;border-left:2px solid var(--accent);
+  blockquote{margin:24px 0 0;padding:0 0 0 22px;border-left:2px solid var(--accent);
     font-style:italic;font-size:18px;line-height:1.5;color:var(--ink);max-width:60ch}
-  blockquote span{font-style:normal}
+  blockquote span{font-style:normal;font-size:14px;color:var(--muted);display:block;margin-top:8px}
+
+  /* principles (what we learned) */
+  ol.learn{margin:18px 0 0;padding-left:0;counter-reset:L;list-style:none}
+  ol.learn li{position:relative;padding:14px 0 14px 40px;border-top:1px solid var(--rule);max-width:72ch}
+  ol.learn li::before{counter-increment:L;content:counter(L,upper-roman);position:absolute;left:0;top:14px;
+    font-family:"Iowan Old Style",Georgia,serif;font-size:14px;color:var(--accent);font-weight:600;font-style:italic}
+  ol.learn h3{margin:0 0 3px;font-size:16px}
+  ol.learn p{margin:0;font-size:14.8px;color:var(--muted);max-width:none}
+
+  /* roadmap */
+  .road{margin:20px 0 0;display:flex;flex-direction:column;gap:12px}
+  .step{display:grid;grid-template-columns:78px 1fr;gap:16px;padding:14px 0;border-top:1px solid var(--rule);align-items:start}
+  .step:first-child{border-top:none}
+  .pri{font-family:system-ui,sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:4px 0;text-align:center;margin-top:2px}
+  .step h3{margin:0 0 3px;font-size:16px}
+  .step p{margin:0;font-size:14.8px;color:var(--muted);max-width:none}
+  .step p b{color:var(--ink);font-weight:600}
 
   .disc{display:grid;grid-template-columns:1fr 1fr;gap:0 30px}
   .disc dt{font-weight:600;font-size:15px;margin-top:16px}
@@ -123,202 +151,177 @@
 
   footer{padding:38px 0 60px}
   footer .label{color:var(--accent)}
-  footer p{font-size:15px;color:var(--muted);max-width:66ch}
+  footer p{font-size:15.5px;color:var(--muted);max-width:66ch}
+  footer p b{color:var(--ink);font-weight:600}
   footer .refs{font-family:system-ui,sans-serif;font-size:12.5px;color:var(--faint);margin-top:20px;line-height:1.7}
   .btn{display:inline-block;margin-top:20px;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;
     color:var(--accent);border-bottom:1px solid var(--accent);padding-bottom:1px}
   .btn:hover{border-bottom-width:2px}
 
-  @media (max-width:640px){ .paper{padding:0 22px} section{padding:32px 0} .head{padding:52px 0 28px} body{font-size:16px} }
+  @media (max-width:640px){ .paper{padding:0 22px} section{padding:32px 0} .head{padding:50px 0 26px} body{font-size:16px} }
 </style>
 
 <div class="head">
   <div class="paper">
-    <div class="label">Systematic strategy research &middot; methods &amp; selected findings</div>
-    <h1>A Platform for Honest Backtesting, Execution Modeling, and the Alpha Lifecycle</h1>
-    <p class="subtitle">An end-to-end apparatus for evaluating trading strategies under realistic frictions — and a discipline for reporting what does <em>not</em> work.</p>
+    <div class="label">Systematic strategy research &middot; a platform, its findings, and the road ahead</div>
+    <h1>An Engineered Platform for Honest Strategy Research — and What It Taught</h1>
+    <p class="subtitle">The durable output of the work is not a strategy; it is a tested system, a set of transferable lessons, and a clear view of where accessible edge actually lives.</p>
     <div class="byline">
       <span><b>Author</b>&ensp;self-directed quant research project</span>
-      <span><b>Stack</b>&ensp;Python · NumPy/SciPy/pandas · 276 unit tests</span>
-      <span><b>Data</b>&ensp;20 yr, 2006–2026 · US equities &amp; ETFs</span>
+      <span><b>System</b>&ensp;~35 Python modules · 276 unit tests</span>
+      <span><b>Sample</b>&ensp;20 yr, 2006–2026 · US equities &amp; ETFs</span>
     </div>
     <div class="abstract">
       <span class="label">Abstract</span>
-      <p>We present a self-directed research platform for systematic trading strategies that privileges
-        methodological honesty over headline performance. Candidate strategies are evaluated under a
-        walk-forward protocol behind an overfitting-aware validation gauntlet — a deflated Sharpe ratio, the
-        probability of backtest overfitting, Newey–West standard errors, and a minimum-detectable-Sharpe power
-        analysis — and priced through an execution model (spread, square-root market impact, borrow, and
-        capacity) <em>calibrated against live paper fills</em>. Across eleven candidate strategies spanning
-        cross-sectional factors, statistical arbitrage, and structural order-flow, none establishes a
-        statistically significant edge on liquid, survivorship-constrained data; each null is reported and its
-        cause diagnosed. The platform's contribution is the apparatus itself, together with an implementation
-        framework — the Grinold–Kahn transfer coefficient — for maximizing the fraction of a signal that
-        survives to realized P&amp;L. All headline results are checked on a <em>pre-registered</em> twenty-year
-        out-of-sample hold-out.</p>
+      <p>This note describes a self-directed software platform for systematic strategy research, the empirical
+        findings it produced, and how those findings direct the next phase of work. The platform is engineered
+        around a single strategy interface and a <em>shared evaluation harness</em>, so every experiment is
+        measured identically under a walk-forward protocol, an overfitting-aware validation gauntlet, a friction
+        model calibrated against live fills, and a factor risk framework. Eleven strategies were run through it;
+        none establishes a statistically significant edge on liquid, survivorship-constrained data, and each null
+        is reported and diagnosed. The right reading is not failure but a <em>located boundary</em>: the work
+        identifies where accessible edge must come from — implementation quality, less-efficient venues, and
+        survivorship-free data — and the system is built to be pointed there. All headline results are confirmed
+        on a pre-registered twenty-year hold-out.</p>
     </div>
   </div>
 </div>
 
 <section>
   <div class="paper">
-    <h2><span class="no">§1</span>Research protocol</h2>
-    <p>Every strategy is expressed against one interface and evaluated by an identical engine, so results are
-      comparable and no study can quietly relax the rules. The protocol fixes the assumptions that most often
-      manufacture false alpha:</p>
-    <ol class="proto">
-      <li><b>Walk-forward, out-of-sample by construction.</b> <span>Parameters are fit on a trailing window and traded on the next block; signals at time <span class="var">t</span> use only data through <span class="var">t</span>−1, with a one-period execution lag. The no-look-ahead property is asserted by a unit test, not assumed.</span></li>
-      <li><b>Excess of the risk-free rate.</b> <span>Sharpe ratios are computed on returns net of a T-bill, because a "Sharpe" is compensation for risk above cash — over 2006–2026 the short rate moved 0%→5%, and ignoring it overstates every ratio.</span></li>
-      <li><b>Point-in-time data &amp; survivorship control.</b> <span>A data-quality audit gates on clean inputs; a point-in-time universe masks names to their as-of membership and realizes delisting losses. (Free data remains survivorship-constrained — see §7.)</span></li>
-      <li><b>Pre-registration.</b> <span>For the flagship study the out-of-sample window and the hypothesis are recorded <em>before</em> the test is run; the result is reported once, whether or not it agrees with the guess (§6).</span></li>
+    <h2><span class="no">§1</span>System architecture</h2>
+    <p class="lead">The engineering decision that makes the research trustworthy is a single one: every strategy
+      implements the <em>same</em> causal interface and is scored by the <em>same</em> evaluation harness. No
+      study can quietly relax the rules, and the two-hundred-plus tests — including one that asserts the
+      no-look-ahead property directly — mean a result reproduces rather than merely being claimed.</p>
+    <div class="sysmap">
+      <div class="tier"><span class="tag">plug-in</span><div class="tt">Strategy SDK — one causal interface</div><div class="td">Any signal (factor · trend · stat-arb · structural flow) subclasses one contract and inherits the entire pipeline below.</div></div>
+      <div class="tier hi"><span class="tag">core</span><div class="tt">Walk-forward engine</div><div class="td">One-period execution lag; no look-ahead, enforced by unit test. Records held weights for attribution.</div></div>
+      <div class="svc">
+        <div class="tier"><div class="tt">Evaluation</div><div class="td">the overfitting gauntlet</div></div>
+        <div class="tier"><div class="tt">Execution</div><div class="td">cost · impact · capacity</div></div>
+        <div class="tier"><div class="tt">Risk &amp; TCA</div><div class="td">VaR · stress · shortfall</div></div>
+        <div class="tier"><div class="tt">Decay monitor</div><div class="td">is the edge dying?</div></div>
+      </div>
+      <div class="tier"><span class="tag">inputs</span><div class="tt">Data layer</div><div class="td">20-year history · point-in-time universe · data-quality audit · deterministic caching.</div></div>
+    </div>
+    <div class="caption"><b>Figure 1.</b> Layered architecture. Strategies plug into a shared engine; evaluation, execution, risk, and lifecycle monitoring are common services, so all eleven experiments are directly comparable.</div>
+    <div class="sysstats">
+      <span><b>~35</b> modules</span><span><b>276</b> tests</span><span><b>1</b> shared evaluation harness</span>
+      <span>deterministic &amp; cached</span><span>Python · NumPy/SciPy/pandas</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="paper">
+    <h2><span class="no">§2</span>Method</h2>
+    <h3>2.1&ensp;Protocol</h3>
+    <p>The protocol fixes the assumptions that most often manufacture false alpha: walk-forward fitting with a
+      one-period lag; returns taken in <em>excess of the risk-free rate</em> (the short rate moved 0%→5% over
+      the sample); point-in-time data with survivorship control; and <em>pre-registration</em> of the
+      out-of-sample window and hypothesis before the test is run.</p>
+    <h3>2.2&ensp;Validation gauntlet</h3>
+    <p>Backtesting <span class="var">N</span> configurations on one history is a multiple-comparisons problem.
+      Each candidate passes a battery of overfitting-aware statistics before any claim is entertained.</p>
+    <div class="tw">
+      <table>
+        <caption><b>Table 1.</b> The validation gauntlet — each statistic corrects a distinct failure mode.</caption>
+        <thead><tr><th>Statistic</th><th>Corrects for</th><th class="num">Bar</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Newey–West <span class="var">t</span></td><td>autocorrelation inflating significance</td><td class="num">|t|&gt;2</td></tr>
+          <tr><td class="name">Deflated Sharpe</td><td>trials tried, plus return skew &amp; kurtosis</td><td class="num">&gt;0.95</td></tr>
+          <tr><td class="name">PBO (CSCV)</td><td>probability the selection is overfit</td><td class="num">&lt;0.5</td></tr>
+          <tr><td class="name">Bonferroni bar</td><td>picking the best of many strategies</td><td class="num">|t|&gt;2.6</td></tr>
+          <tr><td class="name">Min-detectable SR</td><td>whether the sample is even powered</td><td class="num">≤ best</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The power term is decisive: the smallest detectable Sharpe scales as
+      <span class="mono">SR<sub>min</sub> ∝ T<sup>−1/2</sup></span>, so extending the record from six to twenty
+      years lowers the threshold from ≈1.3 to ≈0.64 — and much of what a short sample calls a "null" is merely
+      an underpowered test.</p>
+    <h3>2.3&ensp;Frictions &amp; risk</h3>
+    <p>Realized trade cost is the half-spread, temporary market impact (the empirical square-root law), and a
+      financing carry:</p>
+    <div class="eq"><span class="expr">c = <span class="var">s</span>/2 + <span class="var">κ&thinsp;σ</span> <span class="rad">√</span><span class="ovl"><span class="var">Q</span>/ADV</span> + <span class="var">b</span>·(short notional)</span><span class="num">(1)</span></div>
+    <p>with <span class="var">κ</span> in the literature range [0.1, 0.5] and stress-tested for sensitivity; a
+      participation cap turns over-large orders into partial fills, making the backtest capacity-aware. Risk is
+      structural — a factor covariance <span class="mono">Σ = <span class="var">B F B</span><sup>⊤</sup> + <span class="var">D</span></span>
+      driving a constrained optimizer, with tail risk from a Cornish–Fisher (fat-tailed) VaR. The cost model is
+      not left as an assumption: real paper orders were submitted, and the model matched live quoted spreads for
+      deep names (SPY, IWM ≈ 1.0×) while conservatively under-pricing a thinner one.</p>
+  </div>
+</section>
+
+<section>
+  <div class="paper">
+    <h2><span class="no">§3</span>Findings</h2>
+    <p class="lead">Eleven strategies were taken through the full apparatus. Consistent with an efficient-market
+      prior on liquid, survivorship-constrained data, <strong>none establishes a statistically significant
+      edge.</strong> The value is in the diagnosis: each result is reported honestly and each failure attributed
+      to a specific cause.</p>
+    <div class="tw">
+      <table>
+        <caption><b>Table 2.</b> Verdicts. <span class="v c">proven</span> = a demonstrated platform capability · <span class="v i">insight</span> = a mechanism confirmed or a cause diagnosed · <span class="v n">null</span> = an honest no-result.</caption>
+        <thead><tr><th>Strategy</th><th>Finding</th><th class="num">Verdict</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Transfer coefficient</td><td>Isolated that 57% of momentum's Sharpe was a latent factor tilt; made the book market-neutral.</td><td class="num"><span class="v c">proven</span></td></tr>
+          <tr><td class="name">Live fill validation</td><td>Cost model matched real paper fills for deep names; capacity/TCA figures now anchored to reality.</td><td class="num"><span class="v c">proven</span></td></tr>
+          <tr><td class="name">Pre-registered OOS</td><td>A 20-year hold-out that <em>falsified the analyst's own hypothesis</em> — and it was reported.</td><td class="num"><span class="v c">proven</span></td></tr>
+          <tr><td class="name">Leveraged-ETF flow</td><td>Reversal mechanism confirmed (ρ=+0.47); the decay monitor then refuted its durability thesis.</td><td class="num"><span class="v i">insight</span></td></tr>
+          <tr><td class="name">Trend-following</td><td>Attribution showed the "edge" is volatility-timing plus a short-duration beta, not signal alpha.</td><td class="num"><span class="v i">insight</span></td></tr>
+          <tr><td class="name">Multi-factor book</td><td>Survivorship distorts factors in opposite directions — destroying low-vol, flattering momentum.</td><td class="num"><span class="v i">insight</span></td></tr>
+          <tr><td class="name">Statistical arbitrage</td><td>Avellaneda–Lee residual reversal is arbitraged out of liquid names — the literature-correct result.</td><td class="num"><span class="v n">null</span></td></tr>
+          <tr><td class="name">Buyback blackout</td><td>Refuted — the blackout window is confounded with the pre-earnings drift, which dominates.</td><td class="num"><span class="v n">null</span></td></tr>
+          <tr><td class="name">Vol-control flow</td><td>Wrong sign — post-spike the market front-runs and reverses, so riding the forced flow loses.</td><td class="num"><span class="v n">null</span></td></tr>
+          <tr><td class="name">Multi-asset allocation</td><td>Over 20y the premium is real but it is <em>beta, not skill</em>; every allocator clusters.</td><td class="num"><span class="v n">null</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="paper">
+    <h2><span class="no">§4</span>What the research established</h2>
+    <p class="lead">Ten strategies that "didn't work" are not ten dead ends; read together they are a set of
+      transferable conclusions about where edge is and is not.</p>
+    <ol class="learn">
+      <li><h3>The alpha boundary is located, not lamented.</h3><p>On free, liquid, survivorship-constrained data, nothing clears the significance bar. This confirms the efficient-market prior rather than a shortfall — and it pins down where accessible edge must instead come from: implementation, less-efficient venues, and better data.</p></li>
+      <li><h3>Forced flows pay the maker, not the taker.</h3><p>Every mechanical-flow strategy failed for one reason. A forced trade is the market's most predictable event, so its impact is competed away and reverts — the flow compensates the liquidity provider, not the taker who chases it.</p></li>
+      <li><h3>Implementation is the accessible lever.</h3><p>For a signal already in hand, realized IR is governed by the transfer coefficient — costs, risk, turnover, unintended bets — as much as by the raw IC. Without latency infrastructure, quality of implementation is where value is added.</p></li>
+      <li><h3>Most short-sample nulls are underpowered.</h3><p>Extending to twenty years cut the detectable Sharpe from 1.3 to 0.64 and turned "everything is null" into the sharper "the premia are real, but they are beta, not skill." Power must be established before a null is believed.</p></li>
+      <li><h3>Data provenance sets the question.</h3><p>Survivorship does not inflate uniformly — it destroyed the low-volatility factor (by removing the blow-ups its premium is paid by) while flattering momentum. What a dataset omits determines what it can honestly test.</p></li>
+      <li><h3>Honesty is a system control.</h3><p>Pre-registration, the test-enforced no-look-ahead property, the deflated-Sharpe gauntlet, and the decay monitor are not virtue; they are the controls that stop a research pipeline from shipping false positives — the way unit tests stop a codebase from shipping bugs.</p></li>
     </ol>
   </div>
 </section>
 
 <section>
   <div class="paper">
-    <h2><span class="no">§2</span>The validation gauntlet</h2>
-    <p>Backtesting <span class="var">N</span> configurations on one history is a multiple-comparisons problem:
-      the best of many random strategies looks good by construction. Each candidate therefore passes a battery
-      of overfitting-aware statistics before any claim is entertained.</p>
-    <div class="tw">
-      <table>
-        <caption><b>Table 1.</b> The validation gauntlet. Each component corrects a distinct failure mode of naïve backtesting.</caption>
-        <thead><tr><th>Statistic</th><th>Corrects for</th><th>Threshold</th></tr></thead>
-        <tbody>
-          <tr><td class="name">Newey–West <span class="var">t</span></td><td>autocorrelated, heteroskedastic returns inflating significance</td><td class="num">|t| &gt; 2</td></tr>
-          <tr><td class="name">Block-bootstrap CI</td><td>a point Sharpe indistinguishable from zero</td><td class="num">CI excl. 0</td></tr>
-          <tr><td class="name">Deflated Sharpe</td><td>trials tried, plus skew &amp; kurtosis of returns</td><td class="num">&gt; 0.95</td></tr>
-          <tr><td class="name">PBO (CSCV)</td><td>probability the selected strategy is overfit</td><td class="num">&lt; 0.5</td></tr>
-          <tr><td class="name">Bonferroni bar</td><td>selecting the best of many strategies</td><td class="num">|t| &gt; 2.6</td></tr>
-          <tr><td class="name">Min-detectable SR</td><td>whether the sample is even powered to detect an edge</td><td class="num">≤ best SR</td></tr>
-        </tbody>
-      </table>
+    <h2><span class="no">§5</span>Moving forward</h2>
+    <p class="lead">The findings do not read as "stop"; they read as a prioritized roadmap. Because the platform
+      is engineered as pluggable layers, each item below is a data or module change, not a rebuild — the
+      apparatus is ready to be pointed at a harder target the moment resources allow.</p>
+    <div class="road">
+      <div class="step"><div class="pri">Priority 1</div><div><h3>Survivorship-free, point-in-time data</h3><p>The single binding constraint. A CRSP/Compustat-grade feed removes the distortion that undermined the factor tests — and the platform's <b>point-in-time universe and delisting machinery is already built to consume it</b>, so every downstream result inherits the fix.</p></div></div>
+      <div class="step"><div class="pri">Priority 2</div><div><h3>Intraday data → the execution edge</h3><p>The one thesis with a live chance is liquidity provision — being the maker to forced flow, not the taker. It requires intraday/tick data, which the execution and market-making modules are already designed for.</p></div></div>
+      <div class="step"><div class="pri">Priority 3</div><div><h3>Alternative &amp; filing data</h3><p>Informational signals orthogonal to price — insider transactions (Form 4), short interest, and filing-text sentiment — ingested through the EDGAR pipeline already in the stack.</p></div></div>
+      <div class="step"><div class="pri">Priority 4</div><div><h3>Productionize the research factory</h3><p>A signal-qualification screen that ranks a hundred candidates by information coefficient, decay, and turnover <em>before</em> a full backtest, plus a strategy registry — scaling the front of the pipeline the way the back is already built.</p></div></div>
     </div>
-    <p>The power analysis is decisive. The smallest Sharpe distinguishable from zero at a fixed confidence
-      scales inversely with the square root of the sample length,</p>
-    <div class="eq"><span class="expr mono">SR<sub>min</sub> &nbsp;∝&nbsp; T<sup>−1/2</sup></span><span class="num">(1)</span></div>
-    <p>so extending the record from six to twenty years lowers the detectable threshold from ≈ 1.3 to ≈ 0.64.
-      Much of what a short sample calls a "null" is not evidence of no edge — it is an <em>underpowered</em>
-      test, a distinction §6 makes concrete.</p>
+    <blockquote>The durable asset is the apparatus, and the remaining constraint is data and infrastructure — not methodology.<span>The system was designed to make the next question a matter of pointing it, not rebuilding it.</span></blockquote>
   </div>
 </section>
 
 <section>
   <div class="paper">
-    <h2><span class="no">§3</span>Execution &amp; cost model</h2>
-    <p>A frictionless backtest answers the wrong question. The realized cost of a trade decomposes into the
-      half-spread paid to cross, temporary market impact, and — for short or levered books — a financing
-      carry. Impact follows the empirical square-root law,</p>
-    <div class="eq"><span class="expr">c &nbsp;=&nbsp; <span class="var">s</span>/2 &nbsp;+&nbsp; <span class="var">κ&thinsp;σ</span> <span class="rad">√</span><span style="border-top:1px solid currentColor;padding:0 .15em"><span class="var">Q</span>/ADV</span> &nbsp;+&nbsp; <span class="var">b</span>&thinsp;·&thinsp;(short notional)</span><span class="num">(2)</span></div>
-    <p>with impact coefficient <span class="var">κ</span> in the empirical equity range [0.1, 0.5] (Almgren et
-      al.). A participation cap converts an over-large order into a <em>partial</em> fill, which makes the
-      backtest capacity-aware: sweeping assets under management traces the AUM at which a strategy's own
-      trading erodes its edge. The gap between the frictionless and realistic runs is Perold's implementation
-      shortfall, itself decomposed into execution and opportunity cost.</p>
-    <h3>Calibration against live fills</h3>
-    <p>The model is not left as an assumption. Real orders were submitted to a live paper-trading account and
-      the fills compared to the modeled spread.</p>
-    <div class="tw">
-      <table>
-        <caption><b>Table 2.</b> Modeled spread vs. real quoted spread (basis points), measured live. The model is accurate for deep names and conservatively under-prices a thinner one — a calibration finding, not a guess. Paper fills themselves are an optimistic lower bound (no market impact).</caption>
-        <thead><tr><th>Instrument</th><th class="num">Model</th><th class="num">Real quote</th><th class="num">Ratio</th></tr></thead>
-        <tbody>
-          <tr><td class="name">SPY</td><td class="num">0.5</td><td class="num">0.5</td><td class="num pos">1.0×</td></tr>
-          <tr><td class="name">IWM</td><td class="num">1.0</td><td class="num">1.0</td><td class="num pos">1.0×</td></tr>
-          <tr><td class="name">XLE</td><td class="num">1.5</td><td class="num">1.7</td><td class="num">1.1×</td></tr>
-          <tr><td class="name">XLF</td><td class="num">1.5</td><td class="num">3.5</td><td class="num bad">2.3×</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="paper">
-    <h2><span class="no">§4</span>Risk framework</h2>
-    <p>Risk is modeled structurally rather than as a single volatility number. The asset covariance is built
-      from a factor risk model,</p>
-    <div class="eq"><span class="expr">Σ &nbsp;=&nbsp; <span class="var">B F B</span><sup>⊤</sup> &nbsp;+&nbsp; <span class="var">D</span></span><span class="num">(3)</span></div>
-    <p>with factor loadings <span class="var">B</span>, factor covariance <span class="var">F</span>, and
-      specific variance <span class="var">D</span>; the same Σ drives a constrained mean-variance optimizer
-      (factor- and dollar-neutral, with box and turnover caps). Tail risk is measured with a Cornish–Fisher
-      expansion that corrects the Gaussian quantile for the skew <span class="var">S</span> and excess
-      kurtosis <span class="var">K</span> of realized returns,</p>
-    <div class="eq"><span class="expr">z<sub>cf</sub> = z + <span style="white-space:nowrap">(z²−1)</span><span class="var">S</span>/6 + <span style="white-space:nowrap">(z³−3z)</span><span class="var">K</span>/24 − <span style="white-space:nowrap">(2z³−5z)</span><span class="var">S</span>²/36</span><span class="num">(4)</span></div>
-    <p>so reported VaR and expected shortfall reflect fat tails rather than a normal approximation. The layer
-      also produces marginal risk contributions (where the risk actually sits), historical stress replay of
-      the current book, and mandate limit checks.</p>
-  </div>
-</section>
-
-<section>
-  <div class="paper">
-    <h2><span class="no">§5</span>Findings</h2>
-    <p>Eleven strategies were taken through the full apparatus. Consistent with an efficient-market prior on
-      liquid, survivorship-constrained data, <strong>none establishes a statistically significant edge.</strong>
-      The value is in the diagnosis: every result is reported honestly, and every failure is attributed to a
-      specific cause.</p>
-    <div class="tw">
-      <table>
-        <caption><b>Table 3.</b> Candidate strategies and verdicts. <span class="v c">proven</span> = a demonstrated platform capability; <span class="v i">insight</span> = a mechanism confirmed or a specific cause diagnosed; <span class="v n">null</span> = an honest no-result, reported as such.</caption>
-        <thead><tr><th>Strategy</th><th>Class</th><th>Finding</th><th>Verdict</th></tr></thead>
-        <tbody>
-          <tr><td class="name">Transfer coefficient</td><td>implementation</td><td>Isolated that 57% of momentum's Sharpe was a latent factor tilt; made the book market-neutral.</td><td><span class="v c">proven</span></td></tr>
-          <tr><td class="name">Live fill validation</td><td>execution</td><td>Cost model matched real paper fills for deep names; every capacity/TCA figure now anchored to reality.</td><td><span class="v c">proven</span></td></tr>
-          <tr><td class="name">Pre-registered OOS</td><td>protocol</td><td>A 20-year hold-out that falsified the analyst's own hypothesis — and it was reported.</td><td><span class="v c">proven</span></td></tr>
-          <tr><td class="name">Leveraged-ETF flow</td><td>structural</td><td>Overnight-reversal mechanism confirmed (ρ = +0.47); the decay monitor then refuted its durability thesis.</td><td><span class="v i">insight</span></td></tr>
-          <tr><td class="name">Trend-following</td><td>time-series</td><td>Attribution showed the "edge" is volatility-timing plus a short-duration beta, not signal alpha.</td><td><span class="v i">insight</span></td></tr>
-          <tr><td class="name">Options-expiration</td><td>structural</td><td>Textbook effect had reversed; crowding detector flagged the overlay as beta in disguise.</td><td><span class="v i">insight</span></td></tr>
-          <tr><td class="name">Multi-factor book</td><td>cross-sectional</td><td>Survivorship distorts factors in opposite directions — destroying low-vol, flattering momentum.</td><td><span class="v i">insight</span></td></tr>
-          <tr><td class="name">Statistical arbitrage</td><td>cross-sectional</td><td>Avellaneda–Lee residual reversal is arbitraged out of liquid names — the literature-correct result.</td><td><span class="v n">null</span></td></tr>
-          <tr><td class="name">Buyback blackout</td><td>event / regulation</td><td>Refuted: the blackout window is confounded with the pre-earnings drift, which dominates.</td><td><span class="v n">null</span></td></tr>
-          <tr><td class="name">Vol-control flow</td><td>structural</td><td>Wrong sign — post-spike the market front-runs and reverses, so riding the forced flow loses.</td><td><span class="v n">null</span></td></tr>
-          <tr><td class="name">Multi-asset allocation</td><td>allocation</td><td>Over 20y the premium is real but it is beta, not skill; every allocator clusters, none adds alpha.</td><td><span class="v n">null</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-    <blockquote>Mechanical flows are real, but the edge is not: the forced trade is the most predictable event in the market, so it is compensated to the liquidity provider, not the taker.<span> — the common thread across the structural-flow studies.</span></blockquote>
-  </div>
-</section>
-
-<section>
-  <div class="paper">
-    <h2><span class="no">§6</span>A worked example: the transfer coefficient</h2>
-    <p>The realistic path to added value for a researcher without latency infrastructure is not signal
-      discovery but <em>implementation</em>. In the Grinold–Kahn decomposition of the information ratio,</p>
-    <div class="eq"><span class="expr">IR &nbsp;=&nbsp; IC &nbsp;·&nbsp; <span class="rad">√</span><span style="border-top:1px solid currentColor;padding:0 .15em"><span class="var">breadth</span></span> &nbsp;·&nbsp; TC</span><span class="num">(5)</span></div>
-    <p>the <span class="term">transfer coefficient</span> TC is the fraction of a signal's theoretical
-      performance that survives risk limits, costs, turnover, and unintended factor bets. Discovery moves IC;
-      implementation moves TC. Applying the deployment stack to a standard momentum signal — the signal held
-      fixed — neutralizes hidden bets and controls the tail:</p>
-    <div class="tw">
-      <table>
-        <caption><b>Table 4.</b> Momentum before and after the implementation stack (signal unchanged). Neutralizing a latent beta/volatility tilt removes a bet that was never intended and shrinks the drawdown; it cannot manufacture return where a signal is exhausted — and the analysis says so.</caption>
-        <thead><tr><th>Property</th><th class="num">Raw signal</th><th class="num">Implemented</th></tr></thead>
-        <tbody>
-          <tr><td class="name">Market β</td><td class="num">+0.09</td><td class="num pos">+0.01</td></tr>
-          <tr><td class="name">Maximum drawdown</td><td class="num">−16%</td><td class="num pos">−12%</td></tr>
-          <tr><td class="name">"Alpha" that was factor tilt</td><td class="num" colspan="2" style="text-align:center">57%, exposed by neutralization</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p>The corollary is the discipline the platform most cares about: an honest transfer analysis also
-      <em>refuses</em> to size a signal that only looks like alpha — catching market exposure in an alpha
-      costume before it reaches the book.</p>
-  </div>
-</section>
-
-<section>
-  <div class="paper">
-    <h2><span class="no">§7</span>Limitations &amp; disclosures</h2>
-    <p>The results are bounded by the data available to a self-funded researcher, and are reported with those
-      bounds explicit rather than obscured.</p>
+    <h2><span class="no">§6</span>Limitations &amp; disclosures</h2>
     <dl class="disc">
-      <dt>Survivorship bias</dt><dd>The free universe contains only surviving names, which distorts factor tests (§5); the point-in-time machinery is built for a survivorship-free feed.</dd>
-      <dt>Paper-fill optimism</dt><dd>Live paper fills carry no market impact or queue position, so the measured cost (§3) is a lower bound on true execution cost.</dd>
-      <dt>Single macro cluster</dt><dd>Even 20 years is ≈ 1–2 independent macro cycles; statistical claims remain modest, and are stated as such.</dd>
-      <dt>Calibrated, not measured</dt><dd>Impact and borrow coefficients are sourced to the literature and stress-tested for sensitivity; the qualitative conclusions hold across the plausible band.</dd>
+      <dt>Survivorship bias</dt><dd>The free universe holds only surviving names, distorting the factor tests (§4); the point-in-time machinery awaits a survivorship-free feed.</dd>
+      <dt>Paper-fill optimism</dt><dd>Live paper fills carry no market impact or queue position, so the measured cost (§2.3) is a lower bound on true execution cost.</dd>
+      <dt>Single macro cluster</dt><dd>Even twenty years is ≈1–2 independent macro cycles; statistical claims remain modest and are stated as such.</dd>
+      <dt>Calibrated, not measured</dt><dd>Impact and borrow coefficients are sourced to the literature and stress-tested; the qualitative conclusions hold across the plausible band.</dd>
     </dl>
   </div>
 </section>
@@ -326,10 +329,11 @@
 <footer>
   <div class="paper">
     <div class="label">Contribution</div>
-    <p>The deliverable is not a strategy but a <strong>process</strong>: generate a hypothesis, triage it
-      cheaply, backtest it under real frictions, validate it against a live broker, and — the part rarely
-      demonstrated — establish what is <em>not</em> an edge before capital is committed to it.</p>
-    <a class="btn" href="https://github.com/ste959/FixedIncomeTradingPlatform" target="_blank" rel="noopener">Full source, tests &amp; research notes →</a>
+    <p>The deliverable is not a strategy but a <b>process, engineered and tested</b>: generate a hypothesis,
+      triage it cheaply, backtest it under real frictions, validate it against a live broker, and — the part
+      rarely demonstrated — establish what is <em>not</em> an edge before capital is committed to it. That
+      process, and the map of where edge remains, is what carries forward.</p>
+    <a class="btn" href="https://github.com/ste959/FixedIncomeTradingPlatform" target="_blank" rel="noopener">Full source, tests &amp; research log →</a>
     <p class="refs">Selected methods: Grinold &amp; Kahn, <i>Active Portfolio Management</i> · Bailey &amp; López de
       Prado, <i>The Deflated Sharpe Ratio</i> &amp; <i>PBO / CSCV</i> · Almgren et&nbsp;al., <i>Direct Estimation of
       Equity Market Impact</i> · Frazzini &amp; Pedersen, <i>Betting Against Beta</i> · Avellaneda &amp; Lee,
