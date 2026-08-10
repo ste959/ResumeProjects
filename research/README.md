@@ -24,6 +24,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 > [`FORCEDSELLER-NOTE.md`](FORCEDSELLER-NOTE.md) (vol-control deleveraging; refuted + the cross-study theme) ·
 > [`TRANSFER-NOTE.md`](TRANSFER-NOTE.md) (**capstone**: implementation alpha / the transfer coefficient) ·
 > [`PAPER-NOTE.md`](PAPER-NOTE.md) (modeled cost vs. REAL paper fills — closing the loop) ·
+> [`LONGTEST-NOTE.md`](LONGTEST-NOTE.md) (20-year re-test + pre-registered out-of-sample) ·
 > [`EXECUTION-NOTE.md`](EXECUTION-NOTE.md) (cost realism + capacity curve) ·
 > [`RISK-NOTE.md`](RISK-NOTE.md) (risk system + implementation-shortfall TCA) ·
 > [`DATA-NOTE.md`](DATA-NOTE.md) (data-quality audit + point-in-time universe) ·
@@ -55,6 +56,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/report.py` | **reporting/tooling** — a self-contained **HTML tearsheet** (equity curve, drawdown, rolling Sharpe, monthly-return heatmap, VaR/ES + risk contribution, P&L attribution — inlined SVG/CSS, no dependencies) and a gauntlet-ranked **leaderboard** (`run_report.py`) |
 | `mds/xstatarb.py` | **cross-sectional statistical arbitrage** — the canonical desk strategy: **PCA statistical factors** (eigenportfolios) → residualize (factor-neutral by construction) → **Ornstein–Uhlenbeck s-scores** (Avellaneda–Lee) → dollar-neutral residual reversal on a broad universe (see [`XSTATARB-NOTE.md`](XSTATARB-NOTE.md)) |
 | `mds/opex.py` | **options-expiration structural effect** — the OPEX calendar (3rd-Friday expiries, phase classification), a phase-return study, a timing strategy, and the **Black–Scholes gamma** methodology (dealer-gamma concentration; OI-limited, disclosed) (see [`ALPHA-LIFECYCLE-NOTE.md`](ALPHA-LIFECYCLE-NOTE.md)) |
+| `mds/longdata.py` | **long-history data (yfinance)** — 20+ years of free daily bars (back through the 2008 GFC) + a T-bill risk-free, in the same panel shape as the Alpaca layer, to escape the 2020 floor and enable a **pre-registered out-of-sample** test (see [`LONGTEST-NOTE.md`](LONGTEST-NOTE.md)) |
 | `mds/fillcheck.py` | **paper-fill validation** — closes the modeled-vs-measured loop: real Alpaca **quotes + paper fills** vs. the modeled spread, with a calibration factor (model is spot-on for SPY/IWM, under-charges thinner ETFs; paper fills disclosed as an optimistic lower bound). `run_paper.py [--trade]` (see [`PAPER-NOTE.md`](PAPER-NOTE.md)) |
 | `mds/implement.py` | **implementation alpha (the transfer coefficient)** — take a signal you already trust (cross-sectional momentum) and layer the industry-standard stack (winsorize/z-score, **β+vol neutralization**, vol-targeting, **market-beta hedge**, turnover control); measures how much more survives to deployable, net-of-cost, market-neutral P&L (see [`TRANSFER-NOTE.md`](TRANSFER-NOTE.md)) |
 | `mds/forcedseller.py` | **'The Forced Seller' — vol-control deleveraging** — front-run the mechanical `Δ(target/realized-vol)` flow of vol-target funds; benchmarked against generic vol-timing. Refuted (ride is the wrong sign — the post-spike bounce dominates) (see [`FORCEDSELLER-NOTE.md`](FORCEDSELLER-NOTE.md)) |
@@ -119,7 +121,8 @@ python run_buyback.py           # 'The Absent Buyer': buyback-blackout regulator
 python run_forcedseller.py      # 'The Forced Seller': vol-control deleveraging flow anticipation
 python run_transfer.py          # ★ implementation alpha: raise a signal's transfer coefficient (capstone)
 python run_paper.py [--trade]   # validate the cost model against REAL Alpaca quotes + paper fills
-python -m pytest                # 267 tests (offline; data modules fetch lazily)
+python run_longtest.py          # 20y flagship study + PRE-REGISTERED out-of-sample (free yfinance data)
+python -m pytest                # 269 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests

@@ -141,6 +141,21 @@ honestly testing several — which is what the platform is for.
   flattened cleanly. Disclosing the paper-fill-optimism caveat is the point — it's the execution-cost
   literacy a desk hires for.
 
+**Long-history, out-of-sample re-test ("20 years + a pre-registered hold-out", `run_longtest.py`)**
+- Addresses the two criticisms a senior weights most: the 6-year single regime, and no pristine OOS. Free
+  yfinance data extends the flagship allocation study to 2006–2026 (6 regimes incl. the 2008 GFC); the
+  methods were fixed on 2020–26, so 2006–2019 is a genuine, pre-registered hold-out.
+- **Result — 20 years CHANGES the conclusion, honestly (and it's the strongest honesty artifact yet):**
+  (1) min-detectable Sharpe falls ~1.3 → 0.64, so the earlier "everything is null" was an *underpowered*
+  artifact; (2) the diversified books now clear the bar (60/40 exSharpe 0.64, t 3.2) — but that's the risk
+  PREMIUM, not alpha (all seven allocators cluster at 0.47–0.64, no skill over the premium); (3) the
+  pre-registered OOS confirms the premium persists (best clears the bar on 2006–2019, never seen); (4) it
+  **partially FALSIFIED my own registered hypothesis** — I predicted 2008 would be the worst regime, but
+  60/40 did worse in 2022 (−1.19) than 2008 (−0.75) because 2008 bonds rallied (flight-to-quality) while
+  2022 stocks+bonds fell together. Reporting that partial refutation is what pre-registration is for.
+- Caveat disclosed: yfinance is survivorship-biased; the point-in-time universe machinery is ready for a
+  paid feed.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).
