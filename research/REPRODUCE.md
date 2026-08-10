@@ -28,10 +28,11 @@ export ALPACA_KEY_ID=...      export ALPACA_SECRET_KEY=...   # free Alpaca keys 
 
 python run_assetalloc.py          # multi-asset allocation note (cached after first run)
 python run_assetalloc.py --refresh  # force a re-fetch from Alpaca
+python run_trend.py               # enhanced trend-following ablation (cached after first run)
 python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
 
-python -m pytest -q               # 170+ tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 179 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here

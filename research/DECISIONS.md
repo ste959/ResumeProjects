@@ -41,6 +41,16 @@ exists to keep that day honest.
 - 7 allocators; a 18-config lookback × rebalance × cost sweep; 3 calendar-regime splits.
 - **Result:** nothing clears the bar in *any* configuration; equal-weight wins on downside measures.
 
+**Enhanced trend-following (`run_trend.py`)**
+- A 7-stage ablation (vol-targeting, multi-timescale signal, portfolio vol overlay, carry, crash-
+  protection, cross-sectional overlay) over a 13-market universe; 18-config rebalance × cost × vol-target
+  sweep; 3 regimes.
+- **Result:** the risk-management overlay (portfolio vol-target) drives the only real Sharpe gain
+  (0.24 → 0.60); **carry and crash-protection did NOT help this sample** (carry lowered Sharpe) — added
+  complexity reported as not earning its keep, not quietly dropped. Nothing clears the multiple-testing
+  bar. The signal is in the *regime* table: excess Sharpe 1.77 in 2022, the year every allocator lost —
+  trend's contribution is crisis convexity, not a headline Sharpe.
+
 ## Dead ends (things that did not work, kept visible)
 
 - **Single-factor alpha on mega-caps** — null (efficient-market ceiling on the most-arbitraged names).

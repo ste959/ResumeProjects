@@ -11,6 +11,7 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 >
 > **Research integrity docs:** [`RESEARCH-NOTE.md`](RESEARCH-NOTE.md) (equity factor null) ·
 > [`ASSET-ALLOCATION-NOTE.md`](ASSET-ALLOCATION-NOTE.md) (multi-asset, with regime & tail analysis) ·
+> [`TREND-NOTE.md`](TREND-NOTE.md) (enhanced trend-following, by ablation) ·
 > [`SIGNAL-RATIONALE.md`](SIGNAL-RATIONALE.md) (economic story + failure mode + decay for each signal) ·
 > [`DECISIONS.md`](DECISIONS.md) (research log & researcher degrees of freedom) ·
 > [`REPRODUCE.md`](REPRODUCE.md) (deterministic reproduction).
@@ -48,6 +49,8 @@ backtesting over a columnar data warehouse. Two languages, each for the job it's
 | `mds/factors.py` | **multi-factor composite** — value/quality/momentum families → one standardized score (Grinold–Kahn: lift effective breadth) |
 | `mds/riskmodel.py` | **factor risk model + constrained optimizer** — Σ=BFBᵀ+D and an analytic factor-neutral mean-variance solve with box + turnover caps |
 | `mds/assetalloc.py` | **multi-asset strategic/tactical allocation** — true **equal-risk-contribution risk parity** (correlation-aware), min-variance, long-only max-Sharpe, a **momentum-tilted TAA overlay**, and a walk-forward cost-aware backtest vs. 60/40 (see [`ASSET-ALLOCATION-NOTE.md`](ASSET-ALLOCATION-NOTE.md)) |
+| `mds/trend.py` | **enhanced multi-asset trend-following** — diversified time-series momentum built up by **ablation**: multi-timescale risk-adjusted signal, vol-targeting + a correlation-aware **portfolio vol overlay**, a **carry** blend (income-yield from the total-vs-price gap), crash-protection, and a cross-sectional overlay (see [`TREND-NOTE.md`](TREND-NOTE.md)) |
+| `mds/evaluation.py` | **shared evaluation harness** — the *same* honest stat block (excess-of-cash Sharpe, HAC t, bootstrap CI, tail metrics) + selection-aware **gauntlet** (PBO / Deflated-Sharpe / multiple-testing bar) used by both the allocation and trend studies |
 | `mds/factortiming.py` | **regime-conditional factor timing** — rotate the family mix & time exposure on the FRED credit/VIX state, then vol-budget the book |
 | `mds/structuring.py` | **options structuring overlay** — Black–Scholes tail hedge / covered-call / collar sized off the live IV surface |
 | `mds/taxaware.py` | **tax-aware rebalancing** — tax-lot accounting, HIFO vs FIFO, wash sales, long/short holding periods (after-tax edge) |
@@ -74,7 +77,9 @@ python run_fundamentals.py      # SEC-EDGAR value/quality/accruals factors (poin
 python run_macro.py             # FRED credit/VIX risk-off overlay (halves the long-book drawdown)
 python run_options.py           # live Alpaca options surface: ATM-IV / skew / IV−RV
 python run_construction.py      # 5-layer portfolio construction: composite → risk model → timing → options → tax
-python -m pytest                # 103 tests (offline; data modules fetch lazily)
+python run_assetalloc.py        # multi-asset risk-based allocation vs 60/40 (excess-of-cash, tail, regime)
+python run_trend.py             # enhanced trend-following, by ablation (what each enhancement adds)
+python -m pytest                # 179 tests (offline; data modules fetch lazily)
 ```
 
 ## The philosophy: honest results beat pretty backtests
