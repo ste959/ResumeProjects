@@ -10,12 +10,20 @@ spring:
       group-id: risk-service
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      # Wrap the JSON deserializer so a malformed record surfaces as a handleable error instead of
+      # throwing in the poll loop and re-reading the same offset forever (a poison pill wedging the
+      # whole consumer). The DefaultErrorHandler (see KafkaErrorHandlingConfig) then routes it to the DLT.
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         # The OMS publishes plain JSON with no type headers, so pin the target type here.
         spring.json.value.default.type: com.bonddesk.risk.OrderEvent
         spring.json.use.type.headers: false
         spring.json.trusted.packages: com.bonddesk.risk
+    # Producer used only by the dead-letter recoverer to republish failed records (raw bytes) to the DLT.
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
 
 management:
   endpoints:
@@ -24,8 +32,8 @@ management:
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
-      show-components: always
+      show-details: when-authorized
+      show-components: when-authorized
   metrics:
     tags:
       application: risk-service

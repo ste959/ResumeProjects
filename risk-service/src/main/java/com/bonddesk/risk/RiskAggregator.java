@@ -34,15 +34,18 @@ public class RiskAggregator {
     public DeskRiskSummary summary() {
         List<OrderEvent> current = List.copyOf(latestByRef.values());
 
+        // groupingBy throws NPE on a null classifier key, so coalesce missing status/portfolio to a
+        // sentinel: one partial event (e.g. a field dropped by ignore-unknown deserialization) must
+        // not take down the whole /risk/summary endpoint.
         Map<String, Long> byStatus = current.stream()
-                .collect(Collectors.groupingBy(OrderEvent::status, Collectors.counting()));
+                .collect(Collectors.groupingBy(e -> nzStr(e.status()), Collectors.counting()));
 
         BigDecimal totalFilled = current.stream()
                 .map(e -> nz(e.filledQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<PortfolioRisk> portfolios = current.stream()
-                .collect(Collectors.groupingBy(OrderEvent::portfolio))
+                .collect(Collectors.groupingBy(e -> nzStr(e.portfolio())))
                 .entrySet().stream()
                 .map(RiskAggregator::toPortfolioRisk)
                 .sorted(Comparator.comparing(PortfolioRisk::portfolio))
@@ -62,5 +65,9 @@ public class RiskAggregator {
 
     private static BigDecimal nz(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v;
+    }
+
+    private static String nzStr(String v) {
+        return v == null ? "UNKNOWN" : v;
     }
 }
