@@ -901,10 +901,15 @@ code {
   padding: 14px;
   box-shadow: var(--shadow);
 }
-.ov-section[role='button'] {
+/* Whole-card click without sacrificing semantics: the card stays a plain section with a real
+   heading; the one real <button> below carries the action, and its stretched ::after overlay
+   makes the entire card clickable. Only the button is in the tab order; Enter/Space work natively. */
+.ov-section.clickable {
+  position: relative;
   cursor: pointer;
 }
-.ov-section[role='button']:hover {
+.ov-section.clickable:hover,
+.ov-section.clickable:focus-within {
   border-color: var(--accent);
 }
 .ov-head {
@@ -925,6 +930,24 @@ code {
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+/* The "Open X →" affordance is a real button, styled to look like the old span. */
+button.ov-go {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+button.ov-go::after {
+  content: '';
+  position: absolute;
+  inset: 0;              /* cover the whole card so a mouse click anywhere navigates */
+}
+button.ov-go:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .ov-go.dim {
   color: var(--muted);

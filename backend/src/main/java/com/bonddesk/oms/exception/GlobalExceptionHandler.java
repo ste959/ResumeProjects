@@ -4,6 +4,7 @@ import com.bonddesk.oms.dto.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -42,6 +43,15 @@ public class GlobalExceptionHandler {
         // An unmapped path (e.g. a browser hitting "/") is a 404, not a 500. Handling it
         // explicitly stops the catch-all below from masking it as a server error.
         return build(HttpStatus.NOT_FOUND, "No resource for " + req.getRequestURI(), req);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleOptimisticLock(OptimisticLockingFailureException ex, HttpServletRequest req) {
+        // Two writers raced on the same @Version-guarded aggregate (e.g. concurrent fills/cancels on
+        // one order, or a first-fill insert collision). That's a retryable conflict, not a server
+        // fault — surface 409 so the client can retry rather than seeing a misleading 500.
+        log.warn("Optimistic-lock conflict on {} {}: {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.CONFLICT, "Concurrent modification — please retry", req);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

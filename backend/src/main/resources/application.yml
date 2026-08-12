@@ -39,7 +39,9 @@ spring:
 
   h2:
     console:
-      enabled: true
+      # OFF by default. The H2 console runs arbitrary SQL and is a known RCE/SSRF vector, so it must
+      # never be exposed unauthenticated. Flip H2_CONSOLE_ENABLED=true for local debugging only.
+      enabled: ${H2_CONSOLE_ENABLED:false}
       path: /h2-console
 
 server:
@@ -52,8 +54,10 @@ management:
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
-      show-components: always
+      # Only reveal component/diskspace details to an authenticated principal — otherwise
+      # /actuator/health leaks internal topology to anyone who can reach the port.
+      show-details: when-authorized
+      show-components: when-authorized
   health:
     diskspace:
       enabled: true
@@ -62,7 +66,7 @@ management:
       application: bonddesk-oms
   info:
     env:
-      enabled: true
+      enabled: false     # don't surface environment/config through /actuator/info
 
 info:
   app:

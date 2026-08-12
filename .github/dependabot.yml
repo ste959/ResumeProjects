@@ -1,0 +1,44 @@
+version: 2
+# Weekly dependency-update PRs across every ecosystem in the repo, plus the Actions we pin above.
+# Grouped so a week's patch/minor bumps arrive as one reviewable PR per module rather than a swarm.
+updates:
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      backend-deps:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: maven
+    directory: /risk-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      risk-service-deps:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-deps:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /research
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

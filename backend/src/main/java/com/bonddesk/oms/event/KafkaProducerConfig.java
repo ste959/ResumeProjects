@@ -35,6 +35,13 @@ public class KafkaProducerConfig {
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
         props.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
         props.put(ProducerConfig.ACKS_CONFIG, "all");
+        // Idempotent producer: a retried send is de-duplicated by the broker (producer-id + sequence)
+        // and ordering is preserved per partition. Since every event is keyed by orderRef, all events
+        // for one order land on the same partition in order — so a transient retry can't duplicate or
+        // reorder an order's lifecycle. (Requires acks=all, set above.)
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, 5);
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 120_000);
         return new DefaultKafkaProducerFactory<>(props);
     }
 

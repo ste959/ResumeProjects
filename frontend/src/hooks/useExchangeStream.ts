@@ -19,6 +19,7 @@ function socketUrl(): string {
 export function useExchangeStream(): ExchangeStream {
   const [state, setState] = useState<ExchangeStream>({ connected: false, snapshot: null, tradedPrices: new Set() });
   const lastSeq = useRef(0);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     let closed = false;
@@ -27,6 +28,7 @@ export function useExchangeStream(): ExchangeStream {
     const connect = () => {
       if (closed) return;
       const ws = new WebSocket(socketUrl());
+      wsRef.current = ws;
 
       ws.onopen = () => setState((s) => ({ ...s, connected: true }));
       ws.onmessage = (ev) => {
@@ -57,6 +59,7 @@ export function useExchangeStream(): ExchangeStream {
     return () => {
       closed = true;
       if (retry) window.clearTimeout(retry);
+      wsRef.current?.close(); // close the live socket so onmessage can't setState after unmount
     };
   }, []);
 

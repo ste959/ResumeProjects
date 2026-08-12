@@ -162,14 +162,30 @@ public final class OrderBook {
         }
     }
 
-    /** Marketable quantity available to {@code aggressor} across crossable opposite levels (for FOK). */
+    /**
+     * Marketable quantity actually <i>tradable</i> by {@code aggressor} across crossable opposite
+     * levels (for the FOK all-or-nothing gate).
+     *
+     * <p>Excludes the aggressor's own resting orders: self-trade prevention <b>cancels</b> those
+     * rather than trading against them (see {@link #matchAtLevel}). Counting them here would let a
+     * FOK order pass the "fully fillable" check and then, during matching, have its own liquidity
+     * cancelled out from under it — partially filling and cancelling the remainder, the exact partial
+     * print FOK exists to prevent. So we subtract same-participant resting size level by level.
+     */
     private long marketableQty(Order aggressor, TreeMap<Long, Level> opposite) {
         long available = 0;
         for (Map.Entry<Long, Level> e : opposite.entrySet()) {
             if (!crosses(aggressor, e.getKey())) {
                 break;
             }
-            available += e.getValue().totalQty;
+            Level level = e.getValue();
+            long tradable = level.totalQty;
+            for (Order o : level.orders) {
+                if (o.isActive() && o.participant().equals(aggressor.participant())) {
+                    tradable -= o.remaining();      // STP will cancel this, not trade it
+                }
+            }
+            available += tradable;
             if (available >= aggressor.qty()) {
                 return available;
             }

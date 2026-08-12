@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RatesSnapshot } from '../api/types';
 
 // Live rates-desk market data over /ws/rates: the server pushes a full snapshot (curve, last RFQ,
@@ -12,6 +12,7 @@ function socketUrl(): string {
 export function useRatesStream(): { connected: boolean; snapshot: RatesSnapshot | null } {
   const [connected, setConnected] = useState(false);
   const [snapshot, setSnapshot] = useState<RatesSnapshot | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     let closed = false;
@@ -19,6 +20,7 @@ export function useRatesStream(): { connected: boolean; snapshot: RatesSnapshot 
     const connect = () => {
       if (closed) return;
       const ws = new WebSocket(socketUrl());
+      wsRef.current = ws;
       ws.onopen = () => setConnected(true);
       ws.onmessage = (ev) => {
         try {
@@ -37,6 +39,7 @@ export function useRatesStream(): { connected: boolean; snapshot: RatesSnapshot 
     return () => {
       closed = true;
       if (retry) window.clearTimeout(retry);
+      wsRef.current?.close(); // close the live socket so onmessage can't setState after unmount
     };
   }, []);
 

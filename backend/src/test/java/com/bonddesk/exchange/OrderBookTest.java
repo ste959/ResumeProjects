@@ -116,6 +116,33 @@ class OrderBookTest {
     }
 
     @Test
+    void fokDoesNotCountOwnLiquiditySelfTradePreventionWillCancel() {
+        // Regression: FOK all-or-nothing must hold even when the aggressor's *own* resting orders
+        // sit in the crossable liquidity. STP cancels those instead of trading them, so counting
+        // them in the fillability check would let a FOK order pass the gate and then partial-fill.
+        OrderBook b = book();
+        limit(b, "A", SELL, 100, 3, GTC);              // A's own resting size — STP will cancel it
+        limit(b, "B", SELL, 100, 2, GTC);              // only 2 are genuinely tradable for A
+        SubmitResult r = limit(b, "A", BUY, 100, 5, FOK); // needs 5; only 2 tradable
+        assertThat(r.status()).isEqualTo(SubmitResult.Status.REJECTED); // all-or-nothing upheld
+        assertThat(r.trades()).isEmpty();              // no partial print escaped
+        assertThat(b.tradeCount()).isZero();
+        assertThat(b.restingQuantity()).isEqualTo(5);  // both resting sells untouched
+    }
+
+    @Test
+    void fokFillsAgainstOthersLiquidityIgnoringOwnRestingSize() {
+        OrderBook b = book();
+        limit(b, "A", SELL, 100, 3, GTC);              // A's own — cancelled by STP during the sweep
+        limit(b, "B", SELL, 100, 5, GTC);              // 5 tradable for A → FOK is satisfiable
+        SubmitResult r = limit(b, "A", BUY, 100, 5, FOK);
+        assertThat(r.status()).isEqualTo(SubmitResult.Status.FILLED);
+        assertThat(r.filledQty()).isEqualTo(5);
+        assertThat(b.tradeCount()).isEqualTo(1);       // one real trade against B
+        assertThat(b.restingQuantity()).isZero();      // B's 5 traded, A's 3 STP-cancelled
+    }
+
+    @Test
     void postOnlyRejectsIfItWouldCross() {
         OrderBook b = book();
         limit(b, "A", SELL, 100, 5, GTC);

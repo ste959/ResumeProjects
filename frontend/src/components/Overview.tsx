@@ -22,8 +22,9 @@ export function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) 
   return (
     <div className="overview">
       {/* Fixed income */}
-      <section className="ov-section" onClick={() => onNavigate('trading')} role="button" tabIndex={0}>
-        <div className="ov-head"><h2>Fixed Income Desk</h2><span className="ov-go">Open desk →</span></div>
+      <section className="ov-section clickable">
+        <div className="ov-head"><h2>Fixed Income Desk</h2>
+          <button type="button" className="ov-go" onClick={() => onNavigate('trading')}>Open desk →</button></div>
         <div className="kpi-row">
           <Kpi label="Total Orders" value={desk.data ? num(desk.data.totalOrders) : '—'} />
           <Kpi label="Fill Rate" value={desk.data ? `${desk.data.fillRatePct.toFixed(1)}%` : '—'} accent="#059669" />
@@ -34,8 +35,9 @@ export function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) 
       </section>
 
       {/* Live markets */}
-      <section className="ov-section" onClick={() => onNavigate('market')} role="button" tabIndex={0}>
-        <div className="ov-head"><h2>Live Markets · Coinbase</h2><span className="ov-go">Open market →</span></div>
+      <section className="ov-section clickable">
+        <div className="ov-head"><h2>Live Markets · Coinbase</h2>
+          <button type="button" className="ov-go" onClick={() => onNavigate('market')}>Open market →</button></div>
         <div className="kpi-row">
           {(quotes.data ?? []).map((q) => (
             <div className="kpi" key={q.product}>
@@ -49,8 +51,9 @@ export function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) 
       </section>
 
       {/* Strategies */}
-      <section className="ov-section" onClick={() => onNavigate('strategies')} role="button" tabIndex={0}>
-        <div className="ov-head"><h2>Strategy Engine</h2><span className="ov-go">Open strategies →</span></div>
+      <section className="ov-section clickable">
+        <div className="ov-head"><h2>Strategy Engine</h2>
+          <button type="button" className="ov-go" onClick={() => onNavigate('strategies')}>Open strategies →</button></div>
         <div className="kpi-row">
           <Kpi label="Active Runs" value={num(activeRuns.length)} accent="#1d4ed8" />
           <Kpi label="Total P&L" value={usd(stratPnl)} accent={stratPnl >= 0 ? '#059669' : '#dc2626'} />

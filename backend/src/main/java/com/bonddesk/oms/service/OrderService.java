@@ -88,7 +88,8 @@ public class OrderService {
         } else {
             result = orders.findAllByOrderByCreatedAtDesc();
         }
-        result.forEach(o -> o.getExecutions().size()); // initialise lazy fills in-session
+        // Fills + security are fetched eagerly by the repository entity graph (single query),
+        // so no per-row lazy initialisation is needed here.
         return result;
     }
 
