@@ -10,11 +10,16 @@ strictly backwards — so the value as of the prior close never depends on futur
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pandas as pd
 
 from .alphadsl import CompiledSignal, compile_signal
 from .engine import Strategy
+
+if TYPE_CHECKING:
+    from .sigcache import SignalCache
 
 
 class DslStrategy(Strategy):
@@ -26,12 +31,14 @@ class DslStrategy(Strategy):
     """
 
     def __init__(self, expression: str, symbols: list[str], *, name: str | None = None,
-                 warmup: int = 252, extra_panels: dict[str, pd.DataFrame] | None = None):
+                 warmup: int = 252, extra_panels: dict[str, pd.DataFrame] | None = None,
+                 cache: "SignalCache | None" = None):
         self._signal_expr: CompiledSignal = compile_signal(expression)   # validates up-front
         self._symbols = list(symbols)
         self.name = name or f"dsl:{self._signal_expr.ast.pretty()}"
         self.warmup = warmup
         self._extra = extra_panels or {}
+        self._cache = cache        # optional: memoize the signal panel across repeated runs/sweeps
         self._panel: pd.DataFrame | None = None
 
     def symbols(self) -> list[str]:
@@ -41,7 +48,9 @@ class DslStrategy(Strategy):
         env: dict[str, pd.DataFrame] = {"close": prices, "returns": prices.pct_change()}
         for key, frame in self._extra.items():
             env[key] = frame.reindex(index=prices.index, columns=prices.columns)
-        panel = self._signal_expr.evaluate(env)
+        # Content-addressed cache when provided: identical (signal, data) → reuse, no re-evaluation.
+        panel = self._cache.evaluate(self._signal_expr, env) if self._cache is not None \
+            else self._signal_expr.evaluate(env)
         # A scalar-only expression (no column) isn't a tradable signal.
         if not isinstance(panel, pd.DataFrame):
             raise ValueError(f"signal {self._signal_expr.source!r} does not reference any data column")

@@ -47,8 +47,9 @@ python run_multifactor.py         # diversified multi-factor book, broad 20y uni
 python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
 python run_dsl.py                 # alpha-signal DSL compiler demo (self-contained, no data needed)
+python run_sigcache.py            # content-addressed signal cache: speedup + precise invalidation
 
-python -m pytest -q               # 306 tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 313 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here

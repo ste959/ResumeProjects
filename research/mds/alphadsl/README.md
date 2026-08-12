@@ -65,10 +65,14 @@ from mds.dslstrategy import DslStrategy
 `python run_dsl.py` demonstrates the whole pipeline. See `tests/test_alphadsl.py` and
 `tests/test_dslstrategy.py`.
 
-## Why it's built this way (and what's next)
+## Why it's built this way (the layers on top)
 
-The fingerprint isn't decoration — it's the key for the **next layer**: a content-addressed cache that
-memoizes a signal's evaluated panel on `hash(AST, data version, params)` and invalidates on any input
-change (the same idea as Bazel/dbt). And because the AST is a computation graph of independent
-sub-expressions, evaluation is **embarrassingly parallel** — the third layer. The compiler is the
+The fingerprint isn't decoration — it's the key the layers above are built on. The compiler is the
 keystone that makes both honest: *cache what's identical, parallelize what's independent.*
+
+- **Layer 2 — content-addressed cache** (built: [`mds/sigcache.py`](../sigcache.py)). Memoizes a
+  signal's evaluated panel under `hash(AST fingerprint ‖ content hash of the columns it reads)`.
+  Invalidation is automatic and precise — a changed input simply addresses a different slot; an
+  unrelated change still hits — and results persist to Parquet across processes. `python run_sigcache.py`.
+- **Layer 3 — parallel evaluation** (next). The AST is a graph of independent sub-expressions, and
+  signals × walk-forward windows are embarrassingly parallel.
