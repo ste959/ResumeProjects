@@ -48,8 +48,9 @@ python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
 python run_dsl.py                 # alpha-signal DSL compiler demo (self-contained, no data needed)
 python run_sigcache.py            # content-addressed signal cache: speedup + precise invalidation
+python run_parallel.py            # parallel research sweep (forkserver pool): serial vs parallel timing
 
-python -m pytest -q               # 313 tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 319 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here

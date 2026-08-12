@@ -74,5 +74,8 @@ keystone that makes both honest: *cache what's identical, parallelize what's ind
   signal's evaluated panel under `hash(AST fingerprint ‖ content hash of the columns it reads)`.
   Invalidation is automatic and precise — a changed input simply addresses a different slot; an
   unrelated change still hits — and results persist to Parquet across processes. `python run_sigcache.py`.
-- **Layer 3 — parallel evaluation** (next). The AST is a graph of independent sub-expressions, and
-  signals × walk-forward windows are embarrassingly parallel.
+- **Layer 3 — parallel evaluation** (built: [`mds/parallel.py`](../parallel.py)). Independent signals
+  and backtests fan out across CPU cores over a `forkserver` process pool — shared read-only data,
+  per-task fault isolation, deterministic (input-order) aggregation, and workers share the same
+  content-addressed cache. `python run_parallel.py` (a ~40-signal sweep, ~2–3× on 8 cores; the ceiling
+  is startup + serialization overhead, not compute). Composes as: *parsed → cached → executed in parallel.*
