@@ -107,7 +107,9 @@ def option_snapshots(underlying: str, *, max_dte: int = 45, max_pages: int = 4,
                     continue
                 q = snap.get("latestQuote") or {}
                 bid, ask = q.get("bp"), q.get("ap")
-                mid = ((bid + ask) / 2.0) if (bid and ask) else None
+                # Null check, not truthiness: a legitimate 0.0 bid (deep-OTM, no resting bid) is falsy,
+                # so `if bid and ask` would wrongly drop a real quote. Test for presence explicitly.
+                mid = ((bid + ask) / 2.0) if (bid is not None and ask is not None) else None
                 greeks = snap.get("greeks") or {}
                 daily = snap.get("dailyBar") or {}
                 rows.append({

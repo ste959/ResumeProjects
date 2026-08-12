@@ -240,9 +240,11 @@ def regime_study(prices: pd.DataFrame, regimes: list[tuple[str, str, str]],
     out = []
     for name, start, end in regimes:
         seg = net.loc[start:end]
-        st = ev.stats(seg, rf) if len(seg) > 30 else {"sharpe": float("nan"), "max_drawdown": float("nan")}
+        # Named seg_stats, not st: `st` is the module alias for the stats library (from . import stats
+        # as st) used elsewhere in this file — rebinding it here shadowed the import and was a latent bug.
+        seg_stats = ev.stats(seg, rf) if len(seg) > 30 else {"sharpe": float("nan"), "max_drawdown": float("nan")}
         out.append({"regime": name, "start": start, "end": end,
-                    "sharpe": st["sharpe"], "max_drawdown": st["max_drawdown"], "n_days": int(len(seg))})
+                    "sharpe": seg_stats["sharpe"], "max_drawdown": seg_stats["max_drawdown"], "n_days": int(len(seg))})
     return out
 
 

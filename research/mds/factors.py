@@ -139,13 +139,11 @@ def ic_series(score: pd.DataFrame, fwd_ret: pd.DataFrame, min_names: int = 5) ->
     the NEXT period's return. A diagnostic only (it looks one step ahead, so never feed it back into
     the live weights): the mean IC and its t-stat tell you whether the composite actually forecasts."""
     s = score.shift(1)                                  # score known at t-1 vs return at t (causal)
-    out = {}
-    for dt, row in fwd_ret.iterrows():
-        a, b = s.loc[dt], row
-        m = a.notna() & b.notna()
-        if m.sum() >= min_names:
-            out[dt] = a[m].corr(b[m], method="spearman")
-    return pd.Series(out).dropna()
+    # Vectorized cross-sectional IC: one call computes the per-date rank correlation across names,
+    # instead of a Python loop with a per-row .loc lookup (the idiom already used in implement.py).
+    ic = s.corrwith(fwd_ret, axis=1, method="spearman")
+    valid = (s.notna() & fwd_ret.notna()).sum(axis=1)   # overlapping names per date
+    return ic[valid >= min_names].dropna()
 
 
 def ic_summary(ic: pd.Series) -> dict:
