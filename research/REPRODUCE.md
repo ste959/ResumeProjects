@@ -46,8 +46,9 @@ python run_calibration.py         # cost-model sensitivity bands (impact / borro
 python run_multifactor.py         # diversified multi-factor book, broad 20y universe (yfinance)
 python run_crosssec.py            # the equity factor "honest null" study
 python run_microstructure.py --validate   # the microstructure plumbing/validation study
+python run_dsl.py                 # alpha-signal DSL compiler demo (self-contained, no data needed)
 
-python -m pytest -q               # 276 tests: pure cores, no network, fully deterministic
+python -m pytest -q               # 306 tests: pure cores, no network, fully deterministic
 ```
 
 ## What "reproducible" means here
