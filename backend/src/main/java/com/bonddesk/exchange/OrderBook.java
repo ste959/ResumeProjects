@@ -27,9 +27,12 @@ import java.util.function.LongSupplier;
  *       increase re-queues at the back (the exchange-correct amend rule).</li>
  * </ul>
  *
- * <p>Data structure: price levels in {@link TreeMap}s (best price O(1) to read, any level O(log n)),
- * each level a FIFO {@link ArrayDeque}; cancels are lazy (flag inactive, skip during matching) for
- * O(1) cancels. The hot path is all-integer (tick prices, lot sizes) and allocation-light.
+ * <p>Data structure: price levels in {@link TreeMap}s (any level O(log n) to find), each level a
+ * FIFO {@link ArrayDeque}; cancels are lazy (flag inactive, skip during matching) for O(1) cancels.
+ * Top-of-book is cached and maintained on every mutation, so {@link #bestBid()}/{@link #bestAsk()}
+ * are O(1) reads (a {@code TreeMap.firstKey()} would otherwise walk the tree). The hot path is
+ * all-integer (tick prices, lot sizes); the common passive path — a limit order that rests without
+ * trading — allocates nothing (the trade list is created lazily, only when a fill actually occurs).
  *
  * <p><b>Not thread-safe</b> by design — a single writer thread per book. Every engine event is
  * pushed to the {@link ExchangeListener} in execution order for the market-data feed and analytics.
@@ -49,6 +52,11 @@ public final class OrderBook {
     private final TreeMap<Long, Level> bids = new TreeMap<>(Comparator.reverseOrder()); // high → low
     private final TreeMap<Long, Level> asks = new TreeMap<>();                            // low → high
     private final Map<Long, Order> byId = new HashMap<>();
+
+    // Cached top-of-book (null when a side is empty), refreshed after every mutation so best-price
+    // reads are O(1) instead of an O(log n) TreeMap.firstKey() walk.
+    private Long cachedBestBid;
+    private Long cachedBestAsk;
 
     private long orderSeq;
     private long tradeSeq;
@@ -97,39 +105,48 @@ public final class OrderBook {
             return reject(id, "FOK not fully fillable");
         }
 
-        List<Trade> trades = new ArrayList<>();
-        match(order, opposite, trades);
+        List<Trade> trades = match(order, opposite, null);
 
         long filled = qty - order.remaining();
+        List<Trade> out = trades == null ? List.of() : trades;
         if (order.remaining() == 0) {
-            return new SubmitResult(id, SubmitResult.Status.FILLED, null, trades, filled, 0);
+            refreshTopOfBook();
+            return new SubmitResult(id, SubmitResult.Status.FILLED, null, out, filled, 0);
         }
         boolean rests = type == OrderType.LIMIT && tif == TimeInForce.GTC && order.isActive();
         if (rests) {
             rest(order);
+            refreshTopOfBook();
             listener.onResting(order);
-            return new SubmitResult(id, SubmitResult.Status.RESTING, null, trades, filled, order.remaining());
+            return new SubmitResult(id, SubmitResult.Status.RESTING, null, out, filled, order.remaining());
         }
         order.deactivate();
+        refreshTopOfBook();
         SubmitResult.Status s = filled > 0 ? SubmitResult.Status.PARTIALLY_FILLED : SubmitResult.Status.CANCELLED;
-        return new SubmitResult(id, s, null, trades, filled, 0);
+        return new SubmitResult(id, s, null, out, filled, 0);
     }
 
-    private void match(Order aggressor, TreeMap<Long, Level> opposite, List<Trade> trades) {
+    /**
+     * Sweep the crossable opposite levels. The trade list is created lazily and returned (null when
+     * nothing traded), so a passive limit that rests without crossing allocates no collection.
+     */
+    private List<Trade> match(Order aggressor, TreeMap<Long, Level> opposite, List<Trade> trades) {
         while (aggressor.remaining() > 0 && !opposite.isEmpty()) {
             Map.Entry<Long, Level> bestEntry = opposite.firstEntry();
             long restingPrice = bestEntry.getKey();
             if (!crosses(aggressor, restingPrice)) {
                 break; // best opposite price is not marketable for this order
             }
-            matchAtLevel(aggressor, bestEntry.getValue(), restingPrice, trades);
-            if (bestEntry.getValue().orders.isEmpty() || bestEntry.getValue().totalQty == 0) {
+            Level level = bestEntry.getValue();
+            trades = matchAtLevel(aggressor, level, restingPrice, trades);
+            if (level.orders.isEmpty() || level.totalQty == 0) {
                 opposite.remove(restingPrice);
             }
         }
+        return trades;
     }
 
-    private void matchAtLevel(Order aggressor, Level level, long price, List<Trade> trades) {
+    private List<Trade> matchAtLevel(Order aggressor, Level level, long price, List<Trade> trades) {
         while (aggressor.remaining() > 0 && !level.orders.isEmpty()) {
             Order resting = level.orders.peekFirst();
             if (!resting.isActive()) {
@@ -148,6 +165,9 @@ public final class OrderBook {
             long qty = Math.min(aggressor.remaining(), resting.remaining());
             Trade t = new Trade(++tradeSeq, price, qty, resting.id(), aggressor.id(),
                     resting.participant(), aggressor.participant(), aggressor.side(), clock.getAsLong());
+            if (trades == null) {
+                trades = new ArrayList<>();                      // allocate only once a fill occurs
+            }
             trades.add(t);
             totalTrades++;
             listener.onTrade(t);
@@ -160,6 +180,13 @@ public final class OrderBook {
                 byId.remove(resting.id());
             }
         }
+        return trades;
+    }
+
+    /** Recompute the cached best bid/ask from the books. O(log n), called once per mutation. */
+    private void refreshTopOfBook() {
+        cachedBestBid = bids.isEmpty() ? null : bids.firstKey();
+        cachedBestAsk = asks.isEmpty() ? null : asks.firstKey();
     }
 
     /**
@@ -241,6 +268,7 @@ public final class OrderBook {
             }
         }
         order.deactivate();
+        refreshTopOfBook();
         listener.onCancelled(order);
         return true;
     }
@@ -277,8 +305,8 @@ public final class OrderBook {
     // Read side — L2 (aggregated) and L3 (order-by-order) market data + invariants
     // ─────────────────────────────────────────────────────────────────────────────────────────────
     public String instrument() { return instrument; }
-    public Long bestBid() { return bids.isEmpty() ? null : bids.firstKey(); }
-    public Long bestAsk() { return asks.isEmpty() ? null : asks.firstKey(); }
+    public Long bestBid() { return cachedBestBid; } // O(1): maintained on every mutation
+    public Long bestAsk() { return cachedBestAsk; }
     public long orderCount() { return totalOrders; }
     public long tradeCount() { return totalTrades; }
 

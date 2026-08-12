@@ -46,6 +46,20 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- JMH: rigorous microbenchmark harness for the matching engine (see OrderBookJmhBenchmark) -->
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-core</artifactId>
+            <version>1.37</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-generator-annprocess</artifactId>
+            <version>1.37</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Persistence -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -166,6 +180,14 @@
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
+                        </path>
+                        <!-- Generates the JMH harness for OrderBookJmhBenchmark. An explicit
+                             annotationProcessorPaths list suppresses classpath discovery, so the JMH
+                             processor must be named here too. -->
+                        <path>
+                            <groupId>org.openjdk.jmh</groupId>
+                            <artifactId>jmh-generator-annprocess</artifactId>
+                            <version>1.37</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>

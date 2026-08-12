@@ -16,7 +16,7 @@
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
 ![Observability](https://img.shields.io/badge/observability-Prometheus%20%2B%20Grafana-E6522C)
 ![Tests](https://img.shields.io/badge/tests-320%2B%20passing-brightgreen)
-![Matching engine](https://img.shields.io/badge/matching%20engine-~2.1M%20ord%2Fs-blueviolet)
+![Matching engine](https://img.shields.io/badge/matching%20engine-~3M%20ord%2Fs%20%C2%B7%20193%20B%2Forder-blueviolet)
 
 A single **landing hub** (`/`) links three **self-contained, independently-navigable apps**, each its
 own product with its own identity — not one mashed dashboard:
@@ -90,16 +90,22 @@ anchored to a **live Coinbase BTC mid** so the simulation tracks real price acti
 - **Analytics** decompose maker P&L into **spread capture vs. adverse selection vs. inventory**, with
   per-fill **markouts**, a sortable fill log, and **latency-by-match-depth** buckets.
 
-**Benchmark** (single-threaded, in-memory; `com.bonddesk.exchange.*`, reproduce with
-`./mvnw test -Dtest=ExchangeBenchmarkTest`):
+**Benchmark** (single-threaded, in-memory; `com.bonddesk.exchange.*`). The whole order flow is
+pre-generated into primitive arrays *before* the clock starts, and throughput, latency and allocation
+are measured in **separate passes**, so the timed region is pure engine work — not `Random` draws or
+`"mm"+i` string building. Reproduce the quick version with `./mvnw test -Dtest=ExchangeBenchmarkTest`:
 
 ```
-throughput   : ~2,160,000 orders/sec
-latency p50  : ~300 ns     p99 : ~2.2 µs     p99.9 : ~17 µs   (tail varies run-to-run)
+throughput   : ~3,000,000 orders/sec        (single measured pass)
+latency p50  : ~230 ns    p99 : ~1.8 µs    p99.9 : ~16 µs   (separate latency pass; tail is noisy)
+allocation   : ~193 bytes/order             (blended; the passive resting path allocates nothing)
 ```
 
-*Measured on a laptop-class CPU under JDK 21; throughput and p50 reproduce consistently, the p99.9 tail
-is noisy. This is the pure in-memory core, not a networked exchange.*
+For rigorous numbers there's a **JMH harness** (`OrderBookJmhBenchmark`, forked JVM, `Blackhole`,
+managed warm-up) — run it with `-prof gc` and it reports **193 B/op**, matching the in-test
+`ThreadMXBean` figure to the byte, at ~8M ops/sec sustained. *Measured on a laptop-class CPU under
+JDK 21; throughput and p50 reproduce consistently, the p99.9 tail is noisy. This is the pure in-memory
+core, not a networked exchange.*
 
 ---
 
