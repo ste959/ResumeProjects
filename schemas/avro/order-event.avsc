@@ -1,0 +1,46 @@
+{
+  "type": "record",
+  "name": "OrderEventRecord",
+  "namespace": "com.bonddesk.contracts",
+  "doc": "Wire contract for the order-events Kafka topic. This schema is the single source of truth shared by the OMS producer and the risk-service consumer: both generate their types from this file, and the Schema Registry enforces BACKWARD compatibility on every registered change, so an incompatible edit is rejected before it can mis-aggregate risk downstream.",
+  "fields": [
+    {
+      "name": "type",
+      "doc": "The lifecycle transition that produced this event.",
+      "type": {
+        "type": "enum",
+        "name": "EventType",
+        "symbols": ["ORDER_CREATED", "ORDER_STAGED", "ORDER_ROUTED", "ORDER_PARTIALLY_FILLED", "ORDER_FILLED", "ORDER_CANCELLED", "ORDER_REJECTED"],
+        "default": "ORDER_CREATED"
+      }
+    },
+    { "name": "orderRef", "doc": "Stable external order identifier (UUID).", "type": "string" },
+    { "name": "cusip", "doc": "9-character security identifier.", "type": "string" },
+    { "name": "portfolio", "doc": "Portfolio / account the order is traded for.", "type": "string" },
+    {
+      "name": "status",
+      "doc": "The order's status after this event.",
+      "type": {
+        "type": "enum",
+        "name": "OrderStatus",
+        "symbols": ["NEW", "STAGED", "ROUTED", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED"],
+        "default": "NEW"
+      }
+    },
+    {
+      "name": "quantity",
+      "doc": "Par/face notional requested, exact to the cent.",
+      "type": { "type": "bytes", "logicalType": "decimal", "precision": 19, "scale": 2 }
+    },
+    {
+      "name": "filledQuantity",
+      "doc": "Par/face notional filled so far, exact to the cent.",
+      "type": { "type": "bytes", "logicalType": "decimal", "precision": 19, "scale": 2 }
+    },
+    {
+      "name": "occurredAt",
+      "doc": "When the event occurred (UTC), microsecond precision.",
+      "type": { "type": "long", "logicalType": "timestamp-micros" }
+    }
+  ]
+}

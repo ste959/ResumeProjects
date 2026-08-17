@@ -2,24 +2,26 @@ package com.bonddesk.oms.event;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Wires a JSON-publishing {@link KafkaTemplate} for order events. Only active when
- * {@code oms.kafka.enabled=true}, so the OMS still boots with no broker in dev/test.
+ * Wires an Avro-publishing {@link KafkaTemplate} for order events, registered against a Confluent Schema
+ * Registry. Only active when {@code oms.kafka.enabled=true}, so the OMS still boots with no broker in
+ * dev/test.
  *
- * <p>Type-info headers are switched off: the risk service deserialises into its own
- * {@code OrderEvent} class, so we keep the wire format a plain, portable JSON document
- * rather than coupling consumers to this module's package names.
+ * <p>The wire format is the {@code order-event.avsc} schema, shared with the risk consumer; the registry
+ * enforces BACKWARD compatibility so an incompatible change is rejected before it can reach the topic.
+ * The domain-to-Avro mapping lives in {@link OrderEventAvroSerializer}, so the rest of the OMS keeps
+ * dealing in plain {@link OrderEvent}s.
  */
 @Configuration
 @ConditionalOnProperty(prefix = "oms.kafka", name = "enabled", havingValue = "true")
@@ -27,13 +29,13 @@ public class KafkaProducerConfig {
 
     @Bean
     public ProducerFactory<String, OrderEvent> orderEventProducerFactory(
-            @org.springframework.beans.factory.annotation.Value("${oms.kafka.bootstrap-servers:localhost:9092}")
-            String bootstrapServers) {
+            @Value("${oms.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
+            @Value("${oms.kafka.schema-registry-url:http://localhost:8081}") String schemaRegistryUrl) {
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        props.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, OrderEventAvroSerializer.class);
+        props.put("schema.registry.url", schemaRegistryUrl);
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         // Idempotent producer: a retried send is de-duplicated by the broker (producer-id + sequence)
         // and ordering is preserved per partition. Since every event is keyed by orderRef, all events

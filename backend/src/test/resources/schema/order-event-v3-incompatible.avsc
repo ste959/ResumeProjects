@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "OrderEventRecord",
+  "namespace": "com.bonddesk.contracts",
+  "doc": "v3: adds a REQUIRED 'settlementDate' with no default — a BACKWARD-incompatible change a reader on this schema cannot use to read v1 data. The compatibility gate must reject this.",
+  "fields": [
+    {
+      "name": "type",
+      "type": {
+        "type": "enum",
+        "name": "EventType",
+        "symbols": ["ORDER_CREATED", "ORDER_STAGED", "ORDER_ROUTED", "ORDER_PARTIALLY_FILLED", "ORDER_FILLED", "ORDER_CANCELLED", "ORDER_REJECTED"],
+        "default": "ORDER_CREATED"
+      }
+    },
+    { "name": "orderRef", "type": "string" },
+    { "name": "cusip", "type": "string" },
+    { "name": "portfolio", "type": "string" },
+    {
+      "name": "status",
+      "type": {
+        "type": "enum",
+        "name": "OrderStatus",
+        "symbols": ["NEW", "STAGED", "ROUTED", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED"],
+        "default": "NEW"
+      }
+    },
+    { "name": "quantity", "type": { "type": "bytes", "logicalType": "decimal", "precision": 19, "scale": 2 } },
+    { "name": "filledQuantity", "type": { "type": "bytes", "logicalType": "decimal", "precision": 19, "scale": 2 } },
+    { "name": "occurredAt", "type": { "type": "long", "logicalType": "timestamp-micros" } },
+    { "name": "settlementDate", "doc": "REQUIRED, no default — this is what makes v3 incompatible.", "type": "string" }
+  ]
+}

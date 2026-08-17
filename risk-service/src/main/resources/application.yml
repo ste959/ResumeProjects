@@ -14,16 +14,15 @@ spring:
       group-id: risk-service
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      # Wrap the JSON deserializer so a malformed record surfaces as a handleable error instead of
-      # throwing in the poll loop and re-reading the same offset forever (a poison pill wedging the
-      # whole consumer). The DefaultErrorHandler (see KafkaErrorHandlingConfig) then routes it to the DLT.
+      # Wrap the Avro deserializer so a malformed/unresolvable record surfaces as a handleable error
+      # instead of throwing in the poll loop and re-reading the same offset forever (a poison pill
+      # wedging the consumer). The DefaultErrorHandler (see KafkaErrorHandlingConfig) routes it to the DLT.
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
-        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
-        # The OMS publishes plain JSON with no type headers, so pin the target type here.
-        spring.json.value.default.type: com.bonddesk.risk.OrderEvent
-        spring.json.use.type.headers: false
-        spring.json.trusted.packages: com.bonddesk.risk
+        spring.deserializer.value.delegate.class: io.confluent.kafka.serializers.KafkaAvroDeserializer
+        # Resolve each record against the registry and return the generated SpecificRecord type.
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+        specific.avro.reader: true
     # Producer used only by the dead-letter recoverer to republish failed records (raw bytes) to the DLT.
     producer:
       key-serializer: org.apache.kafka.common.serialization.ByteArraySerializer

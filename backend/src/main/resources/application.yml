@@ -110,6 +110,10 @@ oms:
   kafka:
     enabled: false
     topic: order-events
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # order-events is published as Avro; this is the Confluent Schema Registry the producer registers the
+    # schema with and stamps each record's schema id from. Required whenever oms.kafka.enabled=true.
+    schema-registry-url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
   matching:
     enabled: true          # route orders to the CLOB matching engine
     liquidity:

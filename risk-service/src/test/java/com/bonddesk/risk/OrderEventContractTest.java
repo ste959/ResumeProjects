@@ -1,67 +1,73 @@
 package com.bonddesk.risk;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.bonddesk.contracts.EventType;
+import com.bonddesk.contracts.OrderEventRecord;
+import com.bonddesk.contracts.OrderStatus;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
+import java.math.BigDecimal;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Consumer half of the {@code order-events} contract. The risk service deserializes into its own
- * {@code OrderEvent}; this test proves it accepts everything the shared contract
- * ({@code /contracts/order-event.json}) says the producer emits — the canonical sample and every
- * declared type/status — so a producer change that fits the contract can't surprise the consumer, and a
- * consumer change that breaks the contract fails here.
+ * Consumer half of the {@code order-events} contract. The wire format is now the shared Avro schema
+ * ({@code schemas/avro/order-event.avsc}); the deserializer hands the listener an {@link OrderEventRecord}
+ * and {@link OrderEventAvroMapper} turns it into the risk service's own {@link OrderEvent}. This proves
+ * that mapping handles every event type and status the schema can carry, and that a mapped event
+ * aggregates — so a registry-accepted producer change can't surprise the consumer, and a break in the
+ * mapper fails here. (Schema compatibility itself is enforced by the registry and the OMS's
+ * OrderEventSchemaCompatibilityTest.)
  */
 class OrderEventContractTest {
 
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
-
-    private JsonNode contract() throws Exception {
-        for (Path p : List.of(Path.of("..", "contracts", "order-event.json"),
-                              Path.of("contracts", "order-event.json"))) {
-            if (Files.exists(p)) {
-                return mapper.readTree(Files.readString(p));
-            }
+    @Test
+    void mapsEveryEventTypeTheSchemaCanCarry() {
+        for (EventType type : EventType.values()) {
+            OrderEvent event = OrderEventAvroMapper.fromAvro(sample(type, OrderStatus.NEW));
+            assertThat(event.type()).isEqualTo(type.name());
         }
-        throw new IllegalStateException("contracts/order-event.json not found");
     }
 
     @Test
-    void deserializesTheCanonicalSample() throws Exception {
-        OrderEvent event = mapper.treeToValue(contract().get("sample"), OrderEvent.class);
+    void mapsEveryStatusTheSchemaCanCarry() {
+        for (OrderStatus status : OrderStatus.values()) {
+            OrderEvent event = OrderEventAvroMapper.fromAvro(sample(EventType.ORDER_CREATED, status));
+            assertThat(event.status()).isEqualTo(status.name());
+        }
+    }
+
+    @Test
+    void mapsAllFieldsOfACanonicalEvent() {
+        OrderEvent event = OrderEventAvroMapper.fromAvro(sample(EventType.ORDER_FILLED, OrderStatus.FILLED));
         assertThat(event.type()).isEqualTo("ORDER_FILLED");
         assertThat(event.orderRef()).isEqualTo("O-123");
+        assertThat(event.cusip()).isEqualTo("912828XG8");
+        assertThat(event.portfolio()).isEqualTo("DESK-A");
         assertThat(event.status()).isEqualTo("FILLED");
-        assertThat(event.filledQuantity()).isNotNull();
-        assertThat(event.occurredAt()).isNotNull();
+        assertThat(event.quantity()).isEqualByComparingTo("1000");
+        assertThat(event.filledQuantity()).isEqualByComparingTo("1000");
+        assertThat(event.occurredAt()).isEqualTo(Instant.parse("2026-01-01T00:00:00Z"));
     }
 
     @Test
-    void acceptsEveryDeclaredTypeAndStatus() throws Exception {
-        JsonNode c = contract();
-        ObjectNode base = (ObjectNode) c.get("sample").deepCopy();
-        for (JsonNode type : c.get("types")) {
-            OrderEvent e = mapper.treeToValue(base.deepCopy().put("type", type.asText()), OrderEvent.class);
-            assertThat(e.type()).isEqualTo(type.asText());
-        }
-        for (JsonNode status : c.get("statuses")) {
-            OrderEvent e = mapper.treeToValue(base.deepCopy().put("status", status.asText()), OrderEvent.class);
-            assertThat(e.status()).isEqualTo(status.asText());
-        }
-    }
-
-    @Test
-    void aggregatorCountsAContractEvent() throws Exception {
-        OrderEvent event = mapper.treeToValue(contract().get("sample"), OrderEvent.class);
+    void aggregatorCountsAMappedEvent() {
+        OrderEvent event = OrderEventAvroMapper.fromAvro(sample(EventType.ORDER_FILLED, OrderStatus.FILLED));
         RiskAggregator aggregator = new RiskAggregator();
         aggregator.record(event);
         assertThat(aggregator.summary().ordersByStatus()).containsKey("FILLED");
+    }
+
+    private static OrderEventRecord sample(EventType type, OrderStatus status) {
+        return OrderEventRecord.newBuilder()
+                .setType(type)
+                .setOrderRef("O-123")
+                .setCusip("912828XG8")
+                .setPortfolio("DESK-A")
+                .setStatus(status)
+                .setQuantity(new BigDecimal("1000.00"))
+                .setFilledQuantity(new BigDecimal("1000.00"))
+                .setOccurredAt(Instant.parse("2026-01-01T00:00:00Z"))
+                .build();
     }
 }

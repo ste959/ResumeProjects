@@ -16,3 +16,4 @@ Format: [Michael Nygard's ADR template](https://cognitect.com/blog/2011/11/15/do
 | [0006](0006-tamper-evident-seals.md) | Hash-chained, optionally-signed result seals | Accepted |
 | [0007](0007-ai-forward-with-guardrails.md) | AI-forward development behind committed guardrails | Accepted |
 | [0008](0008-tracing-and-venue-resilience.md) | Distributed tracing + a circuit-broken venue client | Accepted |
+| [0009](0009-schema-registry-avro.md) | Avro on the wire, behind a Schema Registry | Accepted |

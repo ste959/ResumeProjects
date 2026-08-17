@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "OrderEventRecord",
+  "namespace": "com.bonddesk.contracts",
+  "doc": "v2: adds an optional 'venue' with a default — a BACKWARD-compatible evolution.",
+  "fields": [
+    {
+      "name": "type",
+      "type": {
+        "type": "enum",
+        "name": "EventType",
+        "symbols": ["ORDER_CREATED", "ORDER_STAGED", "ORDER_ROUTED", "ORDER_PARTIALLY_FILLED", "ORDER_FILLED", "ORDER_CANCELLED", "ORDER_REJECTED"],
+        "default": "ORDER_CREATED"
+      }
+    },
+    { "name": "orderRef", "type": "string" },
+    { "name": "cusip", "type": "string" },
+    { "name": "portfolio", "type": "string" },
+    {
+      "name": "status",
+      "type": {
+        "type": "enum",
+        "name": "OrderStatus",
+        "symbols": ["NEW", "STAGED", "ROUTED", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED"],
+        "default": "NEW"
+      }
+    },
+    { "name": "quantity", "type": { "type": "bytes", "logicalType": "decimal", "precision": 19, "scale": 2 } },
+    { "name": "filledQuantity", "type": { "type": "bytes", "logicalType": "decimal", "precision": 19, "scale": 2 } },
+    { "name": "occurredAt", "type": { "type": "long", "logicalType": "timestamp-micros" } },
+    { "name": "venue", "doc": "Execution venue — added in v2, optional so old data still reads.", "type": ["null", "string"], "default": null }
+  ]
+}
