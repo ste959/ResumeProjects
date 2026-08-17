@@ -293,6 +293,7 @@ public final class OrderBook {
                 level.totalQty -= (order.remaining() - newQty);
             }
             order.setRemaining(newQty);           // keeps its place in the FIFO queue
+            listener.onReplaced(order);           // the L2/analytics feed must see the size shrink
             return order.id();
         }
         cancel(orderId);

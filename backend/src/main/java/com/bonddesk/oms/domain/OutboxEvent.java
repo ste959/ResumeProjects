@@ -19,7 +19,8 @@ import java.time.Instant;
  * (latest-event-per-key), so a resent row is harmless.
  */
 @Entity
-@Table(name = "outbox_event", indexes = @Index(name = "ix_outbox_unpublished", columnList = "published_at, id"))
+@Table(name = "outbox_event",
+       indexes = @Index(name = "ix_outbox_pending", columnList = "published_at, dead_lettered_at, id"))
 public class OutboxEvent {
 
     @Id
@@ -50,6 +51,14 @@ public class OutboxEvent {
     @Column(nullable = false)
     private int attempts;
 
+    /** Set when the relay gives up on a row (unparseable payload, or send failed past the retry cap),
+     *  so a poison row is parked instead of blocking every later event behind it forever. */
+    @Column(name = "dead_lettered_at")
+    private Instant deadLetteredAt;
+
+    @Column(name = "dead_letter_reason", length = 512)
+    private String deadLetterReason;
+
     protected OutboxEvent() { } // for JPA
 
     public OutboxEvent(String aggregateId, String eventType, String topic, String payload, Instant createdAt) {
@@ -68,6 +77,11 @@ public class OutboxEvent {
         this.attempts++;
     }
 
+    public void markDeadLettered(Instant when, String reason) {
+        this.deadLetteredAt = when;
+        this.deadLetterReason = reason;
+    }
+
     public Long getId() { return id; }
     public String getAggregateId() { return aggregateId; }
     public String getEventType() { return eventType; }
@@ -76,4 +90,6 @@ public class OutboxEvent {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getPublishedAt() { return publishedAt; }
     public int getAttempts() { return attempts; }
+    public Instant getDeadLetteredAt() { return deadLetteredAt; }
+    public String getDeadLetterReason() { return deadLetterReason; }
 }

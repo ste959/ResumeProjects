@@ -18,5 +18,8 @@ public interface ExchangeListener {
 
     default void onCancelled(Order order) {}
 
+    /** An in-place amend (size reduction keeping time priority); the order's remaining qty shrank. */
+    default void onReplaced(Order order) {}
+
     ExchangeListener NOOP = new ExchangeListener() {};
 }

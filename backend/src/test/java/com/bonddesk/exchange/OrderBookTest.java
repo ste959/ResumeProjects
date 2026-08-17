@@ -189,6 +189,18 @@ class OrderBookTest {
     }
 
     @Test
+    void replaceReductionFiresReplacedEventForTheFeed() {
+        java.util.List<Order> replaced = new java.util.ArrayList<>();
+        OrderBook b = new OrderBook("BTC-USD", new ExchangeListener() {
+            @Override public void onReplaced(Order o) { replaced.add(o); }
+        }, () -> 0L);
+        SubmitResult a = b.submit("A", SELL, LIMIT, GTC, false, 100, 5);
+        b.replace(a.orderId(), 100, 2);                    // pure size reduction, in place
+        assertThat(replaced).hasSize(1);
+        assertThat(replaced.get(0).remaining()).isEqualTo(2);   // the feed sees the shrink
+    }
+
+    @Test
     void replaceWithSizeIncreaseLosesPriority() {
         OrderBook b = book();
         SubmitResult a = limit(b, "A", SELL, 100, 5, GTC);

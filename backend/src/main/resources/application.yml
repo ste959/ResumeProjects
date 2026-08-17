@@ -46,6 +46,10 @@ spring:
 
 server:
   port: 8080
+  shutdown: graceful          # let in-flight requests finish on SIGTERM instead of being cut
+
+spring.lifecycle:
+  timeout-per-shutdown-phase: 20s
 
 management:
   endpoints:
