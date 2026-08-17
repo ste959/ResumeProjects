@@ -6,13 +6,16 @@ import { StatusBadge } from './StatusBadge';
 
 interface Props {
   orders: Order[];
+  /** Whether the signed-in user may drive lifecycle actions (backend enforces the same rule). */
+  canWrite: boolean;
   onChanged: () => void;
 }
 
 /** The order blotter: every order with its live fill progress and the lifecycle
  *  actions available in its current state. */
-export function Blotter({ orders, onChanged }: Props) {
+export function Blotter({ orders, canWrite, onChanged }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
+  const gate = canWrite ? undefined : 'Sign in as a trader to act on orders';
 
   async function act(ref: string, fn: () => Promise<unknown>) {
     setBusy(ref);
@@ -79,19 +82,20 @@ export function Blotter({ orders, onChanged }: Props) {
                   </td>
                   <td className="actions">
                     {o.status === 'NEW' && (
-                      <button disabled={busy === o.orderRef} onClick={() => act(o.orderRef, () => api.stage(o.orderRef))}>
+                      <button title={gate} disabled={!canWrite || busy === o.orderRef} onClick={() => act(o.orderRef, () => api.stage(o.orderRef))}>
                         Stage
                       </button>
                     )}
                     {o.status === 'STAGED' && (
-                      <button disabled={busy === o.orderRef} onClick={() => act(o.orderRef, () => api.route(o.orderRef))}>
+                      <button title={gate} disabled={!canWrite || busy === o.orderRef} onClick={() => act(o.orderRef, () => api.route(o.orderRef))}>
                         Route
                       </button>
                     )}
                     {['NEW', 'STAGED', 'ROUTED', 'PARTIALLY_FILLED'].includes(o.status) && (
                       <button
                         className="danger"
-                        disabled={busy === o.orderRef}
+                        title={gate}
+                        disabled={!canWrite || busy === o.orderRef}
                         onClick={() => act(o.orderRef, () => api.cancel(o.orderRef))}
                       >
                         Cancel

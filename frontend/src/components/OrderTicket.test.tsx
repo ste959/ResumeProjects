@@ -45,7 +45,7 @@ describe('OrderTicket', () => {
     } as never);
     const onSubmitted = vi.fn();
 
-    render(<OrderTicket securities={securities} portfolio="PORT-DEMO" onSubmitted={onSubmitted} />);
+    render(<OrderTicket securities={securities} portfolio="PORT-DEMO" canWrite onSubmitted={onSubmitted} />);
 
     await user.selectOptions(screen.getByLabelText('Security'), '912828YK0');
     await user.click(screen.getByRole('button', { name: /Stage BUY Order/i }));
@@ -66,12 +66,25 @@ describe('OrderTicket', () => {
       statusReason: 'Security is on the restricted list',
     } as never);
 
-    render(<OrderTicket securities={securities} portfolio="PORT-DEMO" onSubmitted={vi.fn()} />);
+    render(<OrderTicket securities={securities} portfolio="PORT-DEMO" canWrite onSubmitted={vi.fn()} />);
 
     await user.selectOptions(screen.getByLabelText('Security'), '912828YK0');
     await user.click(screen.getByRole('button', { name: /Stage BUY Order/i }));
 
     expect(await screen.findByText(/Rejected by compliance/i)).toBeInTheDocument();
     expect(screen.getByText(/restricted list/i)).toBeInTheDocument();
+  });
+
+  it('blocks submission for a read-only (signed-out) user', async () => {
+    const user = userEvent.setup();
+    render(<OrderTicket securities={securities} portfolio="PORT-DEMO" canWrite={false} onSubmitted={vi.fn()} />);
+
+    await user.selectOptions(screen.getByLabelText('Security'), '912828YK0');
+    const submit = screen.getByRole('button', { name: /Stage BUY Order/i });
+    expect(submit).toBeDisabled();
+    expect(screen.getByText(/Sign in as a trader/i)).toBeInTheDocument();
+
+    await user.click(submit);
+    expect(api.createOrder).not.toHaveBeenCalled();
   });
 });

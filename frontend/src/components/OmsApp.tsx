@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Security } from '../api/types';
+import { useAuth } from '../auth/AuthContext';
 import { usePolling } from '../hooks/usePolling';
 import { AnalyticsPanel } from './AnalyticsPanel';
 import { Blotter } from './Blotter';
+import { LoginControl } from './LoginControl';
 import { OrderTicket } from './OrderTicket';
 import { Positions } from './Positions';
 import { RatesTerminal } from './RatesTerminal';
@@ -19,6 +21,7 @@ type Tab = 'rates' | 'cash' | 'risk';
 export function OmsApp() {
   const [securities, setSecurities] = useState<Security[]>([]);
   const [tab, setTab] = useState<Tab>('rates');
+  const { canWrite } = useAuth();
 
   const orders = usePolling(api.orders, 2000);
   const positions = usePolling(useCallback(() => api.positions(PORTFOLIO), []), 2000);
@@ -43,6 +46,7 @@ export function OmsApp() {
           <button className={tab === 'cash' ? 'active' : ''} onClick={() => setTab('cash')}>Cash OMS</button>
           <button className={tab === 'risk' ? 'active' : ''} onClick={() => setTab('risk')}>Risk &amp; Tax</button>
         </nav>
+        <LoginControl />
       </header>
 
       {tab === 'rates' && <RatesTerminal />}
@@ -54,9 +58,9 @@ export function OmsApp() {
             Electronic order path — stage, route &amp; fill bond orders through the OMS
           </div>
           <div className="fi-order-grid">
-            <OrderTicket securities={securities} portfolio={PORTFOLIO} onSubmitted={refresh} />
+            <OrderTicket securities={securities} portfolio={PORTFOLIO} canWrite={canWrite} onSubmitted={refresh} />
             <div className="fi-order-content">
-              <Blotter orders={orders.data ?? []} onChanged={refresh} />
+              <Blotter orders={orders.data ?? []} canWrite={canWrite} onChanged={refresh} />
               <Positions positions={positions.data ?? []} />
             </div>
           </div>

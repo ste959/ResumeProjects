@@ -53,6 +53,7 @@ import type {
   YieldCurve,
   ApiError,
 } from './types';
+import { getToken, type LoginResponse } from '../auth/session';
 
 // In dev, requests go to /api and Vite proxies them to the backend. In a built
 // deployment, VITE_API_BASE can point at the API gateway.
@@ -72,9 +73,16 @@ export class HttpError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit, base: string = BASE): Promise<T> {
+  // Attach the signed JWT when present. Reads are public, so a signed-out user still sees data;
+  // writes need the header (the backend enforces roles via @PreAuthorize).
+  const token = getToken();
   const res = await fetch(base + path, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     let body: ApiError | null = null;
@@ -92,6 +100,13 @@ async function request<T>(path: string, init?: RequestInit, base: string = BASE)
 }
 
 export const api = {
+  // Authentication (Java OMS). login returns a signed JWT; me echoes the caller's identity.
+  login: (username: string, password: string) =>
+    request<LoginResponse>('/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    }),
+
   securities: (assetClass?: AssetClass) =>
     request<Security[]>(`/securities${assetClass ? `?assetClass=${assetClass}` : ''}`),
 

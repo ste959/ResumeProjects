@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { Order, Position, Security } from '../api/types';
+import { useAuth } from '../auth/AuthContext';
 import { BondAnalyticsPanel } from './BondAnalyticsPanel';
 import { Blotter } from './Blotter';
 import { OrderTicket } from './OrderTicket';
@@ -18,6 +19,7 @@ export function FixedIncomeDesk({ securities, orders, positions, onChanged, port
   onChanged: () => void;
   portfolio: string;
 }) {
+  const { canWrite } = useAuth();
   // Bonds only for the RFQ / analytics (fall back to the whole master if asset class isn't tagged).
   const bonds = useMemo(() => {
     const fi = securities.filter((s) => s.assetClass === 'FIXED_INCOME');
@@ -43,9 +45,9 @@ export function FixedIncomeDesk({ securities, orders, positions, onChanged, port
       <div className="fi-electronic">
         <div className="fi-sub-label">Electronic path · central limit order book</div>
         <div className="fi-order-grid">
-          <OrderTicket securities={securities} portfolio={portfolio} onSubmitted={onChanged} />
+          <OrderTicket securities={securities} portfolio={portfolio} canWrite={canWrite} onSubmitted={onChanged} />
           <div className="fi-order-content">
-            <Blotter orders={orders} onChanged={onChanged} />
+            <Blotter orders={orders} canWrite={canWrite} onChanged={onChanged} />
             <Positions positions={positions} />
           </div>
         </div>

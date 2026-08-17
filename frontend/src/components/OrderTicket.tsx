@@ -5,6 +5,8 @@ import type { OrderSide, OrderType, Security, TimeInForce } from '../api/types';
 interface Props {
   securities: Security[];
   portfolio: string;
+  /** Whether the signed-in user may submit orders (backend enforces the same rule). */
+  canWrite: boolean;
   onSubmitted: () => void;
 }
 
@@ -14,7 +16,7 @@ const TIFS: TimeInForce[] = ['DAY', 'GTC', 'IOC', 'FOK'];
 
 /** Order-entry ticket: pick a bond, set side/type/qty, submit. Shows validation and
  *  compliance feedback returned by the API. */
-export function OrderTicket({ securities, portfolio, onSubmitted }: Props) {
+export function OrderTicket({ securities, portfolio, canWrite, onSubmitted }: Props) {
   const [cusip, setCusip] = useState('');
   const [side, setSide] = useState<OrderSide>('BUY');
   const [orderType, setOrderType] = useState<OrderType>('MARKET');
@@ -156,10 +158,13 @@ export function OrderTicket({ securities, portfolio, onSubmitted }: Props) {
         )}
       </div>
 
-      <button className="submit" type="submit" disabled={submitting || !cusip}>
+      <button className="submit" type="submit" disabled={submitting || !cusip || !canWrite}>
         {submitting ? 'Submitting…' : `Stage ${side} Order`}
       </button>
 
+      {!canWrite && (
+        <div className="banner warn">Sign in as a trader to submit orders (reads are open to all).</div>
+      )}
       {banner && <div className={`banner ${banner.kind}`}>{banner.text}</div>}
     </form>
   );

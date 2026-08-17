@@ -37,13 +37,13 @@ describe('Blotter', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('renders an order row with its security', () => {
-    render(<Blotter orders={[order()]} onChanged={vi.fn()} />);
+    render(<Blotter orders={[order()]} canWrite onChanged={vi.fn()} />);
     expect(screen.getByText('912828YK0')).toBeInTheDocument();
     expect(screen.getByText('US TREASURY 1.5% 2030')).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no orders', () => {
-    render(<Blotter orders={[]} onChanged={vi.fn()} />);
+    render(<Blotter orders={[]} canWrite onChanged={vi.fn()} />);
     expect(screen.getByText(/No orders yet/i)).toBeInTheDocument();
   });
 
@@ -52,7 +52,7 @@ describe('Blotter', () => {
     vi.mocked(api.stage).mockResolvedValue(order({ status: 'STAGED' }) as never);
     const onChanged = vi.fn();
 
-    render(<Blotter orders={[order()]} onChanged={onChanged} />);
+    render(<Blotter orders={[order()]} canWrite onChanged={onChanged} />);
     await user.click(screen.getByRole('button', { name: /^Stage$/i }));
 
     expect(api.stage).toHaveBeenCalledWith('ref-123');
@@ -60,8 +60,14 @@ describe('Blotter', () => {
   });
 
   it('offers Route (not Stage) for a STAGED order', () => {
-    render(<Blotter orders={[order({ status: 'STAGED' })]} onChanged={vi.fn()} />);
+    render(<Blotter orders={[order({ status: 'STAGED' })]} canWrite onChanged={vi.fn()} />);
     expect(screen.getByRole('button', { name: /^Route$/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Stage$/i })).not.toBeInTheDocument();
+  });
+
+  it('disables lifecycle actions for a read-only (signed-out) user', () => {
+    render(<Blotter orders={[order()]} canWrite={false} onChanged={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /^Stage$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Cancel$/i })).toBeDisabled();
   });
 });
