@@ -1,0 +1,19 @@
+{
+  "topic": "order-events",
+  "description": "Wire contract for the order-events Kafka topic. The producer (backend OMS) and the consumer (risk-service) hand-maintain their own OrderEvent types, coupled ONLY by this JSON contract. Both sides have a test that fails if they drift from it — so renaming an enum value or a field can't silently mis-aggregate risk.",
+  "producer": "backend (com.bonddesk.oms.event.OrderEvent)",
+  "consumer": "risk-service (com.bonddesk.risk.OrderEvent)",
+  "fields": ["type", "orderRef", "cusip", "portfolio", "status", "quantity", "filledQuantity", "occurredAt"],
+  "types": ["ORDER_CREATED", "ORDER_STAGED", "ORDER_ROUTED", "ORDER_PARTIALLY_FILLED", "ORDER_FILLED", "ORDER_CANCELLED", "ORDER_REJECTED"],
+  "statuses": ["NEW", "STAGED", "ROUTED", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED"],
+  "sample": {
+    "type": "ORDER_FILLED",
+    "orderRef": "O-123",
+    "cusip": "912828XG8",
+    "portfolio": "DESK-A",
+    "status": "FILLED",
+    "quantity": 1000,
+    "filledQuantity": 1000,
+    "occurredAt": "2024-01-01T00:00:00Z"
+  }
+}
