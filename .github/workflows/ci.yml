@@ -57,6 +57,25 @@ jobs:
       - name: Typecheck & build
         run: npm run build
 
+  validation-harness:
+    name: Validation harness (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: python -m pytest harness -q          # stdlib only, no install
+      - name: Run the example validation suite (CI gate)
+        run: python -m harness --out artifacts     # non-zero exit fails the build on FAIL/ERROR
+      - name: Upload validation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-results
+          path: artifacts/
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
