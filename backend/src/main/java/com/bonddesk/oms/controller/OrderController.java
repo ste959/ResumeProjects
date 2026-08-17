@@ -6,6 +6,8 @@ import com.bonddesk.oms.dto.CancelRequest;
 import com.bonddesk.oms.dto.CreateOrderRequest;
 import com.bonddesk.oms.dto.FillRequest;
 import com.bonddesk.oms.dto.OrderResponse;
+import com.bonddesk.oms.dto.OrderSummaryResponse;
+import com.bonddesk.oms.dto.PagedResponse;
 import com.bonddesk.oms.exception.IdempotencyConflictException;
 import com.bonddesk.oms.exception.IdempotencyMismatchException;
 import com.bonddesk.oms.idempotency.IdempotencyStore;
@@ -31,7 +33,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import java.util.List;
 
 /** Order entry and lifecycle actions — the trader blotter's backend. */
 @RestController
@@ -50,10 +51,14 @@ public class OrderController {
     }
 
     @GetMapping
-    @Operation(summary = "List orders (the blotter), optionally filtered by status or portfolio")
-    public List<OrderResponse> list(@RequestParam(required = false) OrderStatus status,
-                                    @RequestParam(required = false) String portfolio) {
-        return orders.list(status, portfolio).stream().map(OrderResponse::from).toList();
+    @Operation(summary = "List orders (the blotter) as a keyset page, newest first. Filter by status or "
+            + "portfolio; pass the previous page's nextCursor to page on.")
+    public PagedResponse<OrderSummaryResponse> list(
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) String portfolio,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "50") int size) {
+        return orders.listPage(status, portfolio, cursor, size);
     }
 
     @GetMapping("/{orderRef}")

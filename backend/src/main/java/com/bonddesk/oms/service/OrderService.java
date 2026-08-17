@@ -10,6 +10,9 @@ import com.bonddesk.oms.domain.OrderType;
 import com.bonddesk.oms.domain.Security;
 import com.bonddesk.oms.domain.TimeInForce;
 import com.bonddesk.oms.dto.CreateOrderRequest;
+import com.bonddesk.oms.dto.Cursor;
+import com.bonddesk.oms.dto.OrderSummaryResponse;
+import com.bonddesk.oms.dto.PagedResponse;
 import com.bonddesk.oms.event.OrderEvent;
 import com.bonddesk.oms.event.OrderEventPublisher;
 import com.bonddesk.oms.exception.BadRequestException;
@@ -21,12 +24,14 @@ import com.bonddesk.oms.repository.SecurityRepository;
 import com.bonddesk.oms.risk.PreTradeRiskGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +49,10 @@ public class OrderService {
 
     /** Statuses an order can be in while still working in the market. */
     static final List<OrderStatus> WORKING = List.of(OrderStatus.ROUTED, OrderStatus.PARTIALLY_FILLED);
+
+    /** Blotter page bounds: a sane default, and a hard cap so a client can't ask for an unbounded page. */
+    static final int DEFAULT_PAGE_SIZE = 50;
+    static final int MAX_PAGE_SIZE = 200;
 
     private final OrderRepository orders;
     private final SecurityRepository securities;
@@ -78,19 +87,37 @@ public class OrderService {
         return order;
     }
 
+    /**
+     * One keyset page of the blotter (newest first), optionally filtered by status/portfolio. Fetches one
+     * row beyond the page to decide {@code hasMore} without a separate COUNT, and hands back an opaque
+     * cursor for the next page. Mapping to {@link OrderSummaryResponse} happens inside this read-only
+     * transaction, so the join-fetched security is available and no lazy collection is touched.
+     */
     @Transactional(readOnly = true)
-    public List<Order> list(OrderStatus status, String portfolio) {
-        List<Order> result;
-        if (status != null) {
-            result = orders.findByStatusOrderByCreatedAtDesc(status);
-        } else if (portfolio != null && !portfolio.isBlank()) {
-            result = orders.findByPortfolioOrderByCreatedAtDesc(portfolio);
-        } else {
-            result = orders.findAllByOrderByCreatedAtDesc();
+    public PagedResponse<OrderSummaryResponse> listPage(OrderStatus status, String portfolio,
+                                                        String cursor, int size) {
+        int limit = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        Instant cursorCreatedAt = null;
+        Long cursorId = null;
+        if (cursor != null && !cursor.isBlank()) {
+            Cursor decoded = Cursor.decode(cursor);   // 400 on a malformed token
+            cursorCreatedAt = decoded.createdAt();
+            cursorId = decoded.id();
         }
-        // Fills + security are fetched eagerly by the repository entity graph (single query),
-        // so no per-row lazy initialisation is needed here.
-        return result;
+        String portfolioFilter = (portfolio == null || portfolio.isBlank()) ? null : portfolio;
+
+        List<Order> rows = orders.findBlotterPage(status, portfolioFilter, cursorCreatedAt, cursorId,
+                PageRequest.of(0, limit + 1));   // one extra row = "is there a next page?"
+        boolean hasMore = rows.size() > limit;
+        List<Order> page = hasMore ? rows.subList(0, limit) : rows;
+
+        List<OrderSummaryResponse> content = page.stream().map(OrderSummaryResponse::from).toList();
+        String nextCursor = null;
+        if (hasMore) {
+            Order last = page.get(page.size() - 1);
+            nextCursor = new Cursor(last.getCreatedAt(), last.getId()).encode();
+        }
+        return new PagedResponse<>(content, nextCursor, limit, hasMore);
     }
 
     @Transactional(readOnly = true)

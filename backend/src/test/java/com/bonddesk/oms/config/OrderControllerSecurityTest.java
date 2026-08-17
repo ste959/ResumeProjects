@@ -53,7 +53,8 @@ class OrderControllerSecurityTest {
 
     @Test
     void readsArePublic() throws Exception {
-        when(orders.list(any(), any())).thenReturn(List.of());
+        when(orders.listPage(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new com.bonddesk.oms.dto.PagedResponse<>(List.of(), null, 50, false));
         mvc.perform(get("/api/orders")).andExpect(status().isOk());
     }
 }

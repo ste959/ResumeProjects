@@ -59,7 +59,16 @@ export interface Order {
   statusReason: string | null;
   createdAt: string;
   updatedAt: string;
-  executions: Execution[];
+  // Present on the single-order detail view; omitted from the paginated blotter list (summary rows).
+  executions?: Execution[];
+}
+
+/** A keyset-paginated page. `nextCursor` is an opaque token to fetch the next page (null at the end). */
+export interface Page<T> {
+  content: T[];
+  nextCursor: string | null;
+  size: number;
+  hasMore: boolean;
 }
 
 export interface Position {

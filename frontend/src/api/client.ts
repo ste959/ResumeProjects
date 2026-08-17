@@ -31,6 +31,7 @@ import type {
   NewsItem,
   Catalysts,
   Order,
+  Page,
   PaperOrder,
   PaperOrderRequest,
   PlaceExRequest,
@@ -128,7 +129,8 @@ export const api = {
   taxCompute: (req: TaxRequest) =>
     request<TaxReport>('/tax', { method: 'POST', body: JSON.stringify(req) }),
 
-  orders: () => request<Order[]>('/orders'),
+  // The blotter is a keyset page; the UI shows the most recent page (cap 200) and unwraps the envelope.
+  orders: () => request<Page<Order>>('/orders?size=200').then((p) => p.content),
 
   createOrder: (req: CreateOrderRequest) =>
     request<Order>('/orders', { method: 'POST', body: JSON.stringify(req) }),

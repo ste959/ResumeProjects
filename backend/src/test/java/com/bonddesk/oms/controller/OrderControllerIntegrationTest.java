@@ -94,9 +94,12 @@ class OrderControllerIntegrationTest extends AbstractPostgresIntegrationTest {
     @Test
     void blotterListsOrders() throws Exception {
         createOrderRef("912828YK0");
+        // The blotter is now a keyset page: rows live under "content", with paging metadata alongside.
         mvc.perform(get("/api/orders"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))));
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.size").value(50))
+                .andExpect(jsonPath("$.hasMore").exists());
     }
 
     @Test
