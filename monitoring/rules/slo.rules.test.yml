@@ -1,0 +1,38 @@
+# Unit tests for the SLO alerting rules — run with `promtool test rules slo.rules.test.yml`.
+# They feed synthetic request counters through the real recording + alerting rules and assert the
+# multi-window burn-rate alert fires on a sustained error spike and stays quiet on healthy traffic.
+rule_files:
+  - slo.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: a sustained 5xx spike trips the availability fast-burn page
+    interval: 1m
+    input_series:
+      # ~9% of requests 5xx, steady for 75 minutes — well above 14.4x the 0.001 budget.
+      - series: 'http_server_requests_seconds_count{job="oms-backend",uri="/api/orders",status="500"}'
+        values: '0+10x75'
+      - series: 'http_server_requests_seconds_count{job="oms-backend",uri="/api/orders",status="200"}'
+        values: '0+100x75'
+    alert_rule_test:
+      - eval_time: 75m
+        alertname: OMSAvailabilityErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels:
+              job: oms-backend
+              severity: page
+              slo: availability
+            exp_annotations:
+              summary: "OMS availability error budget burning fast (>=14.4x)"
+              description: "5xx ratio over 1h and 5m both exceed 14.4x the 99.9% budget — ~2% of the 30d budget spends in an hour. Page."
+
+  - name: healthy traffic keeps the budget intact
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="oms-backend",uri="/api/orders",status="200"}'
+        values: '0+100x75'
+    alert_rule_test:
+      - eval_time: 75m
+        alertname: OMSAvailabilityErrorBudgetFastBurn
+        exp_alerts: []

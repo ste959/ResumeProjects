@@ -89,3 +89,7 @@ harness: ## Run the validation harness (sealed, with repro bundles)
 loadtest: ## Matching-path load test: throughput + tail latency under concurrent load (thread sweep)
 	cd backend && ./mvnw -q -B test-compile && \
 		java -cp target/test-classes:target/classes com.bonddesk.exchange.OrderPathLoadTest 2000 16
+
+.PHONY: slo-rules
+slo-rules: ## Validate + unit-test the SLO recording/burn-rate rules (needs promtool on PATH)
+	cd monitoring/rules && promtool check rules slo.rules.yml && promtool test rules slo.rules.test.yml

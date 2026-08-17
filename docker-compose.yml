@@ -107,6 +107,7 @@ services:
     image: prom/prometheus:v2.54.1
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/rules:/etc/prometheus/rules:ro   # SLO recording + burn-rate alert rules
     ports:
       - "9090:9090"
     depends_on:

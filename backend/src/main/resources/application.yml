@@ -86,6 +86,14 @@ management:
   metrics:
     tags:
       application: bonddesk-oms
+    distribution:
+      # Publish a latency histogram for HTTP requests so the SLO rules can compute the "fraction of
+      # requests served under the latency objective" SLI. The explicit SLO buckets guarantee an exact
+      # le="0.5" (and friends) bucket for the recording rules (see monitoring/rules/slo.rules.yml).
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,250ms,500ms,1s,2s
   tracing:
     # Sample every trace in this demo so a full order flow is always visible end-to-end. Turn down in
     # production. Export stays off until management.zipkin.tracing.endpoint points at a collector

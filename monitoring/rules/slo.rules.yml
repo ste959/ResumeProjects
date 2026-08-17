@@ -1,0 +1,164 @@
+# SLO recording + alerting rules for the OMS order API.
+#
+# SLOs (over a rolling 30 days):
+#   * Availability: 99.9% of requests succeed  -> error budget = 0.001 (5xx / total)
+#   * Latency:      99% of requests < 500ms     -> error budget = 0.01  (fraction slower than 500ms)
+#
+# Alerting follows the Google SRE "multi-window, multi-burn-rate" method: a short window confirms the
+# burn is happening *now* while a long window confirms it is *sustained*, so a fast burn pages quickly
+# and a slow burn tickets without either flapping. Burn rate = (error ratio over window) / error budget.
+#
+# The SLIs are computed from Micrometer's http_server_requests_seconds metric; actuator endpoints are
+# excluded so the SLO reflects the API, not health scrapes. Series carry the `job` label so one rule set
+# generalises to any scraped service.
+
+groups:
+  # ---- Availability SLI: 5xx ratio at each window used by the burn-rate alerts ----
+  - name: oms_slo_availability_sli
+    rules:
+      - record: job:slo_availability_errors:ratio_rate5m
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*",status=~"5.."}[5m]))
+          /
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[5m]))
+      - record: job:slo_availability_errors:ratio_rate30m
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*",status=~"5.."}[30m]))
+          /
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[30m]))
+      - record: job:slo_availability_errors:ratio_rate1h
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*",status=~"5.."}[1h]))
+          /
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[1h]))
+      - record: job:slo_availability_errors:ratio_rate2h
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*",status=~"5.."}[2h]))
+          /
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[2h]))
+      - record: job:slo_availability_errors:ratio_rate6h
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*",status=~"5.."}[6h]))
+          /
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[6h]))
+      - record: job:slo_availability_errors:ratio_rate1d
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*",status=~"5.."}[1d]))
+          /
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[1d]))
+      - record: job:slo_availability_errors:ratio_rate3d
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*",status=~"5.."}[3d]))
+          /
+          sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[3d]))
+
+  # ---- Latency SLI: fraction of requests slower than the 500ms objective ----
+  - name: oms_slo_latency_sli
+    rules:
+      - record: job:slo_latency_slow:ratio_rate5m
+        expr: |
+          1 - (
+            sum by (job) (rate(http_server_requests_seconds_bucket{job="oms-backend",uri!~"/actuator.*",le="0.5"}[5m]))
+            /
+            sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[5m]))
+          )
+      - record: job:slo_latency_slow:ratio_rate30m
+        expr: |
+          1 - (
+            sum by (job) (rate(http_server_requests_seconds_bucket{job="oms-backend",uri!~"/actuator.*",le="0.5"}[30m]))
+            /
+            sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[30m]))
+          )
+      - record: job:slo_latency_slow:ratio_rate1h
+        expr: |
+          1 - (
+            sum by (job) (rate(http_server_requests_seconds_bucket{job="oms-backend",uri!~"/actuator.*",le="0.5"}[1h]))
+            /
+            sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[1h]))
+          )
+      - record: job:slo_latency_slow:ratio_rate6h
+        expr: |
+          1 - (
+            sum by (job) (rate(http_server_requests_seconds_bucket{job="oms-backend",uri!~"/actuator.*",le="0.5"}[6h]))
+            /
+            sum by (job) (rate(http_server_requests_seconds_count{job="oms-backend",uri!~"/actuator.*"}[6h]))
+          )
+
+  # ---- Multi-window, multi-burn-rate alerts ----
+  - name: oms_slo_burn_rate_alerts
+    rules:
+      # Availability, error budget 0.001. Page on a fast burn, ticket on a slow one.
+      - alert: OMSAvailabilityErrorBudgetFastBurn
+        expr: |
+          job:slo_availability_errors:ratio_rate1h > (14.4 * 0.001)
+          and
+          job:slo_availability_errors:ratio_rate5m > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: "OMS availability error budget burning fast (>=14.4x)"
+          description: "5xx ratio over 1h and 5m both exceed 14.4x the 99.9% budget — ~2% of the 30d budget spends in an hour. Page."
+      - alert: OMSAvailabilityErrorBudgetMediumBurn
+        expr: |
+          job:slo_availability_errors:ratio_rate6h > (6 * 0.001)
+          and
+          job:slo_availability_errors:ratio_rate30m > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: "OMS availability error budget burning (>=6x)"
+          description: "5xx ratio over 6h and 30m both exceed 6x the budget — ~5% of the 30d budget in six hours. Page."
+      - alert: OMSAvailabilityErrorBudgetSlowBurn
+        expr: |
+          job:slo_availability_errors:ratio_rate1d > (3 * 0.001)
+          and
+          job:slo_availability_errors:ratio_rate2h > (3 * 0.001)
+        for: 1h
+        labels:
+          severity: ticket
+          slo: availability
+        annotations:
+          summary: "OMS availability error budget burning slowly (>=3x)"
+          description: "5xx ratio over 1d and 2h both exceed 3x the budget — ~10% of the 30d budget in a day. Open a ticket."
+      - alert: OMSAvailabilityErrorBudgetSlowestBurn
+        expr: |
+          job:slo_availability_errors:ratio_rate3d > (1 * 0.001)
+          and
+          job:slo_availability_errors:ratio_rate6h > (1 * 0.001)
+        for: 3h
+        labels:
+          severity: ticket
+          slo: availability
+        annotations:
+          summary: "OMS availability error budget burning at ~1x"
+          description: "5xx ratio over 3d and 6h both exceed the budget — the SLO will be missed if this continues. Open a ticket."
+
+      # Latency, error budget 0.01 (99% under 500ms).
+      - alert: OMSLatencyErrorBudgetFastBurn
+        expr: |
+          job:slo_latency_slow:ratio_rate1h > (14.4 * 0.01)
+          and
+          job:slo_latency_slow:ratio_rate5m > (14.4 * 0.01)
+        for: 2m
+        labels:
+          severity: page
+          slo: latency
+        annotations:
+          summary: "OMS latency error budget burning fast (>=14.4x)"
+          description: "Fraction of requests slower than 500ms over 1h and 5m both exceed 14.4x the 99% budget. Page."
+      - alert: OMSLatencyErrorBudgetMediumBurn
+        expr: |
+          job:slo_latency_slow:ratio_rate6h > (6 * 0.01)
+          and
+          job:slo_latency_slow:ratio_rate30m > (6 * 0.01)
+        for: 15m
+        labels:
+          severity: page
+          slo: latency
+        annotations:
+          summary: "OMS latency error budget burning (>=6x)"
+          description: "Fraction of requests slower than 500ms over 6h and 30m both exceed 6x the 99% budget. Page."
