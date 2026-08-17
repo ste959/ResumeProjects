@@ -67,14 +67,18 @@ jobs:
           python-version: "3.12"
       - name: Unit tests
         run: python -m pytest harness -q          # stdlib only, no install
+      - name: Determinism / flakiness gate
+        run: python -m harness --check-determinism --repeats 5   # fail if any scenario's verdict is unstable
       - name: Run the example validation suite (CI gate)
-        run: python -m harness --out artifacts     # non-zero exit fails the build on FAIL/ERROR
+        run: python -m harness --out artifacts --repro-dir repro  # non-zero exit fails on FAIL/ERROR
       - name: Upload validation results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: validation-results
-          path: artifacts/
+          path: |
+            artifacts/
+            repro/
 
   e2e:
     name: E2E (Playwright)

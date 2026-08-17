@@ -31,19 +31,35 @@ def _safe_run(adapter, seed: int) -> AdapterOutcome:
         return AdapterOutcome(ok=False, error=f"adapter crashed: {type(e).__name__}: {e}")
 
 
+def _describe(adapter, seed: int) -> str:
+    describe = getattr(adapter, "describe", None)
+    try:
+        return describe(seed) if callable(describe) else ""
+    except Exception:                            # never let repro-info gathering break a run
+        return ""
+
+
 def _status(outcome: AdapterOutcome, checks) -> Status:
     if not outcome.ok:
         return Status.ERROR                      # the SUT never really ran
     return Status.PASS if all(c.ok for c in checks) else Status.FAIL
 
 
-def _run_one(scenario: Scenario, *, redact_output: bool) -> ScenarioResult:
+def _run_one(scenario: Scenario, *, redact_output: bool,
+             skip_tags: frozenset[str] = frozenset()) -> ScenarioResult:
     started = now_iso()
+    repro = _describe(scenario.adapter, scenario.seed)
+
+    quarantined = skip_tags.intersection(scenario.tags)
+    if quarantined:
+        return ScenarioResult(scenario.id, Status.SKIP, 0.0, seed=scenario.seed,
+                              tags=list(scenario.tags), error=f"quarantined ({', '.join(sorted(quarantined))})",
+                              repro=repro, started_at=started)
     if scenario.skip_if is not None:
         reason = scenario.skip_if()
         if reason:
             return ScenarioResult(scenario.id, Status.SKIP, 0.0, seed=scenario.seed,
-                                  tags=list(scenario.tags), error=reason, started_at=started)
+                                  tags=list(scenario.tags), error=reason, repro=repro, started_at=started)
 
     with Timer() as t:
         outcome = _safe_run(scenario.adapter, scenario.seed)
@@ -61,21 +77,36 @@ def _run_one(scenario: Scenario, *, redact_output: bool) -> ScenarioResult:
         stdout=redact(outcome.stdout) if redact_output else outcome.stdout,
         stderr=redact(outcome.stderr) if redact_output else outcome.stderr,
         error=outcome.error,
+        repro=repro,
         started_at=started,
     )
 
 
 def run_suite(suite: Suite, *, artifacts_dir: str | Path | None = None,
-              include_host: bool = False, redact_output: bool = True) -> RunReport:
-    """Run every scenario in ``suite`` and return the report. Writes artifacts if ``artifacts_dir`` set."""
+              include_host: bool = False, redact_output: bool = True,
+              skip_tags: frozenset[str] | set[str] = frozenset(),
+              repro_dir: str | Path | None = None) -> RunReport:
+    """Run every scenario in ``suite`` and return the report.
+
+    ``skip_tags`` quarantines scenarios carrying any of those tags (SKIP, not run). ``repro_dir``, when
+    set, writes a reproduction bundle for every FAIL/ERROR. ``artifacts_dir`` writes the run's
+    NDJSON/JUnit/JSON.
+    """
+    from .repro import write_repro_bundle           # local import avoids a cycle at module load
+
+    skip = frozenset(skip_tags)
     run_id = f"{now_iso().replace(':', '').replace('-', '')[:15]}-{uuid.uuid4().hex[:8]}"
     started = now_iso()
     with Timer() as run_timer:
-        results = [_run_one(s, redact_output=redact_output) for s in suite.scenarios]
+        results = [_run_one(s, redact_output=redact_output, skip_tags=skip) for s in suite.scenarios]
     report = RunReport(run_id, suite.name, environment_fingerprint(include_host=include_host),
                        results, started, round(run_timer.ms, 3))
     if artifacts_dir is not None:
         write_artifacts(report, artifacts_dir)
+    if repro_dir is not None:
+        for r in results:
+            if r.status in (Status.FAIL, Status.ERROR):
+                write_repro_bundle(r, report, repro_dir)
     return report
 
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import traceback
 from dataclasses import dataclass, field
@@ -41,6 +42,10 @@ class CallableAdapter:
 
     def __init__(self, fn: Callable[[int], dict | None]):
         self._fn = fn
+
+    def describe(self, seed: int) -> str:
+        name = getattr(self._fn, "__qualname__", repr(self._fn))
+        return f"in-process callable {name} (seed={seed})"
 
     def run(self, seed: int) -> AdapterOutcome:
         try:
@@ -64,6 +69,11 @@ class CommandAdapter:
         self._env = env
         self._timeout = timeout
         self._seed_env = seed_env
+
+    def describe(self, seed: int) -> str:
+        """The exact shell command to reproduce this run, with the seed pinned via its env var."""
+        prefix = f"{self._seed_env}={seed} " if self._seed_env else ""
+        return prefix + shlex.join(self._argv)
 
     def run(self, seed: int) -> AdapterOutcome:
         env = {**os.environ, **(self._env or {})}

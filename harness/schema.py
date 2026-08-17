@@ -50,6 +50,7 @@ class ScenarioResult:
     stdout: str = ""
     stderr: str = ""
     error: str | None = None
+    repro: str = ""            # how to reproduce this exact run (command or callable + seed)
     started_at: str = ""
 
     def to_dict(self) -> dict:

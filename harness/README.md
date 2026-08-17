@@ -39,11 +39,27 @@ gate. Pure Python standard library; runs anywhere with a `python`.
 - **Confidential-data hygiene** — captured stdout/stderr is redacted (secrets, emails, IPs, home paths)
   before it's stored.
 
-## Try it
+## Reliability heart: flakiness gate + repro bundles
+
+A validation suite is only trustworthy if it's itself reliable, and a failure is only actionable if you
+can reproduce it. Two capabilities cover that:
+
+- **Determinism / flakiness gate** (`reliability.py`) — run each scenario *N* times under its seed and
+  classify it: `stable_pass`, `stable_fail` (a real, reproducible defect — not flakiness), `flaky` (the
+  verdict changed between runs — the enemy), or `skipped`. It also reports which *metrics* varied in
+  value (a timing metric varying is expected; a computed result varying is a determinism bug), without
+  failing the gate on that. Flaky scenarios are **quarantined** by tag rather than left to fail
+  intermittently.
+- **Repro bundles** (`repro.py`) — on any FAIL/ERROR, write a self-contained bundle: `bundle.json`
+  (seed, config, environment fingerprint, which checks failed, metrics), the captured (**redacted**)
+  `stdout.log`/`stderr.log`, and a `REPRODUCE.txt` with the exact seed-pinned command to re-run it.
 
 ```bash
-python -m harness --out artifacts     # runs the example suite; writes ndjson/junit/json; exits 0/1
-python -m pytest harness -q           # the harness's own tests (32)
+python -m harness --out artifacts                  # run the suite; write ndjson/junit/json; exit 0/1
+python -m harness --repro-dir repro                 # …and drop a repro bundle for each FAIL/ERROR
+python -m harness --check-determinism --repeats 5   # flakiness gate: fail if any verdict is unstable
+python -m harness --quarantine flaky                # skip scenarios tagged 'flaky'
+python -m pytest harness -q                          # the harness's own tests (46)
 ```
 
 The example suite (`suites/example.py`) drives real, deterministic work: a seeded Monte-Carlo estimate,
@@ -67,8 +83,7 @@ and an optional scenario that drives the **Java matching engine** as a subproces
 
 This foundation is the schema everything else consumes:
 
-1. **Reliability heart** — a determinism/flakiness gate (run a scenario *N* times, flag nondeterminism,
-   quarantine) and **repro bundles** (seed + config + fingerprint + logs + exact re-run command).
+1. ~~**Reliability heart** — determinism/flakiness gate + repro bundles.~~ **Built** (see above).
 2. **Quality gates** — golden-result baselines + performance-regression thresholds → fail CI on a delta.
 3. **Config-matrix orchestration** — run the suite across a matrix of configurations, aggregate comparable
    results (the OEM/silicon/driver analog).

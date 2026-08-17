@@ -28,6 +28,9 @@ posture and the practices below are enforced.
 - Container images run as a non-root user.
 - Captured logs/telemetry are **redacted** (secrets, emails, IPs, home paths) before storage
   (`harness/telemetry.py`).
+- **Diagnostic reproduction bundles** (`harness/repro.py`) are a deliberate data-egress surface — they
+  are meant to be attached to a ticket or shared — so they contain only already-redacted output and an
+  environment fingerprint whose hostname is opt-in, never raw secrets.
 
 ## Reporting a vulnerability
 

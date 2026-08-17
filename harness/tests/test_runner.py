@@ -62,6 +62,19 @@ def test_stdout_is_redacted_in_stored_results():
     assert "<redacted" in result.stdout
 
 
+def test_skip_tags_quarantine_a_scenario():
+    scn = Scenario("flaky", CallableAdapter(lambda seed: {"m": 10.0}),
+                   checks=[MetricThreshold("m", ">", 1)], tags=["quarantine"])
+    report = run_suite(Suite("s", [scn, _pass("ok")]), skip_tags={"quarantine"})
+    assert report.results[0].status is Status.SKIP and "quarantined" in report.results[0].error
+    assert report.results[1].status is Status.PASS and report.passed
+
+
+def test_result_carries_a_repro_descriptor():
+    report = run_suite(Suite("s", [_pass("a")]))
+    assert "in-process callable" in report.results[0].repro
+
+
 def test_artifacts_are_written_and_junit_parses(tmp_path):
     report = run_suite(Suite("s", [_pass("a")]), artifacts_dir=tmp_path)
     for fname in ("results.ndjson", "junit.xml", "report.json"):

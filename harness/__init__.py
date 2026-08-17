@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from .adapters import AdapterOutcome, CallableAdapter, CommandAdapter
 from .checks import ExitZero, MetricPresent, MetricThreshold, NoError, OutputContains
+from .reliability import DeterminismResult, check_determinism, flakiness_report, gate_passes
+from .repro import write_repro_bundle
 from .runner import exit_code, run_suite, write_artifacts
 from .scenario import Scenario, Suite
 from .schema import CheckResult, RunReport, ScenarioResult, Status
@@ -29,6 +31,8 @@ __all__ = [
     "CallableAdapter", "CommandAdapter", "AdapterOutcome",
     "ExitZero", "NoError", "OutputContains", "MetricPresent", "MetricThreshold",
     "run_suite", "write_artifacts", "exit_code",
+    "check_determinism", "flakiness_report", "gate_passes", "DeterminismResult",
+    "write_repro_bundle",
     "RunReport", "ScenarioResult", "CheckResult", "Status",
     "environment_fingerprint", "redact",
 ]

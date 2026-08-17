@@ -40,3 +40,6 @@ research/reports/
 
 # Validation harness run artifacts
 artifacts/
+
+# Harness reproduction bundles
+repro/
