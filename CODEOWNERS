@@ -1,0 +1,19 @@
+# Code ownership — GitHub requests review from the owner on PRs touching these paths.
+# (Adjust the handle if the GitHub username differs.)
+
+* @ste959
+
+# Component owners
+/backend/            @ste959
+/risk-service/       @ste959
+/frontend/           @ste959
+/research/           @ste959
+/harness/            @ste959
+
+# Governance and agent configuration — change with care
+/CLAUDE.md           @ste959
+/.claude/            @ste959
+/.github/            @ste959
+/CONTRIBUTING.md     @ste959
+/SECURITY.md         @ste959
+/docs/               @ste959
