@@ -21,6 +21,7 @@ from .adapters import AdapterOutcome, CallableAdapter, CommandAdapter
 from .baseline import (Baseline, BaselinePolicy, Comparison, MetricRule, Regression,
                        capture_baseline, compare_to_baseline)
 from .checks import ExitZero, MetricPresent, MetricThreshold, NoError, OutputContains
+from .matrix import Matrix, MatrixReport, run_matrix
 from .reliability import DeterminismResult, check_determinism, flakiness_report, gate_passes
 from .repro import write_repro_bundle
 from .runner import exit_code, run_suite, write_artifacts
@@ -37,6 +38,7 @@ __all__ = [
     "write_repro_bundle",
     "capture_baseline", "compare_to_baseline", "Baseline", "BaselinePolicy", "MetricRule",
     "Regression", "Comparison",
+    "run_matrix", "Matrix", "MatrixReport",
     "RunReport", "ScenarioResult", "CheckResult", "Status",
     "environment_fingerprint", "redact",
 ]

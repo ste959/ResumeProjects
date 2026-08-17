@@ -19,6 +19,7 @@ from pathlib import Path
 from ..adapters import CallableAdapter, CommandAdapter
 from ..baseline import BaselinePolicy, MetricRule
 from ..checks import ExitZero, MetricPresent, MetricThreshold, NoError, OutputContains
+from ..matrix import Matrix
 from ..scenario import Scenario, Suite
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +57,16 @@ _STATION_UTIL = (
     "print('LAB_RESULT ' + json.dumps({'answer': 42, 'seed_echo': seed}))"
 )
 
+# Reads the LAB_MODE configuration and reports a mode-dependent budget — used by the config matrix to
+# show one suite producing comparable-but-different results across configurations.
+_CONFIG_PROBE = (
+    "import os, json;"
+    "mode=os.environ.get('LAB_MODE','default');"
+    "budget={'default':100,'fast':50,'safe':200}.get(mode,100);"
+    "print(f'probe running in {mode} mode');"
+    "print('LAB_RESULT ' + json.dumps({'budget': budget}))"
+)
+
 
 def _matching_engine_absent() -> str | None:
     classes = _REPO_ROOT / "backend" / "target" / "classes"
@@ -77,6 +88,10 @@ SUITE = Suite("example", [
              checks=[ExitZero(), OutputContains("configuring device"),
                      MetricThreshold("answer", "==", 42), MetricThreshold("seed_echo", "==", 99)]),
 
+    Scenario("config_probe", CommandAdapter([sys.executable, "-c", _CONFIG_PROBE]),
+             tags=["external", "config"],
+             checks=[ExitZero(), MetricPresent("budget"), MetricThreshold("budget", ">", 0)]),
+
     Scenario("matching_engine_smoke",
              CommandAdapter(["java", "-cp", str(_REPO_ROOT / "backend" / "target" / "classes"),
                              "com.bonddesk.oms.matching.MatchingBenchmark", "200000", "50000"],
@@ -91,5 +106,13 @@ SUITE = Suite("example", [
 POLICY = BaselinePolicy(rules={
     "pi_estimate": MetricRule("exact", 0.05),        # seeded → must reproduce within 0.05 anywhere
     "hashes_per_sec": MetricRule("higher", 0.30),    # allow 30% slowdown before failing (CI-noise tolerant)
+})
+
+# Configuration matrix: run the whole suite under three modes. Auto-loaded by `--matrix` beside SUITE.
+# All three pass here (the point is comparable results); config_probe's 'budget' differs by mode.
+MATRIX = Matrix("modes", {
+    "default": {},
+    "fast": {"LAB_MODE": "fast"},
+    "safe": {"LAB_MODE": "safe"},
 })
 

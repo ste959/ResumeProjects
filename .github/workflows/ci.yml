@@ -77,6 +77,8 @@ jobs:
           python -m harness --baseline /tmp/baseline.json
         # Note: perf baselines are hardware-specific, so cross-machine perf gating runs in the lab,
         # not CI. Here we only verify the gate machinery is green on matched hardware.
+      - name: Config-matrix run
+        run: python -m harness --matrix --out artifacts   # run the suite across the example config matrix
       - name: Upload validation results
         if: always()
         uses: actions/upload-artifact@v4

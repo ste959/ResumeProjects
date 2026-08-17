@@ -10,6 +10,7 @@ import argparse
 import importlib
 
 from .baseline import Baseline, BaselinePolicy, capture_baseline, compare_to_baseline
+from .matrix import Matrix, run_matrix
 from .reliability import flakiness_report, gate_passes
 from .runner import exit_code, run_suite
 from .scenario import Suite
@@ -40,6 +41,19 @@ def _load_policy(suite_ref: str, explicit: str | None) -> BaselinePolicy:
     return policy if isinstance(policy, BaselinePolicy) else BaselinePolicy()
 
 
+def _load_matrix(suite_ref: str, explicit: str | None) -> Matrix:
+    """Load a matrix: an explicit module:attr, else a MATRIX beside the suite."""
+    ref = explicit or f"{suite_ref.partition(':')[0]}:MATRIX"
+    module_name, _, attr = ref.partition(":")
+    try:
+        matrix = getattr(importlib.import_module(module_name), attr or "MATRIX")
+    except (ImportError, AttributeError):
+        raise SystemExit(f"could not load matrix {ref!r}")
+    if not isinstance(matrix, Matrix):
+        raise SystemExit(f"{ref} is not a Matrix")
+    return matrix
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m harness", description="Run a validation suite.")
     ap.add_argument("--suite", default="harness.suites.example:SUITE",
@@ -59,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="run the suite and gate against this baseline (regression → non-zero exit)")
     ap.add_argument("--policy", default=None, metavar="mod:attr",
                     help="baseline policy (default: a POLICY beside the suite, if any)")
+    ap.add_argument("--matrix", nargs="?", const="", default=None, metavar="mod:attr",
+                    help="run the suite across a configuration matrix (default: a MATRIX beside the suite)")
     args = ap.parse_args(argv)
 
     suite = _load_suite(args.suite)
@@ -75,6 +91,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.baseline:
         return _baseline_gate(suite, args.baseline, _load_policy(args.suite, args.policy),
                               frozenset(args.quarantine))
+    if args.matrix is not None:
+        return _matrix_gate(suite, _load_matrix(args.suite, args.matrix or None),
+                            frozenset(args.quarantine), args.out)
 
     report = run_suite(suite, artifacts_dir=args.out, include_host=args.include_host,
                        skip_tags=frozenset(args.quarantine), repro_dir=args.repro_dir)
@@ -129,6 +148,25 @@ def _baseline_gate(suite: Suite, baseline_path: str, policy: BaselinePolicy,
         print(f"  REGRESSION [{r.kind}] {r.scenario}: {r.detail}")
     print(f"\n{'PASS: no regressions' if cmp.passed else f'FAIL: {len(cmp.regressions)} regression(s)'}")
     return 0 if cmp.passed else 1
+
+
+def _matrix_gate(suite: Suite, matrix: Matrix, quarantine: frozenset[str], out: str | None) -> int:
+    """Run the suite across the configuration matrix and print a comparable grid."""
+    report = run_matrix(suite, matrix, skip_tags=quarantine)
+    print(f"\nconfig matrix '{matrix.name}': {suite.name} × {len(matrix.configs)} configs\n")
+    print(report.to_grid_text())
+    divergent = report.divergent_scenarios()
+    if divergent:
+        print(f"\n  config-dependent scenarios (verdict varies across configs): {', '.join(divergent)}")
+    if out:
+        from pathlib import Path
+        p = Path(out) / "matrix.json"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(report.to_json())
+        print(f"\nmatrix report → {p}")
+    ok = not report.any_failure()
+    print(f"\n{'PASS: every config clean' if ok else 'FAIL: a configuration produced FAIL/ERROR'}")
+    return 0 if ok else 1
 
 
 def _fmt(v) -> str:

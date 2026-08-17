@@ -83,6 +83,29 @@ python -m harness --capture-baseline baseline.json   # snapshot the golden resul
 python -m harness --baseline baseline.json           # gate a later run; regression → non-zero exit
 ```
 
+## Configuration matrix
+
+Run one suite across a matrix of configurations (`matrix.py`) — the OEM / silicon / driver / power-mode
+analog — and aggregate the runs into a comparable grid. A configuration is injected as environment
+variables for the duration of its run (saved and restored around it), so it reaches both external SUTs
+(subprocesses inherit the environment) and in-process ones, with no change to any scenario.
+
+The grid's most valuable output is the set of **config-dependent failures** — scenarios that pass under
+some configurations and fail under others. Those are exactly the findings a matrix exists to surface:
+
+```
+  scenario            default     fast      safe
+  ------------------------------------------------
+  probe                 PASS      PASS      PASS
+  needs_high_budget     FAIL      FAIL      PASS    ◀ diverges
+```
+
+```bash
+python -m harness --matrix                            # run across a MATRIX beside the suite
+python -m harness --matrix mymod:MATRIX --out out     # explicit matrix; write matrix.json
+python run_matrix.py                                  # self-contained demo (comparable metrics + divergence)
+```
+
 The example suite (`suites/example.py`) drives real, deterministic work: a seeded Monte-Carlo estimate,
 a hashing-throughput perf check, an external "station utility" subprocess that emits a result contract,
 and an optional scenario that drives the **Java matching engine** as a subprocess when it's been built
@@ -106,6 +129,5 @@ This foundation is the schema everything else consumes:
 
 1. ~~**Reliability heart** — determinism/flakiness gate + repro bundles.~~ **Built** (see above).
 2. ~~**Quality gates** — golden baselines + performance-regression thresholds.~~ **Built** (see above).
-3. **Config-matrix orchestration** — run the suite across a matrix of configurations, aggregate comparable
-   results (the OEM/silicon/driver analog).
+3. ~~**Config-matrix orchestration** — run the suite across a matrix of configurations.~~ **Built** (see above).
 4. **Security depth** — tamper-evident, hash-chained run records so results can't be quietly altered.
