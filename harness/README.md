@@ -106,6 +106,26 @@ python -m harness --matrix mymod:MATRIX --out out     # explicit matrix; write m
 python run_matrix.py                                  # self-contained demo (comparable metrics + divergence)
 ```
 
+## Tamper-evident results
+
+When a partner runs the suite on their hardware and submits results, those results have to be
+trustworthy. A run can be **sealed** (`integrity.py`): each result's material verdict (id, status, seed,
+metrics, checks — not timing or logs) is hashed and hash-chained, and the chain head is recorded.
+Re-verifying recomputes the chain and, on a mismatch, **pinpoints the first altered result**.
+
+Two honestly-distinct levels:
+
+- **Integrity** (`sha256-chain`) — any altered / added / removed / reordered result is detected, *if the
+  seal is anchored somewhere the tamperer can't also rewrite* (published, or held by the verifier).
+- **Authenticity** (`hmac-sha256-chain`, opt-in) — the seal is HMAC-signed with a secret `LAB_SEAL_KEY`
+  (environment only, never committed), so a party without the key can't forge a valid seal over altered
+  results.
+
+```bash
+python -m harness --out artifacts --seal              # write artifacts/seal.json (signed if LAB_SEAL_KEY set)
+python -m harness --verify artifacts/report.json      # recompute + check; non-zero exit if tampered
+```
+
 The example suite (`suites/example.py`) drives real, deterministic work: a seeded Monte-Carlo estimate,
 a hashing-throughput perf check, an external "station utility" subprocess that emits a result contract,
 and an optional scenario that drives the **Java matching engine** as a subprocess when it's been built
@@ -130,4 +150,4 @@ This foundation is the schema everything else consumes:
 1. ~~**Reliability heart** — determinism/flakiness gate + repro bundles.~~ **Built** (see above).
 2. ~~**Quality gates** — golden baselines + performance-regression thresholds.~~ **Built** (see above).
 3. ~~**Config-matrix orchestration** — run the suite across a matrix of configurations.~~ **Built** (see above).
-4. **Security depth** — tamper-evident, hash-chained run records so results can't be quietly altered.
+4. ~~**Security depth** — tamper-evident, hash-chained run records.~~ **Built** (see above). *Roadmap complete.*

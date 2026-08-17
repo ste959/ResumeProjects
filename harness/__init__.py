@@ -21,6 +21,7 @@ from .adapters import AdapterOutcome, CallableAdapter, CommandAdapter
 from .baseline import (Baseline, BaselinePolicy, Comparison, MetricRule, Regression,
                        capture_baseline, compare_to_baseline)
 from .checks import ExitZero, MetricPresent, MetricThreshold, NoError, OutputContains
+from .integrity import Seal, VerifyResult, result_hash, seal_report, verify_report
 from .matrix import Matrix, MatrixReport, run_matrix
 from .reliability import DeterminismResult, check_determinism, flakiness_report, gate_passes
 from .repro import write_repro_bundle
@@ -39,6 +40,7 @@ __all__ = [
     "capture_baseline", "compare_to_baseline", "Baseline", "BaselinePolicy", "MetricRule",
     "Regression", "Comparison",
     "run_matrix", "Matrix", "MatrixReport",
+    "seal_report", "verify_report", "result_hash", "Seal", "VerifyResult",
     "RunReport", "ScenarioResult", "CheckResult", "Status",
     "environment_fingerprint", "redact",
 ]

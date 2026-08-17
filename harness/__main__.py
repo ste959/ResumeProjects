@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
+import os
 
 from .baseline import Baseline, BaselinePolicy, capture_baseline, compare_to_baseline
+from .integrity import Seal, seal_report, verify_report
 from .matrix import Matrix, run_matrix
 from .reliability import flakiness_report, gate_passes
 from .runner import exit_code, run_suite
@@ -75,7 +78,15 @@ def main(argv: list[str] | None = None) -> int:
                     help="baseline policy (default: a POLICY beside the suite, if any)")
     ap.add_argument("--matrix", nargs="?", const="", default=None, metavar="mod:attr",
                     help="run the suite across a configuration matrix (default: a MATRIX beside the suite)")
+    ap.add_argument("--seal", action="store_true",
+                    help="with --out, write a tamper-evident seal.json (HMAC-signed if LAB_SEAL_KEY is set)")
+    ap.add_argument("--verify", default=None, metavar="report.json",
+                    help="verify a report against its seal (seal.json beside it, or --seal-file)")
+    ap.add_argument("--seal-file", default=None, help="seal to verify against (default: seal.json beside the report)")
     args = ap.parse_args(argv)
+
+    if args.verify:
+        return _verify(args.verify, args.seal_file)
 
     suite = _load_suite(args.suite)
     if args.tag:
@@ -114,6 +125,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"artifacts → {args.out}/  (results.ndjson, junit.xml, report.json)")
     if args.repro_dir and (c["FAIL"] or c["ERROR"]):
         print(f"repro bundles → {args.repro_dir}/{report.run_id}/")
+    if args.seal:
+        if not args.out:
+            raise SystemExit("--seal requires --out (the seal is written beside the report)")
+        seal = seal_report(report.to_dict(), key=os.environ.get("LAB_SEAL_KEY"))
+        seal.save(f"{args.out}/seal.json")
+        print(f"seal → {args.out}/seal.json  ({seal.algo}, {'signed' if seal.signed else 'unsigned'})")
     return exit_code(report)
 
 
@@ -167,6 +184,25 @@ def _matrix_gate(suite: Suite, matrix: Matrix, quarantine: frozenset[str], out: 
     ok = not report.any_failure()
     print(f"\n{'PASS: every config clean' if ok else 'FAIL: a configuration produced FAIL/ERROR'}")
     return 0 if ok else 1
+
+
+def _verify(report_path: str, seal_path: str | None) -> int:
+    """Verify a report against its seal; report tampering and exit non-zero if not intact/authentic."""
+    from pathlib import Path
+    report = json.loads(Path(report_path).read_text())
+    seal_file = seal_path or str(Path(report_path).with_name("seal.json"))
+    seal = Seal.load(seal_file)
+    result = verify_report(report, seal, key=os.environ.get("LAB_SEAL_KEY"))
+
+    print(f"\nverify {report_path} against {seal_file} ({seal.algo})\n")
+    print(f"  integrity   : {'OK' if result.integrity_ok else 'TAMPERED'}")
+    if result.authenticity_ok is not None:
+        print(f"  authenticity: {'OK' if result.authenticity_ok else 'INVALID'}")
+    if result.tampered_at:
+        print(f"  first change: {result.tampered_at}")
+    print(f"  detail      : {result.detail}")
+    print(f"\n{'PASS: sealed record is intact' if result.ok else 'FAIL: record does not match its seal'}")
+    return 0 if result.ok else 1
 
 
 def _fmt(v) -> str:

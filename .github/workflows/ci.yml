@@ -79,6 +79,14 @@ jobs:
         # not CI. Here we only verify the gate machinery is green on matched hardware.
       - name: Config-matrix run
         run: python -m harness --matrix --out artifacts   # run the suite across the example config matrix
+      - name: Tamper-evidence self-check
+        run: |
+          python -m harness --out artifacts --seal        # seal the run
+          python -m harness --verify artifacts/report.json  # intact → passes
+          # Tamper a material field and confirm verification now FAILS (the control actually fires):
+          python -c "import json,pathlib as P; f=P.Path('artifacts/report.json'); d=json.loads(f.read_text()); d['results'][0]['seed']=d['results'][0].get('seed',0)+1; f.write_text(json.dumps(d))"
+          if python -m harness --verify artifacts/report.json >/dev/null; then echo 'tampering NOT detected'; exit 1; fi
+          echo 'tampering correctly detected'
       - name: Upload validation results
         if: always()
         uses: actions/upload-artifact@v4

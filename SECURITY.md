@@ -31,6 +31,12 @@ posture and the practices below are enforced.
 - **Diagnostic reproduction bundles** (`harness/repro.py`) are a deliberate data-egress surface — they
   are meant to be attached to a ticket or shared — so they contain only already-redacted output and an
   environment fingerprint whose hostname is opt-in, never raw secrets.
+- **Tamper-evident result seals** (`harness/integrity.py`) hash-chain a run's results.
+  - The plain `sha256-chain` gives **integrity**: any altered/added/removed/reordered result is
+    detected and pinpointed — *provided the seal is anchored where a tamperer can't also edit it.*
+  - HMAC signing gives **authenticity** (a party without the key can't forge a valid seal). The signing
+    key is supplied via `LAB_SEAL_KEY` in the **environment only** — it is a secret, never committed,
+    and never written into a seal (a seal stores only the HMAC of the chain head, not the key).
 
 ## Reporting a vulnerability
 
