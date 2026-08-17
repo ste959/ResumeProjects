@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
+@org.springframework.security.test.context.support.WithMockUser(roles = "TRADER")   // writes need a role
 class OrderControllerIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Autowired

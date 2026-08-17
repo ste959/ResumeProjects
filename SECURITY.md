@@ -18,12 +18,31 @@ posture and the practices below are enforced.
 - **Dependabot** weekly dependency updates across Maven, npm, pip, and GitHub Actions
   (`.github/dependabot.yml`).
 
+## Authentication & authorization
+
+The Java API enforces authentication and role-based authorization on every request (Spring Security,
+stateless — no server session):
+
+- **Users** authenticate at `POST /api/v1/auth/login` and receive a signed **JWT** (HMAC-SHA256, jjwt).
+  The token carries the subject and roles; it is verified on each request by a stateless filter — a
+  tampered, wrong-key, or expired token is rejected. Passwords are stored **BCrypt-hashed**, never in
+  plaintext, and login returns an identical error for unknown-user / wrong-password / disabled so it
+  can't be used to enumerate accounts.
+- **Machines** authenticate with an `X-API-Key` (constant-time compared) and get `ROLE_SERVICE`.
+- **Authorization** is role-based (`VIEWER` / `TRADER` / `ADMIN` for humans, `SERVICE` for machines).
+  Reads are public; **writes require a role**, enforced at the controller with method security
+  (`@EnableMethodSecurity` + `@PreAuthorize`). A denied write is a clean `403` (not a masked `500`); an
+  unauthenticated write is `401`. Enforcement is **always on** — there is no config flag to disable it.
+- The signing secret comes from `OMS_JWT_SECRET` (**environment only**, never committed; a dev default
+  is used only when unset). Demo users (`admin`/`trader`/`viewer`) are seeded for local use behind
+  `OMS_SEED_DEMO_USERS` and **must be disabled in any real deployment** — the app logs a warning when
+  it seeds them.
+- The Python research service gates mutating routes behind a separate token.
+
 ## Application security practices
 
 - Persistence is parameterized (Spring Data JPA) — no string-built SQL.
 - Kafka deserialization pins trusted packages; no polymorphic default typing.
-- The Java API supports config-gated authentication (`oms.security.enabled` → `X-API-Key`,
-  constant-time compared); the Python research service gates mutating routes behind a token.
 - WebSocket origins are bound to the CORS allow-list, not `*`.
 - Container images run as a non-root user.
 - Captured logs/telemetry are **redacted** (secrets, emails, IPs, home paths) before storage

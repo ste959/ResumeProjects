@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,6 +51,7 @@ public class OrderController {
         return OrderResponse.from(orders.get(orderRef));
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping
     @Operation(summary = "Stage a new order (runs pre-trade compliance at entry)")
     public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request,
@@ -59,18 +61,21 @@ public class OrderController {
         return ResponseEntity.created(location).body(OrderResponse.from(order));
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{orderRef}/stage")
     @Operation(summary = "Release the order to be worked (NEW → STAGED)")
     public OrderResponse stage(@PathVariable String orderRef) {
         return OrderResponse.from(orders.stage(orderRef));
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{orderRef}/route")
     @Operation(summary = "Route the order to an execution venue (STAGED → ROUTED)")
     public OrderResponse route(@PathVariable String orderRef) {
         return OrderResponse.from(orders.route(orderRef));
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{orderRef}/fills")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Report a fill against a working order")
@@ -79,6 +84,7 @@ public class OrderController {
                 orders.recordFill(orderRef, request.quantity(), request.price(), request.venueOrDefault()));
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{orderRef}/cancel")
     @Operation(summary = "Cancel a non-terminal order")
     public OrderResponse cancel(@PathVariable String orderRef,

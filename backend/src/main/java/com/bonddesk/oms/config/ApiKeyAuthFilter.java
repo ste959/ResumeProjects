@@ -36,7 +36,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                         expectedKey.getBytes(java.nio.charset.StandardCharsets.UTF_8),
                         provided.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
             var authentication = new UsernamePasswordAuthenticationToken(
-                    "api-client", null, AuthorityUtils.createAuthorityList("ROLE_API"));
+                    "api-client", null, AuthorityUtils.createAuthorityList("ROLE_SERVICE"));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
         chain.doFilter(request, response);

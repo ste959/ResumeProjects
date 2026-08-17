@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -43,6 +44,20 @@ public class GlobalExceptionHandler {
         // An unmapped path (e.g. a browser hitting "/") is a 404, not a 500. Handling it
         // explicitly stops the catch-all below from masking it as a server error.
         return build(HttpStatus.NOT_FOUND, "No resource for " + req.getRequestURI(), req);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiError> handleBadCredentials(BadCredentialsException ex, HttpServletRequest req) {
+        // Same message for unknown-user / wrong-password / disabled, so login can't enumerate users.
+        return build(HttpStatus.UNAUTHORIZED, "invalid username or password", req);
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(
+            org.springframework.security.access.AccessDeniedException ex, HttpServletRequest req) {
+        // A @PreAuthorize denial (e.g. a VIEWER attempting a write) is 403 — the catch-all below would
+        // otherwise swallow it into a misleading 500.
+        return build(HttpStatus.FORBIDDEN, "insufficient permissions for this action", req);
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)

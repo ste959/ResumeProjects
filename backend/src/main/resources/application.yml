@@ -123,10 +123,13 @@ oms:
     reconcile-positions: false     # snap OMS positions to broker truth on startup / before each auto run
     check-interval-ms: 300000      # how often the scheduler wakes to check market hours + the daily guard
   security:
-    # API authentication (see SecurityConfig). OFF by default so dev/demo runs unauthenticated;
-    # set enabled=true with a strong OMS_API_KEY in any real deployment to require X-API-Key on writes.
-    enabled: ${OMS_SECURITY_ENABLED:false}
-    api-key: ${OMS_API_KEY:}
+    # Authn/authz (see SecurityConfig): JWT for users, API key for machines. Reads are public; writes
+    # require a role (@PreAuthorize). Enforcement is always on.
+    api-key: ${OMS_API_KEY:}                       # machine access (ROLE_SERVICE); blank → inert
+    seed-demo-users: ${OMS_SEED_DEMO_USERS:true}   # seed admin/trader/viewer on first boot — DISABLE in prod
+    jwt:
+      secret: ${OMS_JWT_SECRET:}                   # HMAC signing secret (SHA-256-derived); dev default if blank
+      ttl-minutes: ${OMS_JWT_TTL_MINUTES:60}
   risk:
     # Aggregate pre-trade breaker on the live order path: reject an order that would push a
     # portfolio's total gross notional (open positions + this order) over this limit. A
