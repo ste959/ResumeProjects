@@ -59,7 +59,28 @@ python -m harness --out artifacts                  # run the suite; write ndjson
 python -m harness --repro-dir repro                 # …and drop a repro bundle for each FAIL/ERROR
 python -m harness --check-determinism --repeats 5   # flakiness gate: fail if any verdict is unstable
 python -m harness --quarantine flaky                # skip scenarios tagged 'flaky'
-python -m pytest harness -q                          # the harness's own tests (46)
+python -m pytest harness -q                          # the harness's own tests (57)
+```
+
+## Quality gates: golden baselines + regression thresholds
+
+Capture a run as a **baseline**, then gate later runs against it (`baseline.py`). Three regression
+kinds, judged by what's actually portable:
+
+- **Status** — a scenario that passed now fails. Gated everywhere.
+- **Accuracy** (`exact` rule) — a deterministic metric drifted beyond an absolute tolerance. Gated
+  everywhere, because a seeded computation must reproduce on any machine.
+- **Performance** (`higher`/`lower` rule) — a throughput/latency metric moved the wrong way beyond a
+  relative tolerance. **Gated only on comparable hardware:** a perf baseline from one CPU can't fairly
+  judge a run on another, so across a hardware mismatch these become *drift notes*, not failures.
+
+That split is the honest core of "comparable results across a hardware ecosystem" — status and accuracy
+travel, raw performance doesn't, and the gate says so instead of pretending. A per-suite `POLICY`
+(metric → rule) travels with the suite.
+
+```bash
+python -m harness --capture-baseline baseline.json   # snapshot the golden results
+python -m harness --baseline baseline.json           # gate a later run; regression → non-zero exit
 ```
 
 The example suite (`suites/example.py`) drives real, deterministic work: a seeded Monte-Carlo estimate,
@@ -84,7 +105,7 @@ and an optional scenario that drives the **Java matching engine** as a subproces
 This foundation is the schema everything else consumes:
 
 1. ~~**Reliability heart** — determinism/flakiness gate + repro bundles.~~ **Built** (see above).
-2. **Quality gates** — golden-result baselines + performance-regression thresholds → fail CI on a delta.
+2. ~~**Quality gates** — golden baselines + performance-regression thresholds.~~ **Built** (see above).
 3. **Config-matrix orchestration** — run the suite across a matrix of configurations, aggregate comparable
    results (the OEM/silicon/driver analog).
 4. **Security depth** — tamper-evident, hash-chained run records so results can't be quietly altered.

@@ -18,6 +18,8 @@ harness adapters, deterministic execution, confidential-data redaction, and a CI
 from __future__ import annotations
 
 from .adapters import AdapterOutcome, CallableAdapter, CommandAdapter
+from .baseline import (Baseline, BaselinePolicy, Comparison, MetricRule, Regression,
+                       capture_baseline, compare_to_baseline)
 from .checks import ExitZero, MetricPresent, MetricThreshold, NoError, OutputContains
 from .reliability import DeterminismResult, check_determinism, flakiness_report, gate_passes
 from .repro import write_repro_bundle
@@ -33,6 +35,8 @@ __all__ = [
     "run_suite", "write_artifacts", "exit_code",
     "check_determinism", "flakiness_report", "gate_passes", "DeterminismResult",
     "write_repro_bundle",
+    "capture_baseline", "compare_to_baseline", "Baseline", "BaselinePolicy", "MetricRule",
+    "Regression", "Comparison",
     "RunReport", "ScenarioResult", "CheckResult", "Status",
     "environment_fingerprint", "redact",
 ]

@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 from ..adapters import CallableAdapter, CommandAdapter
+from ..baseline import BaselinePolicy, MetricRule
 from ..checks import ExitZero, MetricPresent, MetricThreshold, NoError, OutputContains
 from ..scenario import Scenario, Suite
 
@@ -83,3 +84,12 @@ SUITE = Suite("example", [
              tags=["external", "device"], skip_if=_matching_engine_absent,
              checks=[ExitZero()]),
 ])
+
+
+# Quality-gate policy for this suite: accuracy is gated everywhere; throughput is gated only on
+# comparable hardware (see baseline.py). Auto-loaded by the CLI when it loads this module's SUITE.
+POLICY = BaselinePolicy(rules={
+    "pi_estimate": MetricRule("exact", 0.05),        # seeded → must reproduce within 0.05 anywhere
+    "hashes_per_sec": MetricRule("higher", 0.30),    # allow 30% slowdown before failing (CI-noise tolerant)
+})
+

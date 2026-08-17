@@ -71,6 +71,12 @@ jobs:
         run: python -m harness --check-determinism --repeats 5   # fail if any scenario's verdict is unstable
       - name: Run the example validation suite (CI gate)
         run: python -m harness --out artifacts --repro-dir repro  # non-zero exit fails on FAIL/ERROR
+      - name: Quality-gate machinery self-check
+        run: |                                      # capture + gate on the same runner (matched hardware)
+          python -m harness --capture-baseline /tmp/baseline.json
+          python -m harness --baseline /tmp/baseline.json
+        # Note: perf baselines are hardware-specific, so cross-machine perf gating runs in the lab,
+        # not CI. Here we only verify the gate machinery is green on matched hardware.
       - name: Upload validation results
         if: always()
         uses: actions/upload-artifact@v4
