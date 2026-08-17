@@ -30,6 +30,12 @@ import java.util.TreeMap;
  * <p>Not thread-safe by design: the engine is a single-threaded core. Concurrency is
  * handled one level up (a lock per book) so the matching path stays allocation-light and
  * branch-predictable.
+ *
+ * <p><b>Two order books, on purpose.</b> This ({@code com.bonddesk.oms.matching.OrderBook}) is the
+ * OMS-integrated desk crosser, wired through {@link MatchingService} into the JPA order/fill lifecycle.
+ * The separate {@code com.bonddesk.exchange.OrderBook} is the standalone, JMH-benchmarked reference
+ * engine with full exchange semantics behind the crypto exchange. Same TreeMap-of-FIFO shape, different
+ * roles; neither is a duplicate of the other.
  */
 public final class OrderBook {
 

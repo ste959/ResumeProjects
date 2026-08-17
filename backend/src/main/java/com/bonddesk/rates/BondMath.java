@@ -2,7 +2,9 @@ package com.bonddesk.rates;
 
 /**
  * Prices a bond off a discount curve and computes its full risk vector — the analytics a rates desk
- * actually trades on:
+ * actually trades on. (Distinct from {@code com.bonddesk.oms.pricing.BondMath}, which is single-bond,
+ * yield-based DCF analytics; this one is curve-based z-spread/DV01/key-rate risk.)
+ *
  * <ul>
  *   <li><b>Price / z-spread</b> — PV of cash flows off the curve plus a constant continuous spread;
  *       {@code zSpread} solves the spread that reprices to a market quote.</li>

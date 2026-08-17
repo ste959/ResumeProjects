@@ -1,5 +1,9 @@
 """Quant Lab — the platform demo: many strategies, ONE pipeline.
 
+(Note: this is the *research* lab demo. The repo-root ``run_lab.py`` is a different thing — the
+validation-harness entry point. Run this one from the ``research/`` directory.)
+
+
 Every strategy below is defined against the same `engine.Strategy` interface and run through the same
 walk-forward engine, the same excess-of-cash evaluation, the same selection-aware gauntlet, and the same
 tearsheet + attribution. Adding a strategy is ~15 lines; it inherits the entire concept→backtest→validate

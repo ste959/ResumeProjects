@@ -10,6 +10,9 @@ import java.util.List;
  * Newton–Raphson), accrued interest, duration, convexity and DV01. Semi-annual coupons,
  * 30/360 day count, priced per 100 of par.
  *
+ * <p>Not to be confused with {@code com.bonddesk.rates.BondMath}: this one is single-bond, yield-based
+ * analytics; the rates one prices off a discount curve and computes the desk's z-spread/key-rate risk.
+ *
  * <p>The maths, not a library, is the point here — this is deliberately hand-rolled to
  * show the numerical method (an iterative root-find plus analytic derivatives).
  */

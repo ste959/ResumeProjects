@@ -36,6 +36,13 @@ import java.util.function.LongSupplier;
  *
  * <p><b>Not thread-safe</b> by design — a single writer thread per book. Every engine event is
  * pushed to the {@link ExchangeListener} in execution order for the market-data feed and analytics.
+ *
+ * <p><b>Two order books, on purpose.</b> This ({@code com.bonddesk.exchange.OrderBook}) is the
+ * standalone, benchmarked <i>reference engine</i> — integer ticks, allocation-light hot path, full
+ * exchange semantics (IOC/FOK/post-only/STP/replace, L2/L3) — driving the crypto exchange simulation.
+ * The separate {@code com.bonddesk.oms.matching.OrderBook} is a simpler CLOB wired into the OMS/JPA
+ * stack (BigDecimal-priced desk orders) for internal crossing. They share the TreeMap-of-FIFO design
+ * but serve different masters; neither is dead code.
  */
 public final class OrderBook {
 
