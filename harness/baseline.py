@@ -149,7 +149,11 @@ def compare_to_baseline(report: RunReport, baseline: Baseline,
             if rule is None or not isinstance(base_val, (int, float)):
                 continue
             if metric not in result.metrics:
-                cmp.regressions.append(Regression(sid, "missing", f"metric {metric!r} no longer reported", metric))
+                msg = f"metric {metric!r} no longer reported"
+                if rule.hardware_sensitive and not hw_ok:
+                    cmp.notes.append(f"{sid}: perf metric absent — {msg} (cross-hardware, not gated)")
+                else:
+                    cmp.regressions.append(Regression(sid, "missing", msg, metric))
                 continue
             cur_val = result.metrics[metric]
             if not isinstance(cur_val, (int, float)) or not rule.regressed(base_val, cur_val):

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from .adapters import AdapterOutcome
 from .scenario import Scenario, Suite
-from .schema import RunReport, ScenarioResult, Status
+from .schema import CheckResult, RunReport, ScenarioResult, Status
 from .telemetry import Timer, environment_fingerprint, now_iso, redact
 
 
@@ -31,6 +31,21 @@ def _safe_run(adapter, seed: int) -> AdapterOutcome:
         return AdapterOutcome(ok=False, error=f"adapter crashed: {type(e).__name__}: {e}")
 
 
+def _safe_checks(outcome: AdapterOutcome, checks) -> tuple[list[CheckResult], bool]:
+    """Evaluate checks with the same fault isolation as the adapter: a check that raises becomes a
+    failing CheckResult and flags the scenario as ERROR (a check that can't run is an infra fault),
+    rather than aborting the whole run."""
+    results, errored = [], False
+    for c in checks:
+        try:
+            results.append(c.evaluate(outcome))
+        except Exception as e:                   # noqa: BLE001 — one bad check must not kill the suite
+            errored = True
+            name = getattr(c, "name", type(c).__name__)
+            results.append(CheckResult(name, False, f"check raised {type(e).__name__}: {e}"))
+    return results, errored
+
+
 def _describe(adapter, seed: int) -> str:
     describe = getattr(adapter, "describe", None)
     try:
@@ -39,9 +54,9 @@ def _describe(adapter, seed: int) -> str:
         return ""
 
 
-def _status(outcome: AdapterOutcome, checks) -> Status:
-    if not outcome.ok:
-        return Status.ERROR                      # the SUT never really ran
+def _status(outcome: AdapterOutcome, checks, check_error: bool) -> Status:
+    if not outcome.ok or check_error:
+        return Status.ERROR                      # the SUT never ran, or a check couldn't be evaluated
     return Status.PASS if all(c.ok for c in checks) else Status.FAIL
 
 
@@ -63,11 +78,12 @@ def _run_one(scenario: Scenario, *, redact_output: bool,
 
     with Timer() as t:
         outcome = _safe_run(scenario.adapter, scenario.seed)
-    checks = [c.evaluate(outcome) for c in scenario.checks]
+    checks, check_error = _safe_checks(outcome, scenario.checks)
+    error = outcome.error or ("a check raised during evaluation" if check_error else None)
 
     return ScenarioResult(
         id=scenario.id,
-        status=_status(outcome, checks),
+        status=_status(outcome, checks, check_error),
         duration_ms=round(t.ms, 3),
         seed=scenario.seed,
         metrics=outcome.metrics,
@@ -76,7 +92,7 @@ def _run_one(scenario: Scenario, *, redact_output: bool,
         exit_code=outcome.exit_code,
         stdout=redact(outcome.stdout) if redact_output else outcome.stdout,
         stderr=redact(outcome.stderr) if redact_output else outcome.stderr,
-        error=outcome.error,
+        error=(redact(error) if (redact_output and error) else error),   # error can carry paths/secrets too
         repro=repro,
         started_at=started,
     )

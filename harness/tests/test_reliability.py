@@ -45,6 +45,19 @@ def test_varying_metric_is_reported_but_does_not_imply_flaky():
     assert "tick" in r.varying_metrics and "v" not in r.varying_metrics
 
 
+def test_alternating_fail_and_error_is_flaky_not_stable_fail():
+    # Verdict flips between FAIL (check fails) and ERROR (adapter crashes) — genuine instability that
+    # must be caught, not collapsed into stable_fail and waved through the gate.
+    counter = {"n": 0}
+    def flip(seed):
+        n = counter["n"]; counter["n"] += 1
+        if n % 2 == 0:
+            raise RuntimeError("crash")          # → ERROR
+        return {"v": 0.0}                         # → FAIL (v > 1 fails)
+    r = check_determinism(_scn("fe", flip, threshold=1.0), repeats=4)
+    assert r.classification == "flaky" and r.is_flaky
+
+
 def test_all_skips_classify_as_skipped():
     scn = Scenario("dev", CallableAdapter(lambda s: {}), skip_if=lambda: "device absent")
     r = check_determinism(scn, repeats=3)

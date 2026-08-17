@@ -62,9 +62,13 @@ def _classify(statuses: list[Status]) -> tuple[str, int]:
         return "skipped", pass_count
     if pass_count == n:
         return "stable_pass", pass_count
-    if pass_count == 0 and skip_count == 0:
-        return "stable_fail", pass_count
-    return "flaky", pass_count                        # mixed verdicts across runs
+    # Flaky = the verdict was not the same every run. Judge on the distinct non-skip verdicts, so a run
+    # that alternates FAIL and ERROR (sometimes the SUT fails a check, sometimes the adapter crashes) is
+    # correctly flaky — not collapsed into stable_fail and waved through the gate.
+    distinct = {s for s in statuses if s is not Status.SKIP}
+    if len(distinct) == 1:
+        return "stable_fail", pass_count             # a single, uniform failing verdict
+    return "flaky", pass_count
 
 
 def check_determinism(scenario: Scenario, *, repeats: int = 5,

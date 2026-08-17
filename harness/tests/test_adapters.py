@@ -41,3 +41,16 @@ def test_command_adapter_missing_binary_is_infra_fault():
 def test_command_adapter_timeout_is_infra_fault():
     out = CommandAdapter([sys.executable, "-c", "import time; time.sleep(5)"], timeout=0.3).run(0)
     assert not out.ok and "timeout" in out.error
+
+
+def test_command_adapter_caps_huge_output():
+    prog = "print('x' * 500_000)"                           # far over the 64 KB store cap
+    out = CommandAdapter([sys.executable, "-c", prog]).run(0)
+    assert out.ok and len(out.stdout) < 200_000 and "truncated" in out.stdout
+
+
+def test_command_adapter_still_parses_result_after_capping():
+    # A LAB_RESULT line must still be found even when other output is large (parse happens pre-cap).
+    prog = "print('y' * 200_000); import json; print('LAB_RESULT ' + json.dumps({'ok': 1}))"
+    out = CommandAdapter([sys.executable, "-c", prog]).run(0)
+    assert out.metrics == {"ok": 1}

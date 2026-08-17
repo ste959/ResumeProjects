@@ -51,6 +51,17 @@ def test_junit_xml_encodes_statuses():
     assert kinds["e"] == ["error"] and kinds["s"] == ["skipped"]
 
 
+def test_empty_report_is_not_passed():
+    assert not RunReport("r", "s", {}, []).passed          # a run that loaded nothing is a false green
+
+
+def test_junit_strips_xml_illegal_control_chars():
+    r = _report(_result("e", Status.ERROR, error="boom\x00\x08", stderr="log\x00line"))
+    xml = r.to_junit_xml()
+    assert "\x00" not in xml and "\x08" not in xml
+    ET.fromstring(xml)                                       # and it still parses
+
+
 def test_report_json_round_trips():
     r = _report(_result("a", Status.PASS, metrics={"x": 2.0}))
     parsed = json.loads(r.to_json())

@@ -44,6 +44,26 @@ def test_cache_is_transparent(cache, env):
     assert _same(direct, cached)
 
 
+def test_corrupt_cache_file_self_heals(tmp_path, env):
+    import pathlib
+    src = "zscore(close)"
+    SignalCache(tmp_path / "c").evaluate(src, env)            # writes the parquet
+    for p in pathlib.Path(tmp_path / "c").glob("*.parquet"):
+        p.write_bytes(b"not a valid parquet file")           # simulate a truncated/corrupt write
+    fresh = SignalCache(tmp_path / "c")                       # empty memory tier → must read disk
+    out = fresh.evaluate(src, env)                            # must recover, not raise
+    assert out is not None and fresh.stats["misses"] == 1     # recomputed rather than poisoned
+    assert SignalCache(tmp_path / "c").evaluate(src, env) is not None  # and a valid file was rewritten
+
+
+def test_interior_index_labels_do_not_collide(cache):
+    vals = _panel(0, n=4)
+    a = vals.copy(); a.index = pd.to_datetime(["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-31"])
+    b = vals.copy(); b.index = pd.to_datetime(["2021-01-01", "2021-01-15", "2021-01-20", "2021-01-31"])
+    # Same shape/values/endpoints, different interior labels → must be different cache keys.
+    assert cache.key("zscore(close)", {"close": a}) != cache.key("zscore(close)", {"close": b})
+
+
 def test_second_call_hits_without_recomputing(cache, env):
     src = "rank(ts_mean(close, 10))"
     cache.evaluate(src, env)

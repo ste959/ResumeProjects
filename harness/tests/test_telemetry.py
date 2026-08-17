@@ -29,5 +29,20 @@ def test_redact_masks_secrets_and_pii():
     assert "<redacted-email>" in out
 
 
+def test_redact_masks_project_and_vendor_key_formats():
+    text = ("APCA_API_KEY_ID=PK12345ABCDE "                 # the repo's own env var (KEY is a middle part)
+            "AKIAIOSFODNN7EXAMPLE ghp_abcdefghij1234567890 "
+            "-----BEGIN PRIVATE KEY-----\nMIIsecretbytes\n-----END PRIVATE KEY-----")
+    out = redact(text)
+    assert "PK12345ABCDE" not in out
+    assert "AKIAIOSFODNN7EXAMPLE" not in out
+    assert "ghp_abcdefghij1234567890" not in out
+    assert "MIIsecretbytes" not in out
+
+
+def test_redact_does_not_mask_ordinary_words():
+    assert "monkey" in redact("the monkey ate a banana")   # case-sensitive env-var rule, not prose
+
+
 def test_redact_is_a_noop_on_empty():
     assert redact("") == ""

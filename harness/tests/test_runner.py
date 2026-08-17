@@ -62,6 +62,35 @@ def test_stdout_is_redacted_in_stored_results():
     assert "<redacted" in result.stdout
 
 
+def test_raising_check_is_isolated_as_ERROR():
+    class Boom:
+        name = "boom"
+        def evaluate(self, outcome):
+            raise ValueError("check blew up")
+    suite = Suite("s", [Scenario("bad", CallableAdapter(lambda s: {"m": 1.0}), checks=[Boom()]), _pass("after")])
+    report = run_suite(suite)
+    assert report.results[0].status is Status.ERROR          # isolated, not an aborted run
+    assert report.results[1].status is Status.PASS           # suite kept going
+
+
+def test_check_on_non_numeric_metric_does_not_abort_the_run():
+    # MetricThreshold('m','>',1) on a string metric raises TypeError — must become ERROR, not crash.
+    scn = Scenario("t", CallableAdapter(lambda s: {"m": "n/a"}), checks=[MetricThreshold("m", ">", 1)])
+    assert run_suite(Suite("s", [scn])).results[0].status is Status.ERROR
+
+
+def test_error_field_is_redacted():
+    def boom(seed):
+        raise RuntimeError("failed with token=SUPERSECRET123")
+    result = run_suite(Suite("s", [Scenario("e", CallableAdapter(boom))])).results[0]
+    assert result.status is Status.ERROR and "SUPERSECRET123" not in (result.error or "")
+
+
+def test_empty_run_is_not_a_pass():
+    report = run_suite(Suite("empty", []))
+    assert not report.passed and exit_code(report) == 1
+
+
 def test_skip_tags_quarantine_a_scenario():
     scn = Scenario("flaky", CallableAdapter(lambda seed: {"m": 10.0}),
                    checks=[MetricThreshold("m", ">", 1)], tags=["quarantine"])

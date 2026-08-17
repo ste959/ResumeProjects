@@ -89,9 +89,16 @@ def test_performance_regression_downgrades_across_hardware():
 
 def test_missing_metric_is_a_regression():
     base = capture_baseline(_report(_X86, _result("a", Status.PASS, {"tput": 1000.0})))
-    now = _report(_X86, _result("a", Status.PASS, {}))               # metric disappeared
+    now = _report(_X86, _result("a", Status.PASS, {}))               # metric disappeared, same HW
     cmp = compare_to_baseline(now, base, _policy())
     assert not cmp.passed and cmp.regressions[0].kind == "missing"
+
+
+def test_missing_perf_metric_is_a_note_across_hardware():
+    base = capture_baseline(_report(_X86, _result("a", Status.PASS, {"tput": 1000.0})))
+    now = _report(_ARM, _result("a", Status.PASS, {}))               # absent, but different CPU
+    cmp = compare_to_baseline(now, base, _policy())
+    assert cmp.passed and any("perf metric absent" in n for n in cmp.notes)  # not gated cross-hardware
 
 
 def test_new_and_removed_scenarios_are_notes():

@@ -14,11 +14,20 @@ time — the whole point of a readiness lab.
 from __future__ import annotations
 
 import json
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 
 SCHEMA_VERSION = 1
+
+# Characters that are illegal in XML 1.0 even escaped; a binary-ish SUT emitting them would otherwise
+# produce a junit.xml that the CI parser rejects.
+_XML_ILLEGAL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _xml_safe(text: str) -> str:
+    return _XML_ILLEGAL.sub("", text or "")
 
 
 class Status(str, Enum):
@@ -78,8 +87,10 @@ class RunReport:
 
     @property
     def passed(self) -> bool:
-        """True only if nothing failed or errored (skips are fine). Drives the CI exit code."""
-        return all(r.status in (Status.PASS, Status.SKIP) for r in self.results)
+        """True only if there was at least one result and nothing failed or errored (skips are fine).
+        An empty run is NOT a pass — a suite that loaded nothing (bad --suite, an over-aggressive
+        --tag/--quarantine) must not exit 0 as a false green."""
+        return bool(self.results) and all(r.status in (Status.PASS, Status.SKIP) for r in self.results)
 
     # -- serialisation -------------------------------------------------------
     def to_dict(self) -> dict:
@@ -128,9 +139,9 @@ class RunReport:
             if r.status is Status.FAIL:
                 failed = [c for c in r.checks if not c.ok]
                 msg = "; ".join(f"{c.name}: {c.detail}" for c in failed) or "check failed"
-                ET.SubElement(case, "failure", {"message": msg}).text = r.stderr[-2000:]
+                ET.SubElement(case, "failure", {"message": _xml_safe(msg)}).text = _xml_safe(r.stderr[-2000:])
             elif r.status is Status.ERROR:
-                ET.SubElement(case, "error", {"message": r.error or "error"}).text = r.stderr[-2000:]
+                ET.SubElement(case, "error", {"message": _xml_safe(r.error or "error")}).text = _xml_safe(r.stderr[-2000:])
             elif r.status is Status.SKIP:
                 ET.SubElement(case, "skipped")
         return ET.tostring(suite, encoding="unicode")

@@ -21,10 +21,33 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import traceback
 from dataclasses import dataclass, field
 from typing import Callable
+
+_MAX_CAPTURE = 64 * 1024        # cap stored stdout/stderr so a chatty SUT can't bloat results/bundles
+
+
+def _cap(text: str | None) -> str:
+    if not text:
+        return ""
+    if len(text) <= _MAX_CAPTURE:
+        return text
+    half = _MAX_CAPTURE // 2
+    return f"{text[:half]}\n...[{len(text) - _MAX_CAPTURE} chars truncated]...\n{text[-half:]}"
+
+
+def _kill_group(proc: "subprocess.Popen") -> None:
+    """Kill the SUT's whole process group, so a wrapper that spawned the real engine doesn't orphan it."""
+    try:
+        if hasattr(os, "killpg"):
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        else:
+            proc.kill()                                    # Windows: no process groups here
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
 
 
 @dataclass
@@ -79,16 +102,23 @@ class CommandAdapter:
         env = {**os.environ, **(self._env or {})}
         if self._seed_env:
             env[self._seed_env] = str(seed)                # let the SUT seed itself deterministically
+        # start_new_session puts the SUT in its own process group so a timeout can reap the whole tree.
         try:
-            proc = subprocess.run(self._argv, cwd=self._cwd, env=env, capture_output=True,
-                                  text=True, timeout=self._timeout)
-        except subprocess.TimeoutExpired as e:
-            return AdapterOutcome(ok=False, error=f"timeout after {self._timeout}s",
-                                  stdout=e.stdout or "", stderr=e.stderr or "")
+            proc = subprocess.Popen(self._argv, cwd=self._cwd, env=env, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True, start_new_session=True)
         except OSError as e:
             return AdapterOutcome(ok=False, error=f"failed to start {self._argv[0]!r}: {e}")
-        return AdapterOutcome(ok=True, exit_code=proc.returncode, stdout=proc.stdout,
-                              stderr=proc.stderr, metrics=self._parse_results(proc.stdout))
+        try:
+            stdout, stderr = proc.communicate(timeout=self._timeout)
+        except subprocess.TimeoutExpired:
+            _kill_group(proc)
+            stdout, stderr = proc.communicate()            # drain whatever the killed SUT left
+            return AdapterOutcome(ok=False, error=f"timeout after {self._timeout}s",
+                                  stdout=_cap(stdout), stderr=_cap(stderr))
+        # Parse the full stdout for the result contract, then cap what we store.
+        metrics = self._parse_results(stdout)
+        return AdapterOutcome(ok=True, exit_code=proc.returncode, stdout=_cap(stdout),
+                              stderr=_cap(stderr), metrics=metrics)
 
     @classmethod
     def _parse_results(cls, stdout: str) -> dict[str, float]:

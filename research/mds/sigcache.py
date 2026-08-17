@@ -21,6 +21,7 @@ Two tiers: a small in-process LRU in front of a content-addressed Parquet store 
 from __future__ import annotations
 
 import hashlib
+import os
 from collections import Counter, OrderedDict
 from pathlib import Path
 
@@ -42,9 +43,10 @@ def _frame_content_hash(df: pd.DataFrame) -> str:
     h = hashlib.blake2b(digest_size=16)
     h.update(repr(df.shape).encode())
     h.update("|".join(map(str, df.columns)).encode())
-    idx = df.index
-    if len(idx):
-        h.update(f"{idx[0]}|{idx[-1]}|{len(idx)}".encode())
+    # Hash the FULL index, not just its endpoints: two panels with the same shape/values but different
+    # interior index labels must not collide to the same key (the returned frame's labels matter to any
+    # consumer that trusts the index).
+    h.update(pd.util.hash_pandas_object(df.index, index=False).values.tobytes())
     try:
         values = np.ascontiguousarray(df.to_numpy(dtype="float64"))
         h.update(values.tobytes())                          # NaN has a canonical float64 bit pattern
@@ -89,20 +91,35 @@ class SignalCache:
 
         path = self.dir / f"{k}.parquet"
         if path.exists():
-            df = read_parquet(path)
-            self._remember(k, df)
-            self._stats["disk_hits"] += 1
-            self._stats["hits"] += 1
-            return df.copy()
+            try:
+                df = read_parquet(path)
+            except Exception:                               # noqa: BLE001 — any read failure = corrupt file
+                path.unlink(missing_ok=True)                # discard the poison and fall through to recompute
+            else:
+                self._remember(k, df)
+                self._stats["disk_hits"] += 1
+                self._stats["hits"] += 1
+                return df.copy()
 
         self._stats["misses"] += 1
         result = sig.evaluate(env)
         if isinstance(result, pd.DataFrame):
-            write_parquet(result, path)
+            self._atomic_write(result, path)
             self._remember(k, result)
             self._stats["writes"] += 1
             return result.copy()
         return result                                       # scalar signal: nothing to cache
+
+    def _atomic_write(self, df: pd.DataFrame, path: Path) -> None:
+        # Write to a unique temp file then atomically rename onto the final content-addressed path, so a
+        # process killed mid-write never leaves a truncated .parquet that would poison that key forever.
+        tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+        try:
+            write_parquet(df, tmp)
+            os.replace(tmp, path)
+        finally:
+            if tmp.exists():
+                tmp.unlink(missing_ok=True)
 
     # -- housekeeping --------------------------------------------------------
     def _remember(self, key: str, df: pd.DataFrame) -> None:
