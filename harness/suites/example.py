@@ -75,6 +75,16 @@ def _matching_engine_absent() -> str | None:
     return None
 
 
+def _load_test_absent() -> str | None:
+    cls = _REPO_ROOT / "backend" / "target" / "test-classes" / "com/bonddesk/exchange/OrderPathLoadTest.class"
+    if not cls.exists():
+        return "load test not built (run: mvn -pl backend -am test-compile)"
+    return None
+
+
+_BACKEND_CP = f"{_REPO_ROOT / 'backend' / 'target' / 'test-classes'}:{_REPO_ROOT / 'backend' / 'target' / 'classes'}"
+
+
 SUITE = Suite("example", [
     Scenario("pi_monte_carlo", CallableAdapter(_estimate_pi), seed=7, tags=["accuracy", "fast"],
              checks=[NoError(), MetricPresent("pi_estimate"),
@@ -98,6 +108,16 @@ SUITE = Suite("example", [
                             timeout=120),
              tags=["external", "device"], skip_if=_matching_engine_absent,
              checks=[ExitZero()]),
+
+    # Performance gate: drive the matching path under concurrent load and assert throughput and tail
+    # latency stay within bounds (a short run: 300ms/level, 8 instruments, up to 4 threads).
+    Scenario("matching_load_gate",
+             CommandAdapter(["java", "-cp", _BACKEND_CP,
+                             "com.bonddesk.exchange.OrderPathLoadTest", "300", "8", "4"], timeout=120),
+             tags=["external", "perf", "device"], skip_if=_load_test_absent,
+             checks=[ExitZero(),
+                     MetricThreshold("throughput_per_sec", ">", 300_000),
+                     MetricThreshold("p99_ns", "<", 100_000)]),
 ])
 
 

@@ -33,6 +33,31 @@ desk orders inside the JPA lifecycle. Each class Javadoc cross-references the ot
 legal-transition state machine, with `@Version` optimistic locking. Every transition publishes an
 `OrderEvent` through the outbox → Kafka → risk service.
 
+## Performance
+
+Two complementary measurements of the matching path:
+
+- **Single-thread microbenchmark** (`OrderBookJmhBenchmark`, JMH) — ~3M ord/s, ~193 B/order, p50 ~230 ns.
+- **Concurrent load / soak test** (`OrderPathLoadTest`) — drives sustained, saturating load from many
+  client threads across many books (mirroring the per-book locking of `MatchingService`) and reports
+  throughput and **tail latency under contention** at each thread count:
+
+  | threads | throughput/s | p50 | p99 | p99.9 |
+  |--:|--:|--:|--:|--:|
+  | 1 | ~2.0M | 295 ns | 0.9 µs | 8 µs |
+  | 2 | ~3.2M | 395 ns | 1.2 µs | 17 µs |
+  | 4 | ~5.0M | 471 ns | 1.6 µs | 7 µs |
+  | 8 | ~5.1M | 754 ns | 6.0 µs | 116 µs |
+
+  The honest finding: throughput scales to ~4 threads, then **flattens while tail latency degrades** —
+  per-book lock contention and memory bandwidth, not more cores, become the limit. (Laptop-class CPU,
+  JDK 21; numbers vary by machine. This isolates the matching core — the full persistence path is
+  DB-bound, tracked in `docs/follow-ups.md`.) The harness runs a short version of this as a
+  **performance gate** (`matching_load_gate`, asserting throughput and p99 stay within bounds).
+
+  Reproduce: `make loadtest` (or `java -cp target/test-classes:target/classes
+  com.bonddesk.exchange.OrderPathLoadTest 2000 16`).
+
 ## Run / test
 
 ```bash

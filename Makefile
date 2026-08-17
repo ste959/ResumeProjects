@@ -84,3 +84,8 @@ test-harness: ## Validation harness tests + the example suite
 .PHONY: harness
 harness: ## Run the validation harness (sealed, with repro bundles)
 	python -m harness --out artifacts --seal --repro-dir repro
+
+.PHONY: loadtest
+loadtest: ## Matching-path load test: throughput + tail latency under concurrent load (thread sweep)
+	cd backend && ./mvnw -q -B test-compile && \
+		java -cp target/test-classes:target/classes com.bonddesk.exchange.OrderPathLoadTest 2000 16
