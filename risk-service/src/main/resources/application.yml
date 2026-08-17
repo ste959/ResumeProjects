@@ -33,6 +33,9 @@ spring:
       # aggregation keeps up as the event rate grows. Per-key ordering is preserved because all events
       # for one order share a partition, and a partition is owned by exactly one consumer thread.
       concurrency: ${RISK_CONSUMER_CONCURRENCY:3}
+      # Continue the OMS's distributed trace: read the traceparent from each record's headers and open
+      # the processing span as a child of the producing request's span.
+      observation-enabled: true
 
 management:
   endpoints:
@@ -46,6 +49,11 @@ management:
   metrics:
     tags:
       application: risk-service
+  tracing:
+    # Sample every trace in this demo so the whole flow is always visible. Turn this down in a real
+    # deployment. Export stays off until a collector endpoint is configured (no reporter is bundled).
+    sampling:
+      probability: ${TRACING_SAMPLE_PROBABILITY:1.0}
 
 oms:
   kafka:
@@ -54,5 +62,7 @@ oms:
 logging:
   level:
     com.bonddesk.risk: INFO
+  # traceId,spanId tie a log line into the distributed trace (grep one order's flow across services);
+  # correlationId is the edge request id echoed to clients. Both are empty off-request.
   pattern:
-    level: "%5p [%X{correlationId:-}]"
+    level: "%5p [%X{traceId:-},%X{spanId:-}] [%X{correlationId:-}]"

@@ -5,6 +5,11 @@ import com.bonddesk.oms.domain.OrderType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Thin REST client for the Alpaca (paper) trading API. Submits equity orders to the
@@ -37,10 +43,18 @@ public class AlpacaBrokerClient {
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
+    private final CircuitBreaker breaker;
+    private final Retry retry;
 
-    public AlpacaBrokerClient(AlpacaProperties props, ObjectMapper json) {
+    public AlpacaBrokerClient(AlpacaProperties props, ObjectMapper json,
+                              CircuitBreakerRegistry circuitBreakers, RetryRegistry retries) {
         this.props = props;
         this.json = json;
+        // One breaker + retry policy (configured in application.yml under resilience4j.*) guards every
+        // outbound venue call, so a broker outage fails fast for all of them rather than hanging each
+        // caller on its own timeout in turn.
+        this.breaker = circuitBreakers.circuitBreaker("alpaca");
+        this.retry = retries.retry("alpaca");
     }
 
     /** Broker's view of an order after submission or reconciliation. */
@@ -82,9 +96,9 @@ public class AlpacaBrokerClient {
         }
         try {
             String encoded = URLEncoder.encode(symbol, StandardCharsets.UTF_8);
-            HttpResponse<String> res = send(HttpRequest.newBuilder()
+            HttpResponse<String> res = guardedSend(HttpRequest.newBuilder()
                     .uri(URI.create(props.getTradingBaseUrl() + "/v2/assets/" + encoded))
-                    .GET());
+                    .GET(), "asset " + symbol);
             if (res.statusCode() / 100 != 2) {
                 log.debug("Alpaca asset lookup for {} returned {}", symbol, res.statusCode());
                 return false;
@@ -113,12 +127,14 @@ public class AlpacaBrokerClient {
         if (order.getOrderType() == OrderType.LIMIT && order.getLimitPrice() != null) {
             body.put("limit_price", order.getLimitPrice().toPlainString());
         }
-        HttpResponse<String> res = send(HttpRequest.newBuilder()
+        HttpResponse<String> res = guardedSend(HttpRequest.newBuilder()
                 .uri(URI.create(props.getTradingBaseUrl() + "/v2/orders"))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString())));
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString())),
+                "submit " + order.getOrderRef());
         if (res.statusCode() / 100 != 2) {
-            throw new IllegalStateException("Alpaca order rejected (" + res.statusCode() + "): " + res.body());
+            // A 4xx here is a terminal rejection (bad symbol/qty, buying power, ...) — not retryable.
+            throw new BrokerRejectedException("Alpaca order rejected (" + res.statusCode() + "): " + res.body());
         }
         return parseOrder(readTree(res.body()));
     }
@@ -126,34 +142,38 @@ public class AlpacaBrokerClient {
     /** Fetch an order by our reference (client_order_id); null if the broker has none. */
     public AlpacaOrder getByClientOrderId(String orderRef) {
         String encoded = URLEncoder.encode(orderRef, StandardCharsets.UTF_8);
-        HttpResponse<String> res = send(HttpRequest.newBuilder()
+        HttpResponse<String> res = guardedSend(HttpRequest.newBuilder()
                 .uri(URI.create(props.getTradingBaseUrl() + "/v2/orders:by_client_order_id?client_order_id=" + encoded))
-                .GET());
+                .GET(), "lookup " + orderRef);
         if (res.statusCode() == 404) {
             return null;
         }
         if (res.statusCode() / 100 != 2) {
-            throw new IllegalStateException("Alpaca lookup failed (" + res.statusCode() + "): " + res.body());
+            throw new BrokerRejectedException("Alpaca lookup failed (" + res.statusCode() + "): " + res.body());
         }
         return parseOrder(readTree(res.body()));
     }
 
-    /** Cancel a working order at the broker. Best-effort. */
+    /** Cancel a working order at the broker. Best-effort — a broker outage never propagates from here. */
     public void cancel(String alpacaOrderId) {
-        HttpResponse<String> res = send(HttpRequest.newBuilder()
-                .uri(URI.create(props.getTradingBaseUrl() + "/v2/orders/" + alpacaOrderId))
-                .DELETE());
-        if (res.statusCode() / 100 != 2 && res.statusCode() != 404) {
-            log.debug("Alpaca cancel of {} returned {}", alpacaOrderId, res.statusCode());
+        try {
+            HttpResponse<String> res = guardedSend(HttpRequest.newBuilder()
+                    .uri(URI.create(props.getTradingBaseUrl() + "/v2/orders/" + alpacaOrderId))
+                    .DELETE(), "cancel " + alpacaOrderId);
+            if (res.statusCode() / 100 != 2 && res.statusCode() != 404) {
+                log.debug("Alpaca cancel of {} returned {}", alpacaOrderId, res.statusCode());
+            }
+        } catch (RuntimeException e) {
+            log.debug("Alpaca cancel of {} failed: {}", alpacaOrderId, e.getMessage());
         }
     }
 
     /** Paper account summary; null if unavailable. */
     public AccountInfo account() {
         try {
-            HttpResponse<String> res = send(HttpRequest.newBuilder()
+            HttpResponse<String> res = guardedSend(HttpRequest.newBuilder()
                     .uri(URI.create(props.getTradingBaseUrl() + "/v2/account"))
-                    .GET());
+                    .GET(), "account");
             if (res.statusCode() / 100 != 2) {
                 return null;
             }
@@ -181,9 +201,9 @@ public class AlpacaBrokerClient {
             return List.of();
         }
         try {
-            HttpResponse<String> res = send(HttpRequest.newBuilder()
+            HttpResponse<String> res = guardedSend(HttpRequest.newBuilder()
                     .uri(URI.create(props.getTradingBaseUrl() + "/v2/positions"))
-                    .GET());
+                    .GET(), "positions");
             if (res.statusCode() / 100 != 2) {
                 log.debug("Alpaca positions fetch returned {}", res.statusCode());
                 return List.of();
@@ -216,9 +236,9 @@ public class AlpacaBrokerClient {
             return new MarketClock(false, null, null, null);
         }
         try {
-            HttpResponse<String> res = send(HttpRequest.newBuilder()
+            HttpResponse<String> res = guardedSend(HttpRequest.newBuilder()
                     .uri(URI.create(props.getTradingBaseUrl() + "/v2/clock"))
-                    .GET());
+                    .GET(), "clock");
             if (res.statusCode() / 100 != 2) {
                 log.debug("Alpaca clock fetch returned {}", res.statusCode());
                 return new MarketClock(false, null, null, null);
@@ -235,7 +255,34 @@ public class AlpacaBrokerClient {
         }
     }
 
-    private HttpResponse<String> send(HttpRequest.Builder builder) {
+    /**
+     * Send an authenticated request through the retry + circuit-breaker policy. A transport error or an
+     * HTTP 5xx becomes a retryable {@link BrokerUnavailableException} (and counts toward the breaker); a
+     * 4xx response is handed back to the caller to interpret (an order rejection, a 404, ...) and stays
+     * out of the breaker's failure accounting — retrying it could never help.
+     */
+    private HttpResponse<String> guardedSend(HttpRequest.Builder builder, String desc) {
+        return execute(() -> {
+            HttpResponse<String> res = rawSend(builder);
+            if (res.statusCode() / 100 == 5) {
+                throw new BrokerUnavailableException("Alpaca " + desc + " -> HTTP " + res.statusCode());
+            }
+            return res;
+        }, desc);
+    }
+
+    /** Decorate a venue call with retry (outer) over the circuit breaker (inner), failing fast when open. */
+    private <T> T execute(Supplier<T> call, String desc) {
+        Supplier<T> guarded = Retry.decorateSupplier(retry, CircuitBreaker.decorateSupplier(breaker, call));
+        try {
+            return guarded.get();
+        } catch (CallNotPermittedException e) {
+            // Breaker is open — don't touch the venue; surface the transient failure callers already handle.
+            throw new BrokerUnavailableException("Alpaca circuit open (" + desc + ")", e);
+        }
+    }
+
+    private HttpResponse<String> rawSend(HttpRequest.Builder builder) {
         try {
             HttpRequest req = builder
                     .header("APCA-API-KEY-ID", props.getKeyId())
@@ -244,7 +291,7 @@ public class AlpacaBrokerClient {
                     .build();
             return http.send(req, HttpResponse.BodyHandlers.ofString());
         } catch (Exception e) {
-            throw new IllegalStateException("Alpaca request failed: " + e.getMessage(), e);
+            throw new BrokerUnavailableException("Alpaca request failed: " + e.getMessage(), e);
         }
     }
 

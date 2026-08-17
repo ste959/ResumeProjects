@@ -34,6 +34,13 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+        <!-- Distributed tracing: continues the trace the OMS started. With listener observation
+             enabled, the traceparent rides the Kafka record headers, so consuming an order event is
+             a child span of the OMS request that produced it. Inert until pointed at a collector. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>

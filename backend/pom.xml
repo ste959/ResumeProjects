@@ -100,6 +100,28 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+        <!-- Distributed tracing: stamps every request/log with a traceId+spanId and propagates the
+             W3C trace context across HTTP and (with observation enabled) Kafka, so one order's flow
+             is a single trace from this service into the risk service. No exporter is bundled, so it
+             is inert until you point management.zipkin.tracing.endpoint at a collector. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
+
+        <!-- Client-side resilience (circuit breaker + retry) for outbound venue calls. Auto-configures
+             the Resilience4j registries from resilience4j.* config and binds their state to metrics and
+             actuator health. -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <!-- Not managed by the Spring Boot 3.3 BOM; 2.2.x is the line built for Spring Boot 3 / Spring 6.1. -->
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
 
         <!-- Event-driven messaging (Phase 2). Auto-config is disabled unless a broker
              is configured, so the app runs fine without Kafka present. -->

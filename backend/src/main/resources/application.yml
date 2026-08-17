@@ -65,9 +65,17 @@ management:
   health:
     diskspace:
       enabled: true
+    circuitbreakers:
+      enabled: true      # surface Resilience4j breaker state under /actuator/health
   metrics:
     tags:
       application: bonddesk-oms
+  tracing:
+    # Sample every trace in this demo so a full order flow is always visible end-to-end. Turn down in
+    # production. Export stays off until management.zipkin.tracing.endpoint points at a collector
+    # (Zipkin/Tempo) — no reporter is bundled, so tracing is otherwise local-only (ids in the logs).
+    sampling:
+      probability: ${TRACING_SAMPLE_PROBABILITY:1.0}
   info:
     env:
       enabled: false     # don't surface environment/config through /actuator/info
@@ -146,10 +154,44 @@ compliance:
   max-security-notional-per-portfolio: 50000000
   min-rating: BB_MINUS
 
+# Client-side resilience for outbound Alpaca (venue) calls. The distinction that makes this correct:
+# only a *transient* failure (IO/timeout/5xx -> BrokerUnavailableException) is retried and counts toward
+# the breaker; a *terminal* business rejection (4xx -> BrokerRejectedException) is neither retried nor
+# recorded, because retrying a rejected order would never succeed and would falsely trip the breaker.
+resilience4j:
+  circuitbreaker:
+    instances:
+      alpaca:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10          # don't judge the failure rate on a tiny sample
+        failure-rate-threshold: 50           # open once >=50% of the window is transient failures
+        wait-duration-in-open-state: 30s     # fail fast for 30s before probing again
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - com.bonddesk.oms.equities.BrokerUnavailableException
+        ignore-exceptions:
+          - com.bonddesk.oms.equities.BrokerRejectedException
+  retry:
+    instances:
+      alpaca:
+        max-attempts: 3
+        wait-duration: 300ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.bonddesk.oms.equities.BrokerUnavailableException
+        ignore-exceptions:
+          - com.bonddesk.oms.equities.BrokerRejectedException
+
 logging:
   level:
     com.bonddesk.oms: INFO
     order-events: INFO
-  # Prefix every log line with the request's correlation id (set by CorrelationIdFilter; empty off-request).
+  # Prefix every log line with the distributed-trace ids (traceId,spanId — Micrometer Tracing) and the
+  # edge correlation id (set by CorrelationIdFilter, echoed to clients). traceId spans services and
+  # Kafka; correlationId is the per-request id a client can grep on. All empty off-request.
   pattern:
-    level: "%5p [%X{correlationId:-}]"
+    level: "%5p [%X{traceId:-},%X{spanId:-}] [%X{correlationId:-}]"

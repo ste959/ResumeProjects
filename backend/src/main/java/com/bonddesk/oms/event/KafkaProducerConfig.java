@@ -53,6 +53,11 @@ public class KafkaProducerConfig {
     @Bean
     public KafkaTemplate<String, OrderEvent> orderEventKafkaTemplate(
             ProducerFactory<String, OrderEvent> factory) {
-        return new KafkaTemplate<>(factory);
+        KafkaTemplate<String, OrderEvent> template = new KafkaTemplate<>(factory);
+        // Emit a producer span per send and inject the W3C trace context into the record headers, so a
+        // consumer that continues the observation ties its processing span to the request that produced
+        // the event — one trace spanning the OMS, the topic, and the risk service.
+        template.setObservationEnabled(true);
+        return template;
     }
 }
