@@ -1,5 +1,6 @@
 import { api } from '../api/client';
 import { usePolling } from '../hooks/usePolling';
+import { Term } from './Term';
 
 const usd = (n: number | null | undefined, dp = 2) =>
   n == null ? '—' : n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: dp });
@@ -21,10 +22,23 @@ export function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) 
 
   return (
     <div className="overview">
+      <section className="ov-intro">
+        <h1 className="ov-title">Trading platform</h1>
+        <p>
+          A live crypto market you can watch, a fixed-income desk where orders are placed and tracked,
+          and a research lab that tests strategies. Under the finance it's a low-latency{' '}
+          <Term>matching engine</Term>, event-driven microservices, and a signal compiler. New to the
+          terms? Hover any <span className="term-hint">dotted</span> word — or read the 3-minute primer
+          in <code>docs/domain-primer.md</code>.
+        </p>
+      </section>
+
       {/* Fixed income */}
       <section className="ov-section clickable">
         <div className="ov-head"><h2>Fixed Income Desk</h2>
           <button type="button" className="ov-go" onClick={() => onNavigate('trading')}>Open desk →</button></div>
+        <p className="ov-explain">Place bond orders and watch them move through compliance, matching, and
+          settlement — an order-lifecycle state machine. <Term>Fill rate</Term> is the share that traded.</p>
         <div className="kpi-row">
           <Kpi label="Total Orders" value={desk.data ? num(desk.data.totalOrders) : '—'} />
           <Kpi label="Fill Rate" value={desk.data ? `${desk.data.fillRatePct.toFixed(1)}%` : '—'} accent="#059669" />
@@ -38,6 +52,8 @@ export function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) 
       <section className="ov-section clickable">
         <div className="ov-head"><h2>Live Markets · Coinbase</h2>
           <button type="button" className="ov-go" onClick={() => onNavigate('market')}>Open market →</button></div>
+        <p className="ov-explain">Real-time prices from a live exchange feed. Each tile is an instrument's
+          last price and its <Term>spread</Term> (the bid–ask gap).</p>
         <div className="kpi-row">
           {(quotes.data ?? []).map((q) => (
             <div className="kpi" key={q.product}>
@@ -54,6 +70,8 @@ export function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) 
       <section className="ov-section clickable">
         <div className="ov-head"><h2>Strategy Engine</h2>
           <button type="button" className="ov-go" onClick={() => onNavigate('strategies')}>Open strategies →</button></div>
+        <p className="ov-explain">Automated trading strategies (execution algos + a <Term>market maker</Term>)
+          running live, with their running P&amp;L.</p>
         <div className="kpi-row">
           <Kpi label="Active Runs" value={num(activeRuns.length)} accent="#1d4ed8" />
           <Kpi label="Total P&L" value={usd(stratPnl)} accent={stratPnl >= 0 ? '#059669' : '#dc2626'} />
@@ -66,9 +84,10 @@ export function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) 
       <section className="ov-section research-card">
         <div className="ov-head"><h2>Quant Research (Python)</h2><span className="ov-go dim">offline · research/</span></div>
         <p className="ov-note">
-          A DuckDB/Parquet warehouse with hand-rolled econometrics (cointegration, OU half-life) and a
-          cost-aware backtester. The BTC/ETH stat-arb study reports an <b>honest verdict</b>: strong
-          in-sample Sharpe but no cointegration → flagged as likely overfit, not alpha.
+          A DuckDB/Parquet warehouse with hand-rolled econometrics (<Term>cointegration</Term>, OU
+          half-life) and a cost-aware <Term>backtest</Term>er. The BTC/ETH <Term>stat-arb</Term> study
+          reports an <b>honest verdict</b>: strong in-sample <Term>Sharpe</Term> but no cointegration →
+          flagged as likely overfit, not alpha.
         </p>
       </section>
     </div>

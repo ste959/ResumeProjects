@@ -24,6 +24,11 @@ nanoseconds), **correctness invariants** (an order book must never violate price
 **large-data research** (thousands of signals over decades of history). Each subsystem below is a real
 answer to one of those.
 
+> **Not a finance person?** You don't need to be. Every domain term maps to a familiar software concept
+> — an *order book* is a priority queue, *matching* is a merge, an *alpha signal* is a pure function over
+> a time-series. The 3-minute **[finance-for-engineers primer](docs/domain-primer.md)** translates it all
+> (and the UI glosses jargon inline on hover).
+
 ## Engineering highlights
 
 | | What it is | The hard part | Evidence |
