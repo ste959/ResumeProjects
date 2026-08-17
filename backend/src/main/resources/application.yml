@@ -37,6 +37,18 @@ spring:
   flyway:
     enabled: false
 
+  # Redis connection for the shared idempotency store. Only contacted when oms.redis.enabled=true;
+  # Lettuce connects lazily, so these settings are inert otherwise.
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+      # We use Redis as a plain key/value store (StringRedisTemplate), not Spring Data Redis
+      # repositories — turning the repository scan off avoids it mis-scanning the JPA repositories.
+      repositories:
+        enabled: false
+
   h2:
     console:
       # OFF by default. The H2 console runs arbitrary SQL and is a known RCE/SSRF vector, so it must
@@ -67,6 +79,10 @@ management:
       enabled: true
     circuitbreakers:
       enabled: true      # surface Resilience4j breaker state under /actuator/health
+    redis:
+      # Off by default: with oms.redis.enabled=false the app uses the in-memory idempotency store and
+      # never talks to Redis, so a Redis ping would falsely mark health DOWN. Turn on alongside Redis.
+      enabled: ${OMS_REDIS_ENABLED:false}
   metrics:
     tags:
       application: bonddesk-oms
@@ -130,6 +146,13 @@ oms:
     auto-enabled: false            # market-hours auto-rebalancer (off — never auto-trades until set true)
     reconcile-positions: false     # snap OMS positions to broker truth on startup / before each auto run
     check-interval-ms: 300000      # how often the scheduler wakes to check market hours + the daily guard
+  redis:
+    # false -> the in-memory idempotency store (single node, the default; app boots with just a JDK).
+    # true  -> the Redis-backed store shared across instances (needs spring.data.redis reachable).
+    enabled: ${OMS_REDIS_ENABLED:false}
+  idempotency:
+    # How long a completed Idempotency-Key outcome is retained so a client retry replays it.
+    ttl: ${OMS_IDEMPOTENCY_TTL:24h}
   security:
     # Authn/authz (see SecurityConfig): JWT for users, API key for machines. Reads are public; writes
     # require a role (@PreAuthorize). Enforcement is always on.

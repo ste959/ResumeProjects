@@ -130,6 +130,14 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
+        <!-- Redis: the shared store behind API idempotency keys (SET NX + TTL). Used only when
+             oms.redis.enabled=true; otherwise an in-memory store backs the same interface, so the app
+             still boots on just a JDK. Lettuce connects lazily, so the dependency alone contacts nothing. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <!-- Schema migrations -->
         <dependency>
             <groupId>org.flywaydb</groupId>
