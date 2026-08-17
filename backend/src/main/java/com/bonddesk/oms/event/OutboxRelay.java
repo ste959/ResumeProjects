@@ -12,9 +12,14 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.kafka.support.SendResult;
+
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -58,6 +63,14 @@ public class OutboxRelay {
     public void drain() {
         List<OutboxEvent> pending =
                 outbox.findByPublishedAtIsNullAndDeadLetteredAtIsNullOrderByIdAsc(Limit.of(BATCH));
+
+        // Phase 1 — fire every send without awaiting each ack. Throughput is then bounded by the
+        // producer's in-flight batching, not by one round-trip per row (the old serial loop capped at
+        // ~100/s). Ordering is still safe: all events for one order share a partition and the idempotent
+        // producer preserves per-partition order across retries, so delivery order == send order here
+        // regardless of the order we await the acks in.
+        List<Map.Entry<OutboxEvent, CompletableFuture<SendResult<String, OrderEvent>>>> inflight =
+                new ArrayList<>(pending.size());
         for (OutboxEvent row : pending) {
             OrderEvent event;
             try {
@@ -68,10 +81,16 @@ public class OutboxRelay {
                 log.error("Outbox row id={} dead-lettered (unparseable payload)", row.getId(), parseEx);
                 continue;
             }
+            inflight.add(Map.entry(row, kafka.send(row.getTopic(), row.getAggregateId(), event)));
+        }
+
+        // Phase 2 — await acks; mark published on confirmed delivery, retry/dead-letter on failure. An
+        // un-acked row simply isn't marked and is retried next tick (a redelivery is harmless: idempotent
+        // producer + latest-event-per-key consumer).
+        for (Map.Entry<OutboxEvent, CompletableFuture<SendResult<String, OrderEvent>>> e : inflight) {
+            OutboxEvent row = e.getKey();
             try {
-                // Block on the broker ack so we only mark published on confirmed delivery.
-                kafka.send(row.getTopic(), row.getAggregateId(), event)
-                        .get(ACK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                e.getValue().get(ACK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 row.markPublished(Instant.now());          // dirty-checked; flushed at commit
             } catch (Exception sendEx) {
                 row.recordFailedAttempt();
@@ -79,12 +98,10 @@ public class OutboxRelay {
                     row.markDeadLettered(Instant.now(), "send failed after " + MAX_SEND_ATTEMPTS + " attempts");
                     log.error("Outbox row id={} dead-lettered after {} send attempts",
                             row.getId(), MAX_SEND_ATTEMPTS, sendEx);
-                    continue;                              // skip the poison head; don't stall forever
+                } else {
+                    log.warn("Outbox row id={} send failed (attempt {}): {}",
+                            row.getId(), row.getAttempts(), sendEx.toString());
                 }
-                // Transient: stop this batch to preserve per-aggregate ordering, retry next tick.
-                log.warn("Outbox relay stalled at id={} (attempt {}): {}",
-                        row.getId(), row.getAttempts(), sendEx.toString());
-                break;
             }
         }
     }

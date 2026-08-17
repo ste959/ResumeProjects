@@ -56,6 +56,14 @@ def test_corrupt_cache_file_self_heals(tmp_path, env):
     assert SignalCache(tmp_path / "c").evaluate(src, env) is not None  # and a valid file was rewritten
 
 
+def test_memory_tier_evicts_on_byte_budget(tmp_path, env):
+    panel_bytes = int(dsl.evaluate("zscore(close)", env).memory_usage(deep=True).sum())
+    c = SignalCache(tmp_path / "c", memory_bytes=panel_bytes + 16)   # room for ~one panel
+    c.evaluate("zscore(close)", env)
+    c.evaluate("rank(close)", env)                                    # same size → evicts the first
+    assert len(c._mem) == 1 and c._mem_bytes <= panel_bytes + 16
+
+
 def test_interior_index_labels_do_not_collide(cache):
     vals = _panel(0, n=4)
     a = vals.copy(); a.index = pd.to_datetime(["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-31"])

@@ -28,6 +28,11 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+    listener:
+      # Consume with N threads (≤ the topic's partition count) instead of a single thread, so risk
+      # aggregation keeps up as the event rate grows. Per-key ordering is preserved because all events
+      # for one order share a partition, and a partition is owned by exactly one consumer thread.
+      concurrency: ${RISK_CONSUMER_CONCURRENCY:3}
 
 management:
   endpoints:

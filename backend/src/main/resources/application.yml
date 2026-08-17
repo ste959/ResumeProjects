@@ -2,15 +2,15 @@ spring:
   application:
     name: bonddesk-oms
 
-  # ~7 @Scheduled jobs (strategy tick, liquidity refresh, L2 flush, curve refresh, recorders)
-  # share this pool. Default size is 1, which serialises them, so one slow job stalls the live
-  # strategy/market-making loop. A pool of 4 lets them run concurrently. (The Alpaca broker
-  # reconciler, whose HTTP calls can block for seconds, runs on its own dedicated executor and
-  # is deliberately not on this shared pool.)
+  # ~11 @Scheduled jobs (strategy tick, liquidity refresh, L2 flush, curve refresh, recorders, the
+  # outbox relay + purge) share this pool. Default size is 1, which serialises them, so one slow job
+  # stalls the live loop; sized above the concurrently-eligible job count so they don't queue behind
+  # each other. (The Alpaca broker reconciler, whose HTTP calls can block for seconds, runs on its own
+  # dedicated executor and is deliberately not on this shared pool.)
   task:
     scheduling:
       pool:
-        size: 4
+        size: 12
 
   # Optional, git-ignored file holding Alpaca API keys for the equities module. "optional:"
   # means the app still boots if it is absent (the equities feed just stays idle).

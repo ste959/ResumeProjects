@@ -58,11 +58,18 @@ def _frame_content_hash(df: pd.DataFrame) -> str:
 class SignalCache:
     """Memoise compiled-signal evaluation, keyed on (expression, the data it reads)."""
 
-    def __init__(self, cache_dir: str | Path | None = None, *, memory_items: int = 128):
+    def __init__(self, cache_dir: str | Path | None = None, *, memory_items: int = 128,
+                 memory_bytes: int = 512 * 1024 * 1024):
         self.dir = Path(cache_dir) if cache_dir is not None else DATA_DIR / "sigcache"
         self.dir.mkdir(parents=True, exist_ok=True)
         self._mem: OrderedDict[str, pd.DataFrame] = OrderedDict()
         self._mem_cap = memory_items
+        # The memory tier is bounded by BYTES as well as item count: 128 big panels (100 MB each at
+        # long-history × thousands of names) would be GBs resident, so evict on an approximate byte
+        # budget too, not just a count.
+        self._mem_byte_cap = memory_bytes
+        self._mem_bytes = 0
+        self._mem_sizes: dict[str, int] = {}
         self._stats: Counter[str] = Counter()
 
     # -- keying --------------------------------------------------------------
@@ -123,14 +130,23 @@ class SignalCache:
 
     # -- housekeeping --------------------------------------------------------
     def _remember(self, key: str, df: pd.DataFrame) -> None:
+        if key in self._mem_sizes:
+            self._mem_bytes -= self._mem_sizes[key]         # replacing an existing entry
+        size = int(df.memory_usage(deep=True).sum())
         self._mem[key] = df
+        self._mem_sizes[key] = size
+        self._mem_bytes += size
         self._mem.move_to_end(key)
-        while len(self._mem) > self._mem_cap:
-            self._mem.popitem(last=False)                   # evict least-recently-used
+        # Evict least-recently-used until under BOTH the item and the byte budget.
+        while self._mem and (len(self._mem) > self._mem_cap or self._mem_bytes > self._mem_byte_cap):
+            old_key, _ = self._mem.popitem(last=False)
+            self._mem_bytes -= self._mem_sizes.pop(old_key, 0)
 
     def clear(self, disk: bool = True) -> None:
         """Drop the in-memory tier (and, by default, delete the on-disk store)."""
         self._mem.clear()
+        self._mem_sizes.clear()
+        self._mem_bytes = 0
         if disk:
             for p in self.dir.glob("*.parquet"):
                 p.unlink()

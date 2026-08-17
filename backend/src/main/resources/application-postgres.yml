@@ -8,6 +8,14 @@ spring:
     username: ${DB_USERNAME:bonddesk}
     password: ${DB_PASSWORD:bonddesk}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # The default 10-connection pool is shared by the fill-write path, the outbox relay, and the
+      # ~12 scheduled jobs — enough to exhaust it under load, where callers then block 30s. Size it for
+      # the workload and fail fast instead.
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: 5
+      connection-timeout: 10000
+      pool-name: oms-pool
 
   jpa:
     hibernate:

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import os
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import BrokenExecutor, ProcessPoolExecutor
 from dataclasses import dataclass
 
 import pandas as pd
@@ -64,16 +64,31 @@ def _context() -> mp.context.BaseContext:
     return mp.get_context()
 
 
-def _run(worker_fn, tasks, init_fn, initargs, workers):
+def _run(worker_fn, tasks, init_fn, initargs, workers, on_crash):
     """Fan ``tasks`` out to ``worker_fn`` across processes, with the shared read-only context built once
     per worker by ``init_fn``. ``init_fn`` also runs in the parent to serve the serial path. Results are
-    returned in input order, so a sweep's output never depends on the scheduler."""
+    returned in input order, so a sweep's output never depends on the scheduler.
+
+    A *hard* worker death (a native segfault, or the OS OOM-killer) breaks the pool and would otherwise
+    lose the whole sweep — so results are collected per-future and a crash is turned into a per-task
+    error result via ``on_crash(task, exc)``, matching the isolation soft failures already get.
+    (A per-task hard timeout is deliberately not attempted: ProcessPoolExecutor can't cancel a running
+    worker cleanly, so a real timeout needs killing the process group, out of scope here.)"""
     init_fn(*initargs)                                   # parent context (serial path)
     if workers == 1 or len(tasks) <= 1:
         return [worker_fn(t) for t in tasks]
+    results: list = [None] * len(tasks)
     with ProcessPoolExecutor(max_workers=workers, mp_context=_context(),
                              initializer=init_fn, initargs=initargs) as pool:
-        return list(pool.map(worker_fn, tasks))
+        futures = {pool.submit(worker_fn, t): i for i, t in enumerate(tasks)}
+        for fut, i in futures.items():
+            try:
+                results[i] = fut.result()
+            except BrokenExecutor as e:                  # the worker/pool died — isolate this task
+                results[i] = on_crash(tasks[i], e)
+            except Exception as e:                       # noqa: BLE001 — any other worker fault
+                results[i] = on_crash(tasks[i], e)
+    return results
 
 
 # ── evaluate_signals ─────────────────────────────────────────────────────────
@@ -108,7 +123,8 @@ def evaluate_signals(signals, env, *, max_workers: int | None = None,
     signals = list(signals)
     cache_dir = str(cache.dir) if cache is not None else None
     workers = _resolve_workers(max_workers, len(signals) or 1)
-    return _run(_eval_one, signals, _eval_init, (env, cache_dir), workers)
+    on_crash = lambda sig, e: SignalResult(sig, False, error=f"worker died: {type(e).__name__}: {e}")
+    return _run(_eval_one, signals, _eval_init, (env, cache_dir), workers, on_crash)
 
 
 # ── backtest_signals ─────────────────────────────────────────────────────────
@@ -155,4 +171,7 @@ def backtest_signals(signals: dict[str, str], prices: pd.DataFrame, *,
     syms = symbols if symbols is not None else list(prices.columns)
     cache_dir = str(cache.dir) if cache is not None else None
     workers = _resolve_workers(max_workers, len(items) or 1)
-    return _run(_bt_one, items, _bt_init, (prices, cfg, syms, warmup, extra_panels, cache_dir), workers)
+    on_crash = lambda item, e: {"name": item[0], "signal": item[1], "ok": False,
+                                "error": f"worker died: {type(e).__name__}: {e}"}
+    return _run(_bt_one, items, _bt_init, (prices, cfg, syms, warmup, extra_panels, cache_dir),
+                workers, on_crash)
