@@ -15,8 +15,8 @@ GitHub Actions runs (build + all suites, plus CodeQL SAST and Trivy image scanni
 | Backend (OMS) | 216 `@Test` (+ jqwik `@Property`) | `cd backend && ./mvnw -B verify` | Unit + web-layer + **Testcontainers integration** (needs Docker; runs in CI) |
 | Risk service | 7 | `cd risk-service && ./mvnw -B verify` | Includes the Avro consumer-contract test |
 | Frontend | 12 | `cd frontend && npm ci && npm test` | Vitest (auth, order ticket, blotter, status) |
-| Research (Python) | 318 | `cd research && python -m pytest -q` | Includes the DSL **differential** test (evaluator vs reference, 1e-12) |
-| Validation harness | 77 | `python -m pytest harness -q` | Pure standard library; determinism gate |
+| Research (Python) | 322 | `cd research && python -m pytest -q` | Includes the DSL **differential** test (evaluator vs reference, 1e-12) |
+| Validation harness | 81 | `python -m pytest harness -q` | Pure standard library; determinism gate |
 
 Run everything with `make test`. Nothing merges unless these gates pass.
 

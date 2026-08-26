@@ -16,7 +16,7 @@ committed guardrails.
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
 ![tests](https://img.shields.io/badge/tests-630%2B%20passing-brightgreen)
-![matching engine](https://img.shields.io/badge/matching%20engine-~3M%20ord%2Fs%20%C2%B7%20p50%20~300ns-blueviolet)
+![matching engine](https://img.shields.io/badge/matching%20engine-~1.9M%20ord%2Fs%20%C2%B7%20p50%20~300ns-blueviolet)
 
 📋 **Every claim here is checkable.** [**EVIDENCE.md**](EVIDENCE.md) maps each one to a test you can run, a
 committed result, or an ADR — with what runs locally vs. in CI. Deep dive:
@@ -37,7 +37,7 @@ answer to one of those.
 
 | | What it is | The hard part | Evidence |
 |---|---|---|---|
-| **Matching engine** | A price-time-priority central limit order book (`com.bonddesk.exchange`) | O(1) cached top-of-book, O(log n) level lookup, O(1) cancel, allocation-free hot path (integer ticks/lots) | **~3M ord/s** single-thread (JMH, `-prof gc` = 193 B/order); a concurrent **load test** ([committed run](docs/benchmarks/matching-loadtest.txt), `make loadtest`) scales to ~4 threads then saturates on lock contention, p50 ~300 ns |
+| **Matching engine** | A price-time-priority central limit order book (`com.bonddesk.exchange`) | O(1) cached top-of-book, O(log n) level lookup, O(1) cancel, allocation-free hot path (integer ticks/lots) | a **load test** ([committed run](docs/benchmarks/matching-loadtest.txt), `make loadtest`) measures **~1.9M ord/s** single-thread through the full order path (p50 ~300 ns), scaling to **~4.9M/s** before saturating on lock contention; a tighter **JMH** microbenchmark of the isolated book ops measures ~3M ops/s |
 | **Event-driven microservices** | An OMS publishes `OrderEvent`s to Kafka; an independent risk service consumes them | The dual-write problem, solved with a **transactional outbox**; idempotent producer + idempotent consumer = **effectively-once** ([writeup](docs/writeups/effectively-once.md)); poison rows dead-lettered | `oms.event`, `risk-service/`; **Avro + Schema Registry** with a CI **schema-compatibility test** that fails the build on a backward-incompatible change ([ADR-0009](docs/adr/0009-schema-registry-avro.md)) |
 | **A compiler** | An alpha-signal DSL — `rank(ts_delta(close,5)) - 0.5*zscore(volume)` | Lexer → **Pratt parser** → semantic checker → evaluator lowering to vectorized NumPy; the AST fingerprint drives a content-addressed cache and a parallel executor | `research/mds/alphadsl`, a **differential test** pinning the evaluator to the reference to 1e-12 |
 | **Validation harness** | A dependency-free "readiness lab" for validating systems under test | Deterministic runner, pluggable adapters, telemetry (NDJSON/JUnit), a flakiness gate, repro bundles, hardware-aware regression gates, tamper-evident hash-chained results | `harness/` — 81 tests, pure standard library |
@@ -67,8 +67,9 @@ Flyway ▼                   ▼
 ```
 
 The services are genuinely independent (each owns its schema/topic view and deploys on its own); they
-share only the **JSON event contract** on the topic — enforced by the contract test — which is what
-keeps them decoupled. See [ADR-0001](docs/adr/0001-transactional-outbox.md) for why the outbox, and
+share only the **Avro schema** on the topic — backward-compatibility enforced by the Schema Registry
+([ADR-0009](docs/adr/0009-schema-registry-avro.md)) — which keeps them decoupled. See
+[ADR-0001](docs/adr/0001-transactional-outbox.md) for why the outbox, and
 [ADR-0002](docs/adr/0002-two-matching-engines.md) for why there are two order books.
 
 ## Repository map
@@ -86,11 +87,13 @@ keeps them decoupled. See [ADR-0001](docs/adr/0001-transactional-outbox.md) for 
 
 Claims in this repo are backed by tests, not prose — every number is reproducible from a command.
 
-- **~600 automated tests** — Java 189 (incl. **jqwik property-based** invariants on the order book +
-  **Testcontainers** integration tests against real Postgres), Python research 323, harness 81, frontend 8.
+- **630+ automated tests** — Java 223 (backend + risk; incl. **jqwik property-based** invariants on the
+  order book + **Testcontainers** integration tests against real Postgres), Python 322 (research) + 81
+  (harness), TypeScript 12 (frontend).
 - **The strong kinds, on purpose:** *property-based* (invariants across generated inputs), *differential*
   (a new implementation must equal the reference it replaces, to 1e-12), *determinism / no-look-ahead*
-  (seeded; reproducible), and a *consumer-driven contract test* across the service boundary.
+  (seeded; reproducible), and *schema-compatibility* enforcement across the service boundary (the Schema
+  Registry rejects a backward-incompatible change).
 - **CI** runs the whole matrix on every push — all services, the frontend, the validation harness (tests
   + flakiness gate + a tamper-evidence self-check), plus **CodeQL** SAST, **Trivy** image scanning, and
   **Dependabot**.
@@ -120,7 +123,7 @@ Per component:
 
 ```bash
 cd backend   && ./mvnw -B verify          # matching engine + OMS (Docker for integration tests)
-cd research  && python -m pytest -q        # quant engine + alpha DSL (323 tests)
+cd research  && python -m pytest -q        # quant engine + alpha DSL (322 tests)
 python -m pytest harness -q                # validation harness (81 tests)
 ```
 

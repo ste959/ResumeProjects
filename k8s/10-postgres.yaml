@@ -1,3 +1,5 @@
+# Demo-only credentials for local/cluster bring-up. REPLACE `postgres-credentials` (e.g. via a sealed
+# secret or an external secrets manager) before any non-local use — same posture as the JWT dev default.
 apiVersion: v1
 kind: Secret
 metadata:

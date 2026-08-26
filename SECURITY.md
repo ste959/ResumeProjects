@@ -30,9 +30,14 @@ stateless — no server session):
   can't be used to enumerate accounts.
 - **Machines** authenticate with an `X-API-Key` (constant-time compared) and get `ROLE_SERVICE`.
 - **Authorization** is role-based (`VIEWER` / `TRADER` / `ADMIN` for humans, `SERVICE` for machines).
-  Reads are public; **writes require a role**, enforced at the controller with method security
-  (`@EnableMethodSecurity` + `@PreAuthorize`). A denied write is a clean `403` (not a masked `500`); an
-  unauthenticated write is `401`. Enforcement is **always on** — there is no config flag to disable it.
+  Reads are public and **every write requires at least an authenticated principal** (the filter chain's
+  `anyRequest().authenticated()`). The regulated **order-entry path** (`OrderController`) additionally
+  enforces **role-based** authorization with method security (`@EnableMethodSecurity` + `@PreAuthorize`:
+  `TRADER`/`ADMIN`/`SERVICE`); a denied write there is a clean `403` (not a masked `500`), an
+  unauthenticated write is `401`. The other desks (exchange, market, strategies, RFQ, rates, tax,
+  rebalance) are login-gated demo surfaces — authenticated, but not yet role-restricted at the controller;
+  extending `@PreAuthorize` to those write endpoints is a tracked hardening item. Enforcement is
+  **always on** — there is no config flag to disable it.
 - The signing secret comes from `OMS_JWT_SECRET` (**environment only**, never committed; a dev default
   is used only when unset). Demo users (`admin`/`trader`/`viewer`) are seeded for local use behind
   `OMS_SEED_DEMO_USERS` and **must be disabled in any real deployment** — the app logs a warning when

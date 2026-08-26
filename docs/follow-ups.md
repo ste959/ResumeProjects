@@ -21,20 +21,19 @@ than the current honest throughput ceiling.
 `FillRecorder` retry/dead-letter behavior; add integration tests asserting N-level sweeps produce one
 transaction and identical final state.
 
-## 2. Blotter pagination (scale)
+## 2. Blotter pagination (scale) — ✅ SHIPPED
 
-**What.** `OrderRepository.findAllByOrderByCreatedAtDesc` (and the status/portfolio variants) return the
-entire result set with an `@EntityGraph` collection fetch — fine now, an OOM risk at 100× orders.
+**What it was.** `GET /api/orders` returned the entire result set with an `@EntityGraph` collection fetch
+— fine at demo size, an OOM risk at 100× orders.
 
-**Why deferred.** Pagination changes the controller/service API surface (`Pageable` → `Page<Order>`),
-which ripples into the frontend blotter and the existing tests. Worth doing as its own change with the
-frontend updated in lockstep, using **keyset** pagination on the new `(status, created_at)` index (added
-in `V6__query_indexes.sql`) rather than offset pagination.
-
-**Note.** The supporting indexes are already in place (V6), so the query side is ready; only the API
-change remains.
+**Done** (commit `ee06845`). Replaced with **keyset** (cursor) pagination on the `(status, created_at)`
+index from `V6`: `OrderController.list` now returns a `PagedResponse<OrderSummaryResponse>` with an opaque
+cursor, the summary rows drop the per-fill collection so the page query fetches only the to-one security
+(the `LIMIT` is a real SQL limit, not an in-memory slice), and the frontend was updated in lockstep.
+Verified by `OrderRepositoryKeysetTest` (real DB, `@DataJpaTest`) and `CursorTest`. See ADR — the change
+went in with tests, not as a tail-of-session edit.
 
 ---
 
-Both were surfaced by the audit and are real; they are sequenced after the safe, self-contained fixes
-precisely *because* they touch the money path and a public API and deserve dedicated, tested treatment.
+Item 1 (fill batching) is the remaining open follow-up; it is deliberately unrushed *because* it touches
+the order-money path and deserves dedicated, tested treatment. Item 2 above is done.

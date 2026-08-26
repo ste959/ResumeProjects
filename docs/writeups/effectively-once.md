@@ -56,7 +56,7 @@ about *why*.
   reaches the topic **twice**. Here's the subtle part most write-ups get wrong: the idempotent producer
   does **not** save you here — it only de-duplicates retries *within one producer session/epoch*, and a
   relay restart is a new session, so the broker sees a genuinely new record. The duplicate is real on the
-  wire. What makes it harmless is **the consumer**, not the producer: convergent, latest-state-per-order
+  wire. What makes it harmless is **the consumer**, not the producer: last-arrived-wins, per-order
   aggregation means processing that duplicate produces the same result. **Duplicate delivered, but
   effectively-once in outcome.**
 - **A permanently bad row** (unserializable payload, or a send that keeps failing) → it is

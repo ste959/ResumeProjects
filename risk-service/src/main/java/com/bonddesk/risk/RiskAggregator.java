@@ -14,9 +14,11 @@ import java.util.stream.Collectors;
  * Maintains a live, in-memory view of desk risk from the order-event stream.
  *
  * <p>Events are lifecycle updates keyed by order reference, so rather than summing every
- * event (which would double-count), we keep only the <em>latest</em> event per order and
- * derive all aggregates from that current-state map. This makes the aggregation
- * idempotent: replaying the topic yields the same numbers.
+ * event (which would double-count), we keep the last-arrived event per order and derive all
+ * aggregates from that current-state map. It is <em>last-arrived-wins</em>, which is safe because
+ * all events for one order share a partition and are therefore totally ordered — so the last one to
+ * arrive is the newest. That makes the aggregation idempotent under redelivery: replaying the topic
+ * (in that per-key order) yields the same numbers.
  */
 @Component
 public class RiskAggregator {

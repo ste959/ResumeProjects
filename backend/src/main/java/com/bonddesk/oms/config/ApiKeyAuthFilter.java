@@ -15,7 +15,8 @@ import java.io.IOException;
  * Authenticates a request when it carries a valid {@code X-API-Key} header. A match populates the
  * {@link SecurityContextHolder} with an authenticated principal so downstream authorization lets the
  * request through; no header (or a wrong one) leaves the context anonymous, and protected endpoints
- * respond 401/403. Only wired into the chain when {@code oms.security.enabled=true}.
+ * respond 401/403. Always in the chain (see {@code SecurityConfig}); inert unless an
+ * {@code oms.security.api-key} is configured.
  */
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 

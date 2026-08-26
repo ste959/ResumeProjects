@@ -19,10 +19,11 @@ import java.util.stream.StreamSupport;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Producer half of the consumer-driven contract for the {@code order-events} topic. The risk service
- * hand-maintains its own {@code OrderEvent} coupled to this producer only by the JSON contract in
- * {@code /contracts/order-event.json}; this test fails if the producer drifts from it — so renaming an
- * enum value or a field can't silently break downstream risk aggregation.
+ * Producer-side structural check for the {@code order-events} event. The enforced wire contract is now
+ * the Avro schema ({@code schemas/avro/order-event.avsc}), whose compatibility the Schema Registry
+ * guarantees (see {@code OrderEventSchemaCompatibilityTest} + ADR-0009); this test is the lighter
+ * companion that keeps the producer's {@code OrderEvent} field/enum names in step with the human-readable
+ * field reference in {@code /contracts/order-event.json}, so a rename shows up here too.
  */
 class OrderEventContractTest {
 

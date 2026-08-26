@@ -9,6 +9,7 @@ a "connect Alpaca" state rather than an error.
 
 from __future__ import annotations
 
+import hmac
 import os
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
@@ -28,7 +29,9 @@ QD_API_TOKEN = os.environ.get("QD_API_TOKEN", "").strip()
 
 
 def require_token(x_qd_token: str | None = Header(default=None)) -> None:
-    if QD_API_TOKEN and x_qd_token != QD_API_TOKEN:
+    # Constant-time compare so the check can't be used as a timing oracle (mirrors the Java side's
+    # MessageDigest.isEqual in ApiKeyAuthFilter).
+    if QD_API_TOKEN and not hmac.compare_digest(x_qd_token or "", QD_API_TOKEN):
         raise HTTPException(status_code=401, detail="invalid or missing X-QD-Token")
 
 
