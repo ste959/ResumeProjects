@@ -3,7 +3,7 @@
 A polyglot **systems-engineering** project built around a hard problem domain. Trading is the vehicle;
 the substance is software: a sub-microsecond matching engine, event-driven microservices with
 effectively-once messaging, a from-scratch expression **compiler**, and a deterministic **validation
-harness**. Java 21 · Python 3.12 · TypeScript. **~600 automated tests**, built AI-forward behind
+harness**. Java 21 · Python 3.12 · TypeScript. **630+ automated tests**, built AI-forward behind
 committed guardrails.
 
 [![CI](https://github.com/ste959/ResumeProjects/actions/workflows/ci.yml/badge.svg)](https://github.com/ste959/ResumeProjects/actions/workflows/ci.yml)
@@ -15,8 +15,12 @@ committed guardrails.
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Flyway-336791)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-manifests-326CE5)
-![tests](https://img.shields.io/badge/tests-~600%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-630%2B%20passing-brightgreen)
 ![matching engine](https://img.shields.io/badge/matching%20engine-~3M%20ord%2Fs%20%C2%B7%20p50%20~300ns-blueviolet)
+
+📋 **Every claim here is checkable.** [**EVIDENCE.md**](EVIDENCE.md) maps each one to a test you can run, a
+committed result, or an ADR — with what runs locally vs. in CI. Deep dive:
+[**how effectively-once works**](docs/writeups/effectively-once.md).
 
 Why trading? Because it forces the problems worth engineering: **low latency** (a match must clear in
 nanoseconds), **correctness invariants** (an order book must never violate price-time priority),
@@ -33,8 +37,8 @@ answer to one of those.
 
 | | What it is | The hard part | Evidence |
 |---|---|---|---|
-| **Matching engine** | A price-time-priority central limit order book (`com.bonddesk.exchange`) | O(1) cached top-of-book, O(log n) level lookup, O(1) cancel, allocation-free hot path (integer ticks/lots) | **~3M ord/s** single-thread (JMH, `-prof gc` = 193 B/order); a concurrent **load test** shows it scale to ~4 threads then saturate on lock contention with the p99 curve to prove it |
-| **Event-driven microservices** | An OMS publishes `OrderEvent`s to Kafka; an independent risk service consumes them | The dual-write problem, solved with a **transactional outbox**; idempotent producer + latest-event-per-key consumer = effectively-once; poison rows dead-lettered | `oms.event`, `risk-service/`, a consumer-driven **contract test** that fails the build on schema drift |
+| **Matching engine** | A price-time-priority central limit order book (`com.bonddesk.exchange`) | O(1) cached top-of-book, O(log n) level lookup, O(1) cancel, allocation-free hot path (integer ticks/lots) | **~3M ord/s** single-thread (JMH, `-prof gc` = 193 B/order); a concurrent **load test** ([committed run](docs/benchmarks/matching-loadtest.txt), `make loadtest`) scales to ~4 threads then saturates on lock contention, p50 ~300 ns |
+| **Event-driven microservices** | An OMS publishes `OrderEvent`s to Kafka; an independent risk service consumes them | The dual-write problem, solved with a **transactional outbox**; idempotent producer + idempotent consumer = **effectively-once** ([writeup](docs/writeups/effectively-once.md)); poison rows dead-lettered | `oms.event`, `risk-service/`; **Avro + Schema Registry** with a CI **schema-compatibility test** that fails the build on a backward-incompatible change ([ADR-0009](docs/adr/0009-schema-registry-avro.md)) |
 | **A compiler** | An alpha-signal DSL — `rank(ts_delta(close,5)) - 0.5*zscore(volume)` | Lexer → **Pratt parser** → semantic checker → evaluator lowering to vectorized NumPy; the AST fingerprint drives a content-addressed cache and a parallel executor | `research/mds/alphadsl`, a **differential test** pinning the evaluator to the reference to 1e-12 |
 | **Validation harness** | A dependency-free "readiness lab" for validating systems under test | Deterministic runner, pluggable adapters, telemetry (NDJSON/JUnit), a flakiness gate, repro bundles, hardware-aware regression gates, tamper-evident hash-chained results | `harness/` — 81 tests, pure standard library |
 | **Full stack + platform** | React/TS front end, REST + WebSocket, PostgreSQL/Flyway, Docker/K8s, Prometheus/Grafana | Real persistence tested against **real Postgres** (Testcontainers), not H2 stand-ins; graceful shutdown; connection-pool + index tuning | `frontend/`, `backend/`, `docker-compose.yml`, `k8s/` |

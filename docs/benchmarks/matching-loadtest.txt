@@ -1,0 +1,29 @@
+Matching-path concurrent load test — committed result artifact
+==============================================================
+
+Source     : backend/src/test/java/com/bonddesk/exchange/OrderPathLoadTest.java
+Reproduce  : make loadtest        (or: cd backend && ./mvnw -q -B test-compile &&
+             java -cp target/test-classes:target/classes com.bonddesk.exchange.OrderPathLoadTest 2000 16)
+What it does: submits orders through the full order path (per-book locking, 16 instruments) on N worker
+             threads for 2000 ms per level, sweeping thread counts and recording throughput + tail latency.
+
+Conditions : author workstation (macOS, x86_64, JDK 21). Absolute numbers vary by hardware; the SHAPE is
+             the result — near-linear scaling to ~4 threads, then saturation on per-book lock contention,
+             with the p99/p99.9 tail widening as contention rises.
+
+=== Matching-path load test (16 instruments, 2000 ms per level) ===
+  threads      throughput/s          p50          p99        p99.9
+  1               1,914,258        311 ns       1045 ns      11291 ns
+  2               3,047,488        397 ns       2151 ns      18004 ns
+  4               4,672,547        491 ns       1702 ns      11081 ns
+  8               4,872,203        724 ns       2928 ns      85533 ns
+LAB_RESULT {"threads": 8, "throughput_per_sec": 4872203, "p50_ns": 724, "p99_ns": 2928, "p999_ns": 85533, "orders": 9745261}
+
+Reading it:
+  - Single thread: ~1.9M orders/s at p50 ~311 ns through the full submission path.
+  - Scales to ~4.7M/s at 4 threads (2.4x), then only ~4.9M/s at 8 — the per-book lock is the ceiling,
+    which is the honest, expected result for a lock-per-book design and exactly what the test is meant
+    to surface.
+  - The separate JMH microbenchmark (OrderBookJmhBenchmark) measures the pure book operations in
+    isolation (no submission plumbing) and reports ~3M ops/s single-thread — a different, tighter path
+    than this end-to-end number; the two are not the same measurement and should not be conflated.
