@@ -25,5 +25,6 @@ Reading it:
     which is the honest, expected result for a lock-per-book design and exactly what the test is meant
     to surface.
   - The separate JMH microbenchmark (OrderBookJmhBenchmark) measures the pure book operations in
-    isolation (no submission plumbing) and reports ~3M ops/s single-thread — a different, tighter path
+    isolation (no submission plumbing) and reports ~8M ops/s single-thread (see matching-jmh.txt) — a
+    different, tighter path
     than this end-to-end number; the two are not the same measurement and should not be conflated.

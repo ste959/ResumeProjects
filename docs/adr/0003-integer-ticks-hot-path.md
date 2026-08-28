@@ -14,7 +14,7 @@ engine core knows nothing about `BigDecimal` or JPA.
 
 ## Consequences
 - **Gain:** allocation-free, branch-predictable comparisons; deterministic integer arithmetic; the
-  benchmark (~3M ord/s) reflects real engine cost, not boxing.
+  benchmark (~8M ops/s single-thread) reflects real engine cost, not boxing.
 - **Cost:** a tick/lot scale must be defined per instrument, and boundary conversions must be correct
   (tested).
 - **Alternative rejected:** `BigDecimal` end-to-end — correct but too slow and allocation-heavy for the

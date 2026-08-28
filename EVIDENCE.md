@@ -12,7 +12,7 @@ GitHub Actions runs (build + all suites, plus CodeQL SAST and Trivy image scanni
 
 | Suite | Count | Run it | Notes |
 |---|---:|---|---|
-| Backend (OMS) | 216 `@Test` (+ jqwik `@Property`) | `cd backend && ./mvnw -B verify` | Unit + web-layer + **Testcontainers integration** (needs Docker; runs in CI) |
+| Backend (OMS) | 214 run (234 `@Test` + 4 `@Property` incl. integration) | `cd backend && ./mvnw -B verify` | Unit + web-layer + **Testcontainers integration** (needs Docker; the extra ~20 run in CI) |
 | Risk service | 7 | `cd risk-service && ./mvnw -B verify` | Includes the Avro consumer-contract test |
 | Frontend | 12 | `cd frontend && npm ci && npm test` | Vitest (auth, order ticket, blotter, status) |
 | Research (Python) | 322 | `cd research && python -m pytest -q` | Includes the DSL **differential** test (evaluator vs reference, 1e-12) |
@@ -31,7 +31,7 @@ Run everything with `make test`. Nothing merges unless these gates pass.
 | **RBAC** — reads public, writes need a role; a denied write is 403 (not a masked 500) | `OrderControllerSecurityTest`, `JwtServiceTest` · code: `config.SecurityConfig` | local test |
 | **Keyset pagination** — correct order, no gaps/overlaps, stable tie-break | `OrderRepositoryKeysetTest` (real DB via `@DataJpaTest`), `CursorTest` | local test |
 | **Matching-path performance** — p50 ~300 ns; ~1.9M/s single-thread scaling to ~4.9M/s then lock-saturating | Committed run: [docs/benchmarks/matching-loadtest.txt](docs/benchmarks/matching-loadtest.txt) · reproduce: `make loadtest` | committed artifact |
-| **Matching hot path (isolated)** — ~3M ops/s single-thread (a *separate*, tighter measurement) | `OrderBookJmhBenchmark` (JMH); see the note in the load-test artifact on why it differs | benchmark |
+| **Matching hot path (isolated)** — ~8M ops/s single-thread (a *separate*, tighter measurement) | committed run: [docs/benchmarks/matching-jmh.txt](docs/benchmarks/matching-jmh.txt) · reproduce: `make bench` (JMH) | committed artifact |
 | **DSL evaluator matches the reference** to 1e-12 | the differential test in `research/mds/alphadsl` (in the research suite) | local test |
 | **Resilience** — transient venue failures retry & trip a circuit breaker; terminal 4xx don't | `AlpacaBrokerClientResilienceTest` (local HTTP server) · **ADR:** [0008](docs/adr/0008-tracing-and-venue-resilience.md) | local test |
 | **SLO burn-rate alerts** fire on a sustained error spike, quiet on healthy traffic | `make slo-rules` (`promtool test rules`) · policy: [docs/slo.md](docs/slo.md) | rule unit test |

@@ -1,0 +1,25 @@
+Matching-engine JMH throughput microbenchmark — committed result artifact
+=========================================================================
+
+Source     : backend/src/test/java/com/bonddesk/exchange/OrderBookJmhBenchmark.java
+Reproduce  : make bench
+What it does: measures the throughput of the isolated order-book operations (submit/match/cancel replay
+             of a fixed batch, integer ticks/lots, allocation-free hot path) in JMH's Throughput mode,
+             single-thread, with @OperationsPerInvocation counting each book operation.
+
+Conditions : author workstation (macOS, x86_64, JDK 21). JMH: 3 warmup + 6 measurement iterations, 3s
+             each, 1 fork. Absolute numbers are hardware-dependent; the point is the order of magnitude.
+
+Result:
+  Benchmark                          Mode  Cnt        Score        Error  Units
+  OrderBookJmhBenchmark.throughput  thrpt    6  8113960.626 ± 169628.138  ops/s
+
+  Measurement iterations: 8.10M, 8.10M, 8.17M, 8.12M, 8.01M, 8.18M ops/s  (tight; ±170K)
+
+Reading it:
+  - ~8.1M isolated book operations/sec on a single thread.
+  - This is a DIFFERENT, tighter measurement than the end-to-end concurrent load test in
+    matching-loadtest.txt (which drives the full order-submission path, per-book locking, 16 instruments,
+    and reports ~1.9M/s single-thread -> ~4.9M/s at 8 threads with p50 ~300 ns). The two are not the same
+    number and should not be conflated: this benchmark isolates the book's hot path; the load test
+    measures the whole submission path under contention.

@@ -93,3 +93,9 @@ loadtest: ## Matching-path load test: throughput + tail latency under concurrent
 .PHONY: slo-rules
 slo-rules: ## Validate + unit-test the SLO recording/burn-rate rules (needs promtool on PATH)
 	cd monitoring/rules && promtool check rules slo.rules.yml && promtool test rules slo.rules.test.yml
+
+.PHONY: bench
+bench: ## Matching-engine JMH throughput microbenchmark (isolated book ops, single-thread)
+	cd backend && ./mvnw -q -B test-compile dependency:build-classpath -Dmdep.outputFile=target/bench-cp.txt && \
+		java -cp "target/test-classes:target/classes:$$(cat target/bench-cp.txt)" \
+			org.openjdk.jmh.Main 'OrderBookJmhBenchmark.throughput' -wi 3 -w 3s -i 6 -r 3s -f 1 -tu s
