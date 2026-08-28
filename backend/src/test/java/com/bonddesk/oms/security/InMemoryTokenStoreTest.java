@@ -63,6 +63,19 @@ class InMemoryTokenStoreTest {
     }
 
     @Test
+    void expiredRefreshRecordsAreSweptOnNewLoginsSoTheMapStaysBounded() {
+        for (int i = 0; i < 5; i++) {
+            store.issueRefresh("u" + i, List.of("VIEWER"), Duration.ofMinutes(10));
+        }
+        assertThat(store.refreshEntryCount()).isEqualTo(5);
+
+        clock.addAndGet(Duration.ofMinutes(11).toMillis());   // all five lapse
+        store.issueRefresh("fresh", List.of("VIEWER"), ttl);  // a new login triggers the sweep
+
+        assertThat(store.refreshEntryCount()).isEqualTo(1);   // only the fresh record remains
+    }
+
+    @Test
     void accessTokenRevocationExpiresWithTheToken() {
         store.revokeAccess("jti-1", Duration.ofSeconds(30));
         assertThat(store.isAccessRevoked("jti-1")).isTrue();

@@ -23,6 +23,9 @@ Rebuild the token layer to the pattern real identity providers use.
 - **Short access + rotating refresh.** Login returns a short-lived access token and a long-lived,
   opaque, **hashed-at-rest** refresh token. Refreshing rotates it (new token, old one dead); replay of an
   already-rotated token — the signature of a leaked token — is **detected and burns the whole family**.
+  The Redis store makes the check-and-mark-used a single **atomic Lua CAS**, so two concurrent replays
+  can't both succeed; the in-memory store serializes it under a lock and sweeps expired records so it
+  can't grow unbounded.
 - **Revocation.** Logout revokes the refresh family and adds the current access token's `jti` to a
   short-TTL denylist the auth filter checks, so a token can be killed before it expires. The refresh /
   denylist state uses the same in-memory-or-Redis store the idempotency keys do.

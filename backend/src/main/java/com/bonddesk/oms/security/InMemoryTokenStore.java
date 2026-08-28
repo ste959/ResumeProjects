@@ -34,6 +34,7 @@ public class InMemoryTokenStore implements TokenStore {
 
     @Override
     public synchronized String issueRefresh(String username, List<String> roles, Duration ttl) {
+        pruneExpired();   // bound growth: drop lapsed refresh + revocation entries on each new login
         return mint(username, roles, newFamilyId(), ttl);
     }
 
@@ -89,6 +90,19 @@ public class InMemoryTokenStore implements TokenStore {
 
     private void revokeFamily(String familyId) {
         refresh.entrySet().removeIf(e -> e.getValue().familyId().equals(familyId));
+    }
+
+    /** Drop refresh records and denylist entries that have passed their expiry, so neither map grows
+     *  without bound over a long-running process. Called under the instance lock. */
+    private void pruneExpired() {
+        long now = nowMillis.getAsLong();
+        refresh.values().removeIf(rec -> rec.expiresAt() <= now);
+        revokedJti.values().removeIf(expiresAt -> expiresAt <= now);
+    }
+
+    /** Test-only: number of refresh records currently retained. */
+    int refreshEntryCount() {
+        return refresh.size();
     }
 
     private String newFamilyId() {
