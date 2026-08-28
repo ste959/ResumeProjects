@@ -27,8 +27,8 @@ it was built is in [`docs/ai-assisted-engineering.md`](docs/ai-assisted-engineer
 The crown jewel is the [`exchange`](backend/src/main/java/com/bonddesk/exchange/OrderBook.java) matching
 engine: a price-time-priority order book on `TreeMap` price levels + FIFO queues + a hash index —
 **O(log n) level lookup, O(1) cancel, O(1) cached top-of-book**, an allocation-free passive path
-(integer ticks/lots). A **JMH** benchmark (forked JVM, `Blackhole`, `-prof gc`) reports **~3M orders/sec
-single-thread and 193 B/order**, cross-validated by an in-test `ThreadMXBean` measurement.
+(integer ticks/lots). A **JMH** benchmark (forked JVM, `Blackhole`, `-prof gc`) reports **~8M ops/sec
+single-thread and 193 B/op** (committed run: `docs/benchmarks/matching-jmh.txt`, `make bench`).
 
 A self-directed senior-SWE audit drove concrete fixes: a **FOK×self-trade-prevention invariant bug**, a
 **transactional outbox** replacing a dual-write to Kafka, a **dead-letter consumer**, config-gated

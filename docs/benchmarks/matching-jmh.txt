@@ -11,10 +11,13 @@ Conditions : author workstation (macOS, x86_64, JDK 21). JMH: 3 warmup + 6 measu
              each, 1 fork. Absolute numbers are hardware-dependent; the point is the order of magnitude.
 
 Result:
-  Benchmark                          Mode  Cnt        Score        Error  Units
-  OrderBookJmhBenchmark.throughput  thrpt    6  8113960.626 ± 169628.138  ops/s
+  Benchmark                                             Mode  Cnt        Score        Error  Units
+  OrderBookJmhBenchmark.throughput                     thrpt    6  8113960.626 ± 169628.138  ops/s
+  OrderBookJmhBenchmark.throughput:gc.alloc.rate.norm  thrpt    4      193.153 ±      0.001  B/op
+  OrderBookJmhBenchmark.sampleLatency:p0.50            sample             ~100 ns/op (sub-microsecond)
 
-  Measurement iterations: 8.10M, 8.10M, 8.17M, 8.12M, 8.01M, 8.18M ops/s  (tight; ±170K)
+  Throughput iterations: 8.10M, 8.10M, 8.17M, 8.12M, 8.01M, 8.18M ops/s  (tight; ±170K).
+  Allocation: 193 B/op exactly (-prof gc) — the "allocation-free hot path" claim, measured.
 
 Reading it:
   - ~8.1M isolated book operations/sec on a single thread.

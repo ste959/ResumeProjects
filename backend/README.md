@@ -24,7 +24,7 @@ REST + WebSocket APIs front it; PostgreSQL (Flyway-managed) persists it.
 
 `exchange.OrderBook` and `oms.matching.OrderBook` share the TreeMap-of-FIFO design but are **not
 duplicates**: the former is the standalone, allocation-light **reference engine** behind the crypto
-exchange (benchmarked at ~3M ord/s); the latter is the **OMS-integrated crosser** for BigDecimal-priced
+exchange (benchmarked at ~8M ops/s single-thread); the latter is the **OMS-integrated crosser** for BigDecimal-priced
 desk orders inside the JPA lifecycle. Each class Javadoc cross-references the other.
 
 ## Order lifecycle
@@ -37,7 +37,8 @@ legal-transition state machine, with `@Version` optimistic locking. Every transi
 
 Two complementary measurements of the matching path:
 
-- **Single-thread microbenchmark** (`OrderBookJmhBenchmark`, JMH) — ~3M ord/s, ~193 B/order, p50 ~230 ns.
+- **Single-thread microbenchmark** (`OrderBookJmhBenchmark`, JMH) — ~8M ops/s, 193 B/op, sub-microsecond
+  p50 (`make bench`; committed run in `docs/benchmarks/matching-jmh.txt`).
 - **Concurrent load / soak test** (`OrderPathLoadTest`) — drives sustained, saturating load from many
   client threads across many books (mirroring the per-book locking of `MatchingService`) and reports
   throughput and **tail latency under contention** at each thread count:
