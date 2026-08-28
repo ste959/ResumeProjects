@@ -5,6 +5,7 @@ import com.bonddesk.oms.tax.dto.TaxDtos.TaxRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,6 +26,7 @@ public class TaxController {
         this.engine = engine;
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping
     @Operation(summary = "Compute after-tax P&L for a trade sequence under a lot method and regime")
     public TaxReport compute(@RequestBody TaxRequest req) {

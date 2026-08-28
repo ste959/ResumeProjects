@@ -14,16 +14,20 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Authenticates a request carrying a valid {@code Authorization: Bearer <jwt>} header: the token's
- * subject becomes the principal and its roles become {@code ROLE_*} authorities. An absent, malformed,
- * or expired token simply leaves the context anonymous — protected endpoints then respond 401/403.
+ * Authenticates a request carrying a valid {@code Authorization: Bearer <jwt>} header: the access token is
+ * verified (signature via the {@code kid}-selected public key, issuer, audience, expiry) and, unless it has
+ * been revoked (its {@code jti} is on the denylist), its subject becomes the principal and its roles become
+ * {@code ROLE_*} authorities. An absent, malformed, expired, or revoked token simply leaves the context
+ * anonymous — protected endpoints then respond 401/403.
  */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwt;
+    private final TokenStore tokens;
 
-    public JwtAuthenticationFilter(JwtService jwt) {
+    public JwtAuthenticationFilter(JwtService jwt, TokenStore tokens) {
         this.jwt = jwt;
+        this.tokens = tokens;
     }
 
     @Override
@@ -35,11 +39,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 Claims claims = jwt.parse(header.substring(7));
-                List<String> roles = claims.get("roles", List.class);
-                var authorities = (roles == null ? List.<String>of() : roles).stream()
-                        .map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList();
-                var auth = new UsernamePasswordAuthenticationToken(claims.getSubject(), null, authorities);
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                if (claims.getId() != null && tokens.isAccessRevoked(claims.getId())) {
+                    // Token was logged out before it expired — treat as anonymous.
+                    SecurityContextHolder.clearContext();
+                } else {
+                    List<String> roles = claims.get("roles", List.class);
+                    var authorities = (roles == null ? List.<String>of() : roles).stream()
+                            .map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList();
+                    var auth = new UsernamePasswordAuthenticationToken(claims.getSubject(), null, authorities);
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                }
             } catch (Exception e) {
                 // Invalid/expired/tampered token → stay anonymous; don't leak why.
                 SecurityContextHolder.clearContext();

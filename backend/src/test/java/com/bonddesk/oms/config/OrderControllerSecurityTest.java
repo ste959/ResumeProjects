@@ -3,6 +3,7 @@ package com.bonddesk.oms.config;
 import com.bonddesk.oms.controller.OrderController;
 import com.bonddesk.oms.idempotency.IdempotencyStore;
 import com.bonddesk.oms.security.JwtService;
+import com.bonddesk.oms.security.TokenStore;
 import com.bonddesk.oms.service.OrderService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,9 @@ class OrderControllerSecurityTest {
 
     @MockBean
     private IdempotencyStore idempotency;   // OrderController collaborator; unused on these paths
+
+    @MockBean
+    private TokenStore tokens;   // SecurityConfig's Jwt filter needs it; unused under @WithMockUser
 
     @Test
     void unauthenticatedWriteIsUnauthorized() throws Exception {

@@ -1,54 +1,65 @@
-// Client-side auth session: the signed JWT plus the identity it encodes, persisted so a page reload
-// stays logged in. Deliberately framework-agnostic (no React) so the API client can read the token
-// without importing the component tree — that keeps client.ts <- session.ts a one-way dependency.
+// Client-side auth session: a short-lived access token (sent as the bearer) plus a long-lived refresh
+// token used to mint new access tokens without re-login. Persisted so a reload stays signed in.
+// Deliberately framework-agnostic (no React) so the API client can read/rotate tokens without importing
+// the component tree — that keeps client.ts <- session.ts a one-way dependency.
 
 const STORAGE_KEY = 'bonddesk.auth';
 
 export type Role = 'VIEWER' | 'TRADER' | 'ADMIN' | 'SERVICE';
 
-/** The login response returned by POST /api/v1/auth/login. */
+/** POST /api/v1/auth/login response. */
 export interface LoginResponse {
-  token: string;
+  accessToken: string;
+  refreshToken: string;
   tokenType: string;
   username: string;
   roles: Role[];
-  expiresInMinutes: number;
+  expiresInSeconds: number;
 }
 
-/** The persisted session — the token plus who it belongs to and when it lapses. */
+/** POST /api/v1/auth/refresh response (a rotated pair; no identity fields). */
+export interface RefreshResponse {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiresInSeconds: number;
+}
+
+/** The persisted session. */
 export interface Session {
-  token: string;
+  accessToken: string;
+  refreshToken: string;
   username: string;
   roles: Role[];
-  expiresAt: number; // epoch ms
+  expiresAt: number; // epoch ms — when the access token lapses
 }
 
 let current: Session | null = null;
 
-/** Roles that may perform writes (mirrors the backend @PreAuthorize on OrderController). */
+/** Roles that may perform writes (mirrors the backend @PreAuthorize on the write endpoints). */
 const WRITE_ROLES: Role[] = ['TRADER', 'ADMIN', 'SERVICE'];
 
 export function canWrite(session: Session | null): boolean {
   return session != null && session.roles.some((r) => WRITE_ROLES.includes(r));
 }
 
-/** The raw bearer token for the API client, or null when signed out / expired. */
+/** The current access token for the API client, or null when signed out. */
 export function getToken(): string | null {
-  const s = load();
-  return s ? s.token : null;
+  return load()?.accessToken ?? null;
 }
 
-/** The active session, hydrating from storage on first call and dropping it once expired. */
+/** The refresh token, if any — used by the client to rotate an expired access token. */
+export function getRefreshToken(): string | null {
+  return load()?.refreshToken ?? null;
+}
+
+/** The active session, hydrating from storage on first call. */
 export function load(): Session | null {
-  if (current) {
-    return isExpired(current) ? clear() : current;
-  }
+  if (current) return current;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Session;
-    if (isExpired(parsed)) return clear();
-    current = parsed;
+    current = JSON.parse(raw) as Session;
     return current;
   } catch {
     return null;
@@ -57,19 +68,28 @@ export function load(): Session | null {
 
 /** Persist a fresh login. `now` is injectable so tests aren't wall-clock dependent. */
 export function save(res: LoginResponse, now: number = Date.now()): Session {
-  const session: Session = {
-    token: res.token,
+  current = {
+    accessToken: res.accessToken,
+    refreshToken: res.refreshToken,
     username: res.username,
     roles: res.roles,
-    expiresAt: now + res.expiresInMinutes * 60_000,
+    expiresAt: now + res.expiresInSeconds * 1000,
   };
-  current = session;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-  } catch {
-    /* storage disabled (private mode) — session still works in-memory for this tab */
-  }
-  return session;
+  persist();
+  return current;
+}
+
+/** Apply a refresh: swap in the new access + rotated refresh token, keeping the same identity. */
+export function applyRefresh(res: RefreshResponse, now: number = Date.now()): Session | null {
+  if (!current && !load()) return null;
+  current = {
+    ...(current as Session),
+    accessToken: res.accessToken,
+    refreshToken: res.refreshToken,
+    expiresAt: now + res.expiresInSeconds * 1000,
+  };
+  persist();
+  return current;
 }
 
 export function clear(): null {
@@ -82,6 +102,10 @@ export function clear(): null {
   return null;
 }
 
-function isExpired(s: Session, now: number = Date.now()): boolean {
-  return s.expiresAt <= now;
+function persist(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+  } catch {
+    /* storage disabled (private mode) — session still works in-memory for this tab */
+  }
 }

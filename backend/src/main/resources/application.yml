@@ -171,8 +171,14 @@ oms:
     api-key: ${OMS_API_KEY:}                       # machine access (ROLE_SERVICE); blank → inert
     seed-demo-users: ${OMS_SEED_DEMO_USERS:true}   # seed admin/trader/viewer on first boot — DISABLE in prod
     jwt:
-      secret: ${OMS_JWT_SECRET:}                   # HMAC signing secret (SHA-256-derived); dev default if blank
-      ttl-minutes: ${OMS_JWT_TTL_MINUTES:60}
+      # Access tokens are RS256-signed (asymmetric): the private key stays in-process; verifiers fetch the
+      # public keys from /.well-known/jwks.json and validate by `kid`, so no shared secret is distributed.
+      # Keys are generated at startup; a real deployment would source them from a managed key store.
+      issuer: ${OMS_JWT_ISSUER:bonddesk-oms}
+      audience: ${OMS_JWT_AUDIENCE:bonddesk-api}
+      access-ttl-minutes: ${OMS_JWT_ACCESS_TTL_MINUTES:15}   # short-lived access token
+      refresh-ttl-days: ${OMS_JWT_REFRESH_TTL_DAYS:7}        # long-lived, rotating refresh token
+      jwks-retain: ${OMS_JWT_JWKS_RETAIN:2}                  # signing keys kept verifiable across a rotation
   risk:
     # Aggregate pre-trade breaker on the live order path: reject an order that would push a
     # portfolio's total gross notional (open positions + this order) over this limit. A

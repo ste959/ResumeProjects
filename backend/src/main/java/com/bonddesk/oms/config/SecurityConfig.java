@@ -2,6 +2,7 @@ package com.bonddesk.oms.config;
 
 import com.bonddesk.oms.security.JwtAuthenticationFilter;
 import com.bonddesk.oms.security.JwtService;
+import com.bonddesk.oms.security.TokenStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,21 +43,26 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtService jwt,
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtService jwt, TokenStore tokens,
                                            @Value("${oms.security.api-key:}") String apiKey) throws Exception {
         http.csrf(csrf -> csrf.disable())
             .cors(Customizer.withDefaults())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(h -> h.frameOptions(fo -> fo.sameOrigin()))
-            .addFilterBefore(new JwtAuthenticationFilter(jwt), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new JwtAuthenticationFilter(jwt, tokens), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new ApiKeyAuthFilter(apiKey), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/login").permitAll()
+                // Token endpoints reachable without an access token (they mint/rotate/revoke tokens).
+                .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
+                .requestMatchers("/.well-known/jwks.json", "/oauth2/jwks").permitAll()   // public verification keys
                 .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()                    // read-only market-data push
                 .requestMatchers("/api/v1/auth/me").authenticated()       // who am I → must be logged in
-                .requestMatchers(HttpMethod.GET, "/**").permitAll()       // reads (market data) are public
+                // All GET reads are public in this DEMO — quotes/order books AND the blotter, positions,
+                // and paper-account views. That's a deliberate read-only public surface (no real customer
+                // data); lock the account/blotter reads behind authenticated()/roles for a real deployment.
+                .requestMatchers(HttpMethod.GET, "/**").permitAll()
                 .anyRequest().authenticated())                            // writes require a valid principal
             .exceptionHandling(e -> e.authenticationEntryPoint(
                 (request, response, ex) -> response.sendError(401, "authentication required")));

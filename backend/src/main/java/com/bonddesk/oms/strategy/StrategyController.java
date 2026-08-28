@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,30 +39,35 @@ public class StrategyController {
         return strategies.view(id);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping
     @Operation(summary = "Launch a strategy (TWAP/POV/ALMGREN_CHRISS or AVELLANEDA_STOIKOV)")
     public StrategyView create(@RequestBody CreateStrategyRequest request) {
         return strategies.view(strategies.create(request).id());
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{id}/stop")
     @Operation(summary = "Stop a running strategy")
     public StrategyView stop(@PathVariable String id) {
         return strategies.stop(id);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{id}/pause")
     @Operation(summary = "Pause a running strategy (the runner skips it until resumed)")
     public StrategyView pause(@PathVariable String id) {
         return strategies.pause(id);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{id}/resume")
     @Operation(summary = "Resume a paused strategy")
     public StrategyView resume(@PathVariable String id) {
         return strategies.resume(id);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{id}/modify")
     @Operation(summary = "Modify a running strategy's tunable parameters (POV participation; maker gamma/quoteSize)")
     public StrategyView modify(@PathVariable String id, @RequestBody ModifyStrategyRequest request) {

@@ -7,7 +7,7 @@ import { api } from '../api/client';
 // Mock only the login call; keep the real HttpError for the failure path.
 vi.mock('../api/client', async () => {
   const actual = await vi.importActual<typeof import('../api/client')>('../api/client');
-  return { ...actual, api: { login: vi.fn() } };
+  return { ...actual, api: { login: vi.fn(), logout: vi.fn().mockResolvedValue(undefined) } };
 });
 
 function Harness() {
@@ -32,11 +32,12 @@ describe('AuthContext', () => {
   it('logs in, exposes a write-capable session, and persists it', async () => {
     const user = userEvent.setup();
     vi.mocked(api.login).mockResolvedValue({
-      token: 'jwt.abc.def',
+      accessToken: 'jwt.abc.def',
+      refreshToken: 'refresh.xyz',
       tokenType: 'Bearer',
       username: 'trader',
       roles: ['TRADER'],
-      expiresInMinutes: 60,
+      expiresInSeconds: 900,
     });
 
     render(<AuthProvider><Harness /></AuthProvider>);
@@ -59,7 +60,8 @@ describe('AuthContext', () => {
   it('a viewer is signed in but cannot write', async () => {
     const user = userEvent.setup();
     vi.mocked(api.login).mockResolvedValue({
-      token: 't', tokenType: 'Bearer', username: 'viewer', roles: ['VIEWER'], expiresInMinutes: 60,
+      accessToken: 't', refreshToken: 'r', tokenType: 'Bearer', username: 'viewer', roles: ['VIEWER'],
+      expiresInSeconds: 900,
     });
 
     render(<AuthProvider><Harness /></AuthProvider>);

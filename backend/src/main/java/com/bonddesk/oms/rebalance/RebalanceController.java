@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,6 +33,7 @@ public class RebalanceController {
         this.props = props;
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/rebalance")
     @Operation(summary = "Rebalance a paper equity book toward the research target book (dry run by default)")
     public RebalanceResult rebalance(

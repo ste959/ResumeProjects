@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,12 +40,14 @@ public class ExchangeController {
         return sim.analytics();
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/orders")
     @Operation(summary = "Place an order into the matching engine (as participant YOU)")
     public PlaceResponse place(@RequestBody PlaceRequest request) {
         return sim.place(request);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/orders/{id}/cancel")
     @Operation(summary = "Cancel a resting order")
     public Map<String, Object> cancel(@PathVariable long id) {

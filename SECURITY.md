@@ -23,25 +23,37 @@ posture and the practices below are enforced.
 The Java API enforces authentication and role-based authorization on every request (Spring Security,
 stateless — no server session):
 
-- **Users** authenticate at `POST /api/v1/auth/login` and receive a signed **JWT** (HMAC-SHA256, jjwt).
-  The token carries the subject and roles; it is verified on each request by a stateless filter — a
-  tampered, wrong-key, or expired token is rejected. Passwords are stored **BCrypt-hashed**, never in
-  plaintext, and login returns an identical error for unknown-user / wrong-password / disabled so it
-  can't be used to enumerate accounts.
+- **Users** authenticate at `POST /api/v1/auth/login` and receive a short-lived **access token** plus a
+  long-lived **refresh token**. The access token is an **asymmetrically-signed (RS256) JWT**: the private
+  key stays in-process and verifiers fetch the public keys from the **JWKS endpoint**
+  (`/.well-known/jwks.json`), selecting the right one by the token's `kid` — no shared secret is
+  distributed. Signing keys **rotate** (a retired key stays in the JWKS until its tokens expire, so
+  rotation never breaks an in-flight token; rotation is ADMIN-triggerable). Every access token carries
+  the standard claims — issuer, audience, a unique `jti`, and `iat`/`nbf`/`exp` — all asserted on
+  verification. Passwords are **BCrypt-hashed**, and login returns an identical error for
+  unknown-user / wrong-password / disabled so it can't enumerate accounts.
+- **Token lifecycle & revocation.** Refresh tokens are opaque, stored **hashed**, single-use, and
+  **rotating** — each refresh mints a new one and invalidates the old; presenting an already-rotated
+  token (the signature of a stolen, replayed token) is detected and **revokes the whole token family**.
+  Logout revokes the refresh family and **denylists the current access token's `jti`** for its remaining
+  lifetime (the auth filter checks the denylist). Refresh/revocation state lives in the same in-memory /
+  Redis-selectable store as the idempotency keys.
 - **Machines** authenticate with an `X-API-Key` (constant-time compared) and get `ROLE_SERVICE`.
 - **Authorization** is role-based (`VIEWER` / `TRADER` / `ADMIN` for humans, `SERVICE` for machines).
-  Reads are public and **every write requires at least an authenticated principal** (the filter chain's
-  `anyRequest().authenticated()`). The regulated **order-entry path** (`OrderController`) additionally
-  enforces **role-based** authorization with method security (`@EnableMethodSecurity` + `@PreAuthorize`:
-  `TRADER`/`ADMIN`/`SERVICE`); a denied write there is a clean `403` (not a masked `500`), an
-  unauthenticated write is `401`. The other desks (exchange, market, strategies, RFQ, rates, tax,
-  rebalance) are login-gated demo surfaces — authenticated, but not yet role-restricted at the controller;
-  extending `@PreAuthorize` to those write endpoints is a tracked hardening item. Enforcement is
-  **always on** — there is no config flag to disable it.
-- The signing secret comes from `OMS_JWT_SECRET` (**environment only**, never committed; a dev default
-  is used only when unset). Demo users (`admin`/`trader`/`viewer`) are seeded for local use behind
-  `OMS_SEED_DEMO_USERS` and **must be disabled in any real deployment** — the app logs a warning when
-  it seeds them.
+  Reads are public; **every state-changing write requires a role**, enforced with method security
+  (`@EnableMethodSecurity` + `@PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")`) on **every** write
+  endpoint across all desks (orders, exchange, market, strategies, RFQ, rates, tax, rebalance) — so a
+  `VIEWER` cannot mutate anything even by calling the API directly. A denied write is a clean `403` (not a
+  masked `500`); an unauthenticated write is `401`. Enforcement is **always on** — no config flag disables it.
+- **Public reads (a deliberate demo choice).** Every `GET` is public — not only quotes/order books but
+  also the blotter, positions, and the (paper) account view. This is intentional for a read-only public
+  demo over seeded/paper data (no real customer information), and it's called out here rather than left
+  implicit: a real deployment should move the blotter/position/account reads behind `authenticated()` or a
+  role. Writes are never public.
+- Signing keys are generated at startup (a production deployment would source them from a managed key
+  store / HSM); the `X-API-Key` and any JWT config come from the **environment only**, never committed.
+  Demo users (`admin`/`trader`/`viewer`) are seeded for local use behind `OMS_SEED_DEMO_USERS` and
+  **must be disabled in any real deployment** — the app logs a warning when it seeds them.
 - The Python research service gates mutating routes behind a separate token.
 
 ## Application security practices

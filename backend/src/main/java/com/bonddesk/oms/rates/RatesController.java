@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,12 +31,14 @@ public class RatesController {
         return sim.snapshot();
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/rfq")
     @Operation(summary = "Send an RFQ into the dealer market and get the auction back")
     public RfqView submitRfq(@RequestBody SubmitRfqRequest request) {
         return sim.submitRfq(request);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/shock")
     @Operation(summary = "Apply a parallel + slope curve shock (bps) and reprice the book")
     public Snapshot shock(@RequestBody ShockRequest request) {

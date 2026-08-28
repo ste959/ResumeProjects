@@ -10,6 +10,7 @@ import com.bonddesk.oms.domain.TimeInForce;
 import com.bonddesk.oms.idempotency.IdempotencyStore;
 import com.bonddesk.oms.idempotency.InMemoryIdempotencyStore;
 import com.bonddesk.oms.security.JwtService;
+import com.bonddesk.oms.security.TokenStore;
 import com.bonddesk.oms.service.OrderService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +67,9 @@ class OrderIdempotencyTest {
 
     @MockBean
     private JwtService jwt;
+
+    @MockBean
+    private TokenStore tokens;
 
     @Test
     void aRetryWithTheSameKeyReplaysTheOriginalOrderInsteadOfCreatingASecond() throws Exception {

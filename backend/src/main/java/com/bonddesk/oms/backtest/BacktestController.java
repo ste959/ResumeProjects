@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -45,24 +46,28 @@ public class BacktestController {
         this.props = props;
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping
     @Operation(summary = "Replay a strategy against a recorded L2 session")
     public BacktestResult run(@RequestBody BacktestRequest req) {
         return backtest.run(req);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/capacity")
     @Operation(summary = "Sweep a strategy across order sizes — the capacity curve (cost grows with size)")
     public List<CapacityPoint> capacity(@RequestBody CapacityRequest req) {
         return backtest.capacity(req);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/robustness")
     @Operation(summary = "Replay a strategy across market-condition scenarios — robustness vs. overfitting")
     public List<RobustnessPoint> robustness(@RequestBody RobustnessRequest req) {
         return backtest.robustness(req);
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/synthetic")
     @Operation(summary = "Generate a synthetic market with a known signal — a replayable session for ML validation")
     public SyntheticResult synthetic(@RequestBody SyntheticRequest req) {

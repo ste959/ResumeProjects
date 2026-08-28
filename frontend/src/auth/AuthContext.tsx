@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { api, HttpError } from '../api/client';
-import { canWrite, clear, load, save, type Session } from './session';
+import { canWrite, clear, getRefreshToken, load, save, type Session } from './session';
 
 interface AuthValue {
   session: Session | null;
@@ -32,6 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    // Best-effort server-side revocation (kills the refresh family + denylists the access token),
+    // then clear locally regardless of the network result.
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      api.logout(refreshToken).catch(() => {});
+    }
     clear();
     setSession(null);
   }, []);

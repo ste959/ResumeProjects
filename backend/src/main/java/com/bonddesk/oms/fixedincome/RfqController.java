@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,6 +36,7 @@ public class RfqController {
         this.curve = curve;
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping
     @Operation(summary = "Request quotes on a bond from the dealer panel")
     public RfqView create(@Valid @RequestBody CreateRfqRequest req) {
@@ -53,6 +55,7 @@ public class RfqController {
         return RfqView.from(rfq.get(id));
     }
 
+    @PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")
     @PostMapping("/{id}/accept")
     @Operation(summary = "Accept a quote (best execution by default, or a named dealer) and book the trade")
     public RfqExecutionView accept(@PathVariable String id,

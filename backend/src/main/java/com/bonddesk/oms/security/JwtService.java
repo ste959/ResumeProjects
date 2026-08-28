@@ -1,69 +1,92 @@
 package com.bonddesk.oms.security;
 
-import com.bonddesk.oms.domain.Role;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.LocatorAdapter;
+import io.jsonwebtoken.ProtectedHeader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.Key;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Date;
-import java.util.Set;
+import java.util.List;
+import java.util.UUID;
 
 /**
- * Issues and verifies signed JWTs for user authentication. Tokens carry the username (subject) and the
- * user's roles; they are HMAC-signed with a secret from the environment (never committed). The secret is
- * SHA-256-derived to a 256-bit key so any configured string is a valid HS256 key.
+ * Issues and verifies the short-lived <b>access token</b> as an asymmetrically-signed (RS256) JWT.
+ *
+ * <p>Tokens are signed with the {@link KeyManager}'s current private key and tagged with its {@code kid};
+ * a verifier resolves the matching public key by {@code kid} (published at the JWKS endpoint), so no
+ * shared secret is ever needed to validate a token — the identity pattern real IdPs use. Every token
+ * carries the standard registered claims a resource server checks: issuer, audience, a unique {@code jti}
+ * (so an individual token can be revoked), {@code iat}/{@code nbf}/{@code exp}, plus the user's roles.
  */
 @Service
 public class JwtService {
 
-    private final SecretKey key;
-    private final Duration ttl;
+    private final KeyManager keys;
+    private final String issuer;
+    private final String audience;
+    private final Duration accessTtl;
 
-    public JwtService(@Value("${oms.security.jwt.secret:}") String secret,
-                      @Value("${oms.security.jwt.ttl-minutes:60}") long ttlMinutes) {
-        this.key = deriveKey(secret);
-        this.ttl = Duration.ofMinutes(ttlMinutes);
+    public JwtService(KeyManager keys,
+                      @Value("${oms.security.jwt.issuer:bonddesk-oms}") String issuer,
+                      @Value("${oms.security.jwt.audience:bonddesk-api}") String audience,
+                      @Value("${oms.security.jwt.access-ttl-minutes:15}") long accessTtlMinutes) {
+        this.keys = keys;
+        this.issuer = issuer;
+        this.audience = audience;
+        this.accessTtl = Duration.ofMinutes(accessTtlMinutes);
     }
 
-    /** Sign a token for a user. */
-    public String issue(String username, Set<Role> roles) {
+    /** Sign a short-lived access token for a user. */
+    public String issueAccessToken(String username, Collection<String> roles) {
+        RsaSigningKey signing = keys.current();
         Instant now = Instant.now();
         return Jwts.builder()
+                .header().keyId(signing.kid()).and()
+                .issuer(issuer)
+                .audience().add(audience).and()
                 .subject(username)
-                .claim("roles", roles.stream().map(Enum::name).toList())
+                .id(UUID.randomUUID().toString())                 // jti — the handle for revocation
+                .claim("roles", List.copyOf(roles))
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(ttl)))
-                .signWith(key)
+                .notBefore(Date.from(now))
+                .expiration(Date.from(now.plus(accessTtl)))
+                .signWith(signing.keyPair().getPrivate(), Jwts.SIG.RS256)
                 .compact();
     }
 
-    /** Verify a token and return its claims. Throws {@code io.jsonwebtoken.JwtException} if invalid,
-     *  tampered, wrong-key, or expired. */
+    /**
+     * Verify a token and return its claims. The public key is chosen by the token's {@code kid} (so key
+     * rotation is transparent), the signature and {@code exp}/{@code nbf} are checked by the parser, and
+     * the issuer and audience are asserted. Throws {@link JwtException} for anything invalid, tampered,
+     * wrong-key, expired, or aimed at a different audience.
+     */
     public Claims parse(String token) {
-        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
-    }
-
-    public long ttlMinutes() {
-        return ttl.toMinutes();
-    }
-
-    private static SecretKey deriveKey(String secret) {
-        // A dev-only default keeps local/test flows working; set OMS_JWT_SECRET in any real deployment.
-        byte[] raw = (secret == null || secret.isBlank())
-                ? "dev-only-insecure-jwt-signing-key-change-me".getBytes(StandardCharsets.UTF_8)
-                : secret.getBytes(StandardCharsets.UTF_8);
-        try {
-            return Keys.hmacShaKeyFor(MessageDigest.getInstance("SHA-256").digest(raw));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
+        Claims claims = Jwts.parser()
+                .keyLocator(new LocatorAdapter<Key>() {
+                    @Override
+                    protected Key locate(ProtectedHeader header) {
+                        return keys.verificationKey(header.getKeyId()).orElse(null);
+                    }
+                })
+                .requireIssuer(issuer)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        // jjwt exposes aud as a set; assert this token was minted for us.
+        if (claims.getAudience() == null || !claims.getAudience().contains(audience)) {
+            throw new JwtException("token audience is not " + audience);
         }
+        return claims;
+    }
+
+    public long accessTtlSeconds() {
+        return accessTtl.toSeconds();
     }
 }

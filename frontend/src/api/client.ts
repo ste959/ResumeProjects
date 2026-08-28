@@ -54,7 +54,14 @@ import type {
   YieldCurve,
   ApiError,
 } from './types';
-import { getToken, type LoginResponse } from '../auth/session';
+import {
+  applyRefresh,
+  clear as clearSession,
+  getRefreshToken,
+  getToken,
+  type LoginResponse,
+  type RefreshResponse,
+} from '../auth/session';
 
 // In dev, requests go to /api and Vite proxies them to the backend. In a built
 // deployment, VITE_API_BASE can point at the API gateway.
@@ -73,8 +80,37 @@ export class HttpError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit, base: string = BASE): Promise<T> {
-  // Attach the signed JWT when present. Reads are public, so a signed-out user still sees data;
+// A single in-flight refresh shared by concurrent 401s, so an expired access token triggers exactly one
+// rotation. Returns true if the access token was refreshed and the caller should retry.
+let refreshInFlight: Promise<boolean> | null = null;
+
+function tryRefresh(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return Promise.resolve(false);
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(BASE + '/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          clearSession(); // refresh rejected (expired / revoked / reuse) — sign out
+          return false;
+        }
+        applyRefresh((await res.json()) as RefreshResponse);
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
+async function request<T>(path: string, init?: RequestInit, base: string = BASE, retrying = false): Promise<T> {
+  // Attach the access token when present. Reads are public, so a signed-out user still sees data;
   // writes need the header (the backend enforces roles via @PreAuthorize).
   const token = getToken();
   const res = await fetch(base + path, {
@@ -85,6 +121,12 @@ async function request<T>(path: string, init?: RequestInit, base: string = BASE)
       ...init?.headers,
     },
   });
+  // A short-lived access token that lapsed: rotate it once via the refresh token and retry.
+  if (res.status === 401 && !retrying && base === BASE && !path.startsWith('/v1/auth/') && getRefreshToken()) {
+    if (await tryRefresh()) {
+      return request<T>(path, init, base, true);
+    }
+  }
   if (!res.ok) {
     let body: ApiError | null = null;
     try {
@@ -101,12 +143,14 @@ async function request<T>(path: string, init?: RequestInit, base: string = BASE)
 }
 
 export const api = {
-  // Authentication (Java OMS). login returns a signed JWT; me echoes the caller's identity.
+  // Authentication (Java OMS): login returns an access + refresh token; logout revokes them.
   login: (username: string, password: string) =>
     request<LoginResponse>('/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
+  logout: (refreshToken: string) =>
+    request<void>('/v1/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) }),
 
   securities: (assetClass?: AssetClass) =>
     request<Security[]>(`/securities${assetClass ? `?assetClass=${assetClass}` : ''}`),
