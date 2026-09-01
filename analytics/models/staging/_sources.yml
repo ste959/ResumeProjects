@@ -1,0 +1,27 @@
+version: 2
+
+sources:
+  - name: oms
+    description: >
+      Operational tables owned by the BondDesk OMS backend and managed by its Flyway
+      migrations (backend/src/main/resources/db/migration). This analytics project only
+      *reads* them — it never writes to the OMS schema. In production the source points at
+      the live OMS database; in CI the tables are stood up from a fixture (analytics/ci/seed_raw.sql).
+    schema: public
+    tables:
+      - name: orders
+        description: "One row per parent order across its lifecycle (NEW → … → FILLED/CANCELLED/REJECTED)."
+        columns:
+          - name: id
+            description: "Surrogate PK."
+          - name: order_ref
+            description: "Stable external order identifier (UUID)."
+      - name: execution
+        description: "One row per fill (child of an order). The atomic unit of execution."
+        columns:
+          - name: id
+            description: "Surrogate PK."
+          - name: order_id
+            description: "FK to orders.id."
+      - name: security
+        description: "Reference data for each tradable bond, keyed by CUSIP."

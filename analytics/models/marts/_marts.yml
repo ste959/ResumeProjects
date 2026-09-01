@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: fct_fills
+    description: "Execution fact table. Grain: one row per fill, enriched with order + timing (cycle_time_seconds)."
+    columns:
+      - name: execution_id
+        tests: [not_null, unique]
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: security_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_security')
+              field: security_key
+      - name: venue
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_venue')
+              field: venue_key
+      - name: cycle_time_seconds
+        tests: [not_null]
+
+  - name: dim_security
+    description: "Security dimension, one row per CUSIP."
+    columns:
+      - name: security_key
+        tests: [not_null, unique]
+
+  - name: dim_venue
+    description: "Execution-venue dimension, one row per venue."
+    columns:
+      - name: venue_key
+        tests: [not_null, unique]
+
+  - name: kpi_fill_performance_daily
+    description: "Standardized daily operational KPIs (throughput, fill/reject rate, cycle-time percentiles). Grain: one row per trade date."
+    columns:
+      - name: trade_date
+        tests: [not_null, unique]
+      - name: fill_rate
+        description: "Filled orders / submitted orders for the day (0–1)."
+      - name: cycle_time_p95_s
+        description: "95th-percentile order-to-fill latency in seconds."

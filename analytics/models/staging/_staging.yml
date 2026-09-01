@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: "Cleaned OMS orders, one row per parent order."
+    columns:
+      - name: order_id
+        description: "PK from orders.id."
+        tests: [not_null, unique]
+      - name: order_ref
+        tests: [not_null, unique]
+      - name: cusip
+        description: "FK to the security dimension."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_securities')
+              field: cusip
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['NEW', 'STAGED', 'ROUTED', 'PARTIALLY_FILLED', 'FILLED', 'CANCELLED', 'REJECTED']
+      - name: ordered_quantity
+        tests: [not_null]
+
+  - name: stg_executions
+    description: "Cleaned OMS executions (fills), one row per fill."
+    columns:
+      - name: execution_id
+        tests: [not_null, unique]
+      - name: order_id
+        description: "FK to the order this fill belongs to."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: fill_quantity
+        tests: [not_null]
+      - name: fill_price
+        tests: [not_null]
+
+  - name: stg_securities
+    description: "Cleaned OMS security reference data, one row per CUSIP."
+    columns:
+      - name: cusip
+        tests: [not_null, unique]
