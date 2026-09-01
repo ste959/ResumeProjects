@@ -48,6 +48,24 @@ services:
       timeout: 5s
       retries: 15
 
+  # Schema Registry for the Avro-encoded order-events topic (see ADR-0009). Internal only — the OMS
+  # producer and risk consumer reach it at http://schema-registry:8081 on the compose network (no host
+  # port, to avoid clashing with risk-service on 8081).
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8081'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
   backend:
     build: ./backend
     depends_on:
@@ -55,6 +73,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      schema-registry:
+        condition: service_started   # non-blocking: the outbox relay retries until the registry is up
     environment:
       SPRING_PROFILES_ACTIVE: postgres
       DB_URL: jdbc:postgresql://postgres:5432/bonddesk
@@ -62,6 +82,7 @@ services:
       DB_PASSWORD: bonddesk
       OMS_KAFKA_ENABLED: "true"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
     ports:
       - "8080:8080"
     healthcheck:
@@ -75,8 +96,11 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      schema-registry:
+        condition: service_started
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
     ports:
       - "8081:8081"
 
