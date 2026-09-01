@@ -74,5 +74,7 @@ Confident-but-wrong is the failure mode that matters most. So:
 ## Working style
 
 When the task is substantial, decompose it, state the plan, and verify each step. When it is trivial,
-just do it. Read `CONTRIBUTING.md` for the contribution workflow and
-`docs/ai-assisted-engineering.md` for how AI is used here and why that is a strength, not a shortcut.
+just do it. Read `CONTRIBUTING.md` for the contribution workflow,
+`docs/ai-assisted-engineering.md` for how AI is used here and why that is a strength, not a shortcut,
+and `docs/claude-development-lifecycle.md` for the phased loop (frame → plan → implement → verify →
+audit) every non-trivial AI-assisted change runs through.

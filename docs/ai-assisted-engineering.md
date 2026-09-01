@@ -4,7 +4,9 @@ This project was built with heavy use of AI coding tools (Claude Code), and it s
 interesting question in 2026 is not *whether* an engineer uses AI — the capable ones do — but whether
 they use it the way a professional team does: **as an accelerator wrapped in guardrails, gates, and
 accountable human judgment.** This document is the honest account of how that works here, so the code
-can be trusted and the process can be inspected.
+can be trusted and the process can be inspected. This document is the *why and the gates*; its companion,
+[`claude-development-lifecycle.md`](claude-development-lifecycle.md), is the *how* — the phased loop every
+non-trivial change runs through.
 
 > The quality bar, stated plainly: **AI accelerates the work; deterministic tests, reviewed code, and
 > accountable engineering judgment decide what ships.** An AI-generated change that fails a gate does

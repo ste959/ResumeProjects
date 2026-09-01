@@ -106,8 +106,10 @@ Built with heavy AI assistance — and the apparatus around it is committed and 
 point. Agent operating standards live in [`CLAUDE.md`](CLAUDE.md), review subagents in
 [`.claude/agents/`](.claude/agents/), and the honest account of how AI was used (and the deterministic
 gates every AI change must pass, plus `Co-Authored-By` provenance) is in
-[`docs/ai-assisted-engineering.md`](docs/ai-assisted-engineering.md). The bar: *AI accelerates;
-reproducible tests, reviewed code, and accountable human judgment decide what ships.*
+[`docs/ai-assisted-engineering.md`](docs/ai-assisted-engineering.md); the repeatable phased workflow
+those gates sit inside is the [Claude Development Lifecycle](docs/claude-development-lifecycle.md). The
+bar: *AI accelerates; reproducible tests, reviewed code, and accountable human judgment decide what
+ships.*
 
 ## Run it
 
