@@ -19,7 +19,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <springdoc.version>2.6.0</springdoc.version>
+        <springdoc.version>3.1.0</springdoc.version>
         <avro.version>1.11.3</avro.version>
         <!-- Confluent 7.6.x aligns with the Kafka 3.7 clients pulled in by Spring Boot 3.3. -->
         <confluent.version>7.6.1</confluent.version>
