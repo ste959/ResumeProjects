@@ -1,0 +1,84 @@
+# Dashboard-as-code for the Ops Analytics BI layer. This file is the single source of truth for the
+# Metabase "Desk Operations — Fill Performance" dashboard: the marts database connection, the cards
+# (each a native SQL question against the dbt marts), and their layout. provision.py applies it to a
+# running Metabase via the API; verify_spec.py validates it and runs every card's SQL against the
+# marts in CI. Edit the dashboard here, in review, not by clicking in the UI.
+#
+# Metabase's dashboard grid is 24 columns wide. All SQL is schema-qualified to the dbt target schema
+# (analytics), which is what Metabase queries the Postgres data source as.
+
+database:
+  name: "BondDesk Ops (dbt marts)"
+  engine: postgres
+  schema: analytics
+  # Connection host/port/db/user/password are supplied from the environment at provision time
+  # (MARTS_HOST, MARTS_PORT, MARTS_DB, MARTS_USER, MARTS_PASSWORD) — never committed.
+
+dashboard:
+  name: "Desk Operations — Fill Performance"
+  description: >
+    Standardized daily operating picture for the trading desk: how much got done (throughput and
+    notional), how well (fill and reject rate), how fast (order-to-fill latency percentiles), and
+    where (execution venue mix). Sourced entirely from the dbt marts.
+
+cards:
+  - key: total_notional_filled
+    name: "Notional filled (total)"
+    display: scalar
+    sql: |
+      select sum(fill_notional) as notional_filled
+      from analytics.fct_fills
+    layout: { row: 0, col: 0, size_x: 6, size_y: 4 }
+
+  - key: overall_reject_rate
+    name: "Reject rate (all days)"
+    display: scalar
+    sql: |
+      select round(sum(orders_rejected)::numeric / nullif(sum(orders_submitted), 0), 4) as reject_rate
+      from analytics.kpi_fill_performance_daily
+    layout: { row: 0, col: 6, size_x: 6, size_y: 4 }
+
+  - key: fill_rate_by_day
+    name: "Daily fill rate"
+    display: line
+    sql: |
+      select trade_date, fill_rate
+      from analytics.kpi_fill_performance_daily
+      order by trade_date
+    layout: { row: 0, col: 12, size_x: 12, size_y: 4 }
+
+  - key: cycle_time_percentiles
+    name: "Order → fill cycle time (p50 / p95, seconds)"
+    display: line
+    sql: |
+      select trade_date, cycle_time_p50_s, cycle_time_p95_s
+      from analytics.kpi_fill_performance_daily
+      order by trade_date
+    layout: { row: 4, col: 0, size_x: 12, size_y: 5 }
+
+  - key: order_outcomes_by_day
+    name: "Order outcomes by day"
+    display: bar
+    sql: |
+      select
+        trade_date,
+        orders_filled,
+        orders_partially_filled,
+        orders_rejected,
+        orders_cancelled
+      from analytics.kpi_fill_performance_daily
+      order by trade_date
+    layout: { row: 4, col: 12, size_x: 12, size_y: 5 }
+
+  - key: fills_by_venue
+    name: "Execution by venue (fills & notional)"
+    display: bar
+    sql: |
+      select
+        venue,
+        count(*)              as fills,
+        sum(fill_notional)    as notional
+      from analytics.fct_fills
+      group by venue
+      order by notional desc
+    layout: { row: 9, col: 0, size_x: 24, size_y: 5 }

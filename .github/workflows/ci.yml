@@ -142,6 +142,12 @@ jobs:
         run: psql "postgresql://bonddesk:bonddesk@localhost:5432/bonddesk" -v ON_ERROR_STOP=1 -f ci/seed_raw.sql
       - name: dbt build (models + data-quality tests)
         run: dbt build
+      - name: Verify BI dashboard spec + queries against the marts
+        # Keeps the committed Metabase dashboard (analytics/metabase/dashboard.yml) in lockstep with
+        # the models: validates the spec and runs every card's SQL against the just-built marts.
+        run: |
+          python metabase/provision.py --dry-run   # build every Metabase API payload (no network)
+          python metabase/verify_spec.py --run-sql # run each card's SQL against the marts
 
   e2e:
     name: E2E (Playwright)

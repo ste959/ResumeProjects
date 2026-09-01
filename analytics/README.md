@@ -65,8 +65,15 @@ dbt docs generate && dbt docs serve   # optional: browse lineage
 Against a real OMS database, skip the fixture and point the source at the live schema — the models are
 unchanged.
 
+## Self-service BI (Metabase)
+
+A [Metabase](metabase/README.md) service (docker-compose, `:3001`) reads these marts and serves the
+**Desk Operations — Fill Performance** dashboard to non-technical stakeholders. The dashboard is
+**declared as code** (`metabase/dashboard.yml`) and applied via the Metabase API
+(`metabase/provision.py`) — version-controlled, not clicked together. CI validates the spec and runs
+every dashboard query against the built marts, so the BI layer can't silently drift from the models.
+
 ## Roadmap
 
-- **Slice 2:** a Metabase service (docker-compose) reading the marts, with a fill-performance dashboard.
 - **Slice 3:** orchestration (a Prefect flow / scheduled Actions run) + source-freshness and
   reconciliation checks on a schedule.
