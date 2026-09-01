@@ -165,7 +165,7 @@ jobs:
               --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0
       - name: Upload Trivy results
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend-image
