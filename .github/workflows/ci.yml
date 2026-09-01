@@ -121,7 +121,9 @@ jobs:
       POSTGRES_USER: bonddesk
       POSTGRES_PASSWORD: bonddesk
       POSTGRES_DB: bonddesk
-      DBT_PROFILES_DIR: analytics
+      # Absolute: the dbt steps run inside analytics/ (working-directory), so a relative value
+      # would resolve to analytics/analytics. profiles.yml lives at the repo's analytics/.
+      DBT_PROFILES_DIR: ${{ github.workspace }}/analytics
     defaults:
       run:
         working-directory: analytics
@@ -131,7 +133,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dbt
-        run: python -m pip install --quiet "dbt-postgres==1.8.2"
+        # Pin both core and the adapter to the stable 1.9 line; an unpinned adapter let pip pull a
+        # 2.0.0-beta of dbt-core, which is non-reproducible and changes profile resolution.
+        run: |
+          python -m pip install --quiet "dbt-core~=1.9.0" "dbt-postgres~=1.9.0"
+          dbt --version
       - name: Load raw fixture (stand-in for the live OMS tables dbt reads)
         run: psql "postgresql://bonddesk:bonddesk@localhost:5432/bonddesk" -v ON_ERROR_STOP=1 -f ci/seed_raw.sql
       - name: dbt build (models + data-quality tests)
