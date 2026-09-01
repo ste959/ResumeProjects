@@ -65,8 +65,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install the test runner
+        run: python -m pip install --quiet pytest   # the harness code is stdlib-only; its tests use pytest
       - name: Unit tests
-        run: python -m pytest harness -q          # stdlib only, no install
+        run: python -m pytest harness -q
       - name: Determinism / flakiness gate
         run: python -m harness --check-determinism --repeats 5   # fail if any scenario's verdict is unstable
       - name: Run the example validation suite (CI gate)
