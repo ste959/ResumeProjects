@@ -148,6 +148,12 @@ jobs:
         run: |
           python metabase/provision.py --dry-run   # build every Metabase API payload (no network)
           python metabase/verify_spec.py --run-sql # run each card's SQL against the marts
+      - name: Unit-test the orchestration pipeline planner
+        # Fast, infra-free check of the pipeline plan (order, seed toggle, failure semantics). The
+        # full Prefect flow runs on a schedule in analytics-nightly.yml, not on every PR.
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest orchestration/test_pipeline.py -q
 
   e2e:
     name: E2E (Playwright)

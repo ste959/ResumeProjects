@@ -8,9 +8,17 @@ sources:
       *reads* them — it never writes to the OMS schema. In production the source points at
       the live OMS database; in CI the tables are stood up from a fixture (analytics/ci/seed_raw.sql).
     schema: public
+    # Freshness thresholds describe a *live* OMS feed: warn if the newest row is over 12h old, error
+    # past 24h. `dbt source freshness` checks them. Against the fixed demo/CI fixture (historical
+    # timestamps) freshness reports stale by design, so it runs report-only there (see the nightly
+    # workflow and orchestration/pipeline.py); against a live OMS it is a real staleness alarm.
+    freshness:
+      warn_after: {count: 12, period: hour}
+      error_after: {count: 24, period: hour}
     tables:
       - name: orders
         description: "One row per parent order across its lifecycle (NEW → … → FILLED/CANCELLED/REJECTED)."
+        loaded_at_field: updated_at
         columns:
           - name: id
             description: "Surrogate PK."
@@ -18,6 +26,7 @@ sources:
             description: "Stable external order identifier (UUID)."
       - name: execution
         description: "One row per fill (child of an order). The atomic unit of execution."
+        loaded_at_field: executed_at
         columns:
           - name: id
             description: "Surrogate PK."
@@ -25,3 +34,5 @@ sources:
             description: "FK to orders.id."
       - name: security
         description: "Reference data for each tradable bond, keyed by CUSIP."
+        # Reference data, not a time-series feed → no freshness check.
+        freshness: null

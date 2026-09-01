@@ -73,7 +73,15 @@ A [Metabase](metabase/README.md) service (docker-compose, `:3001`) reads these m
 (`metabase/provision.py`) — version-controlled, not clicked together. CI validates the spec and runs
 every dashboard query against the built marts, so the BI layer can't silently drift from the models.
 
-## Roadmap
+## Orchestration (Prefect)
 
-- **Slice 3:** orchestration (a Prefect flow / scheduled Actions run) + source-freshness and
-  reconciliation checks on a schedule.
+The [orchestration](orchestration/README.md) leg runs the whole pipeline — seed → dbt build + tests →
+source-freshness → BI verification — as a **Prefect flow** on a nightly schedule
+([`analytics-nightly.yml`](../.github/workflows/analytics-nightly.yml)). The plan is pure, unit-tested
+data (`orchestration/pipeline.py`); Prefect (`orchestration/flow.py`) wraps it with retries and
+logging. dbt **source freshness** (`_sources.yml`) alarms on a stale upstream OMS feed.
+
+## Status
+
+Slices 1–3 complete: modeled + tested marts, self-service BI (Metabase, dashboard-as-code), and
+scheduled orchestration with freshness checks.
