@@ -1,0 +1,15 @@
+# Connection profile for the analytics project. All values come from the environment so no
+# credentials are ever committed (see CLAUDE.md: never commit secrets). Point DBT_PROFILES_DIR
+# at this directory (the CI job does). Locally: `export DBT_PROFILES_DIR=$PWD` from analytics/.
+bonddesk_analytics:
+  target: ci
+  outputs:
+    ci:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | as_number }}"
+      user: "{{ env_var('POSTGRES_USER', 'bonddesk') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'bonddesk') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'bonddesk') }}"
+      schema: analytics
+      threads: 4

@@ -130,6 +130,29 @@ services:
     depends_on:
       - prometheus
 
+  # ── Self-service BI over the dbt marts (analytics/). Metabase reads the analytics schema in
+  #    Postgres; the fill-performance dashboard is provisioned as code by analytics/metabase/provision.py.
+  #    App metadata persists in the embedded H2 file on the mounted volume. UI: http://localhost:3001
+  #    (Grafana already holds 3000). See analytics/metabase/README.md for the bring-up flow. ──
+  metabase:
+    image: metabase/metabase:v0.59.31
+    environment:
+      MB_DB_TYPE: h2
+      MB_DB_FILE: /metabase-data/metabase.db
+    volumes:
+      - metabase-data:/metabase-data
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+
 volumes:
   pgdata:
   grafana-data:
+  metabase-data:

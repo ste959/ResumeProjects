@@ -98,6 +98,63 @@ jobs:
             artifacts/
             repro/
 
+  analytics:
+    name: Analytics (dbt)
+    runs-on: ubuntu-latest
+    # Stand up a real Postgres, load a fixture that mirrors the OMS source tables, then run the
+    # dbt models AND their data-quality tests as one gated step. Verifies the analytics layer the
+    # same way the rest of the repo is verified: on every push/PR, against a real database.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bonddesk
+          POSTGRES_PASSWORD: bonddesk
+          POSTGRES_DB: bonddesk
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bonddesk"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: bonddesk
+      POSTGRES_PASSWORD: bonddesk
+      POSTGRES_DB: bonddesk
+      # Absolute: the dbt steps run inside analytics/ (working-directory), so a relative value
+      # would resolve to analytics/analytics. profiles.yml lives at the repo's analytics/.
+      DBT_PROFILES_DIR: ${{ github.workspace }}/analytics
+    defaults:
+      run:
+        working-directory: analytics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dbt
+        # Pin both core and the adapter to the stable 1.9 line; an unpinned adapter let pip pull a
+        # 2.0.0-beta of dbt-core, which is non-reproducible and changes profile resolution.
+        run: |
+          python -m pip install --quiet "dbt-core~=1.9.0" "dbt-postgres~=1.9.0"
+          dbt --version
+      - name: Load raw fixture (stand-in for the live OMS tables dbt reads)
+        run: psql "postgresql://bonddesk:bonddesk@localhost:5432/bonddesk" -v ON_ERROR_STOP=1 -f ci/seed_raw.sql
+      - name: dbt build (models + data-quality tests)
+        run: dbt build
+      - name: Verify BI dashboard spec + queries against the marts
+        # Keeps the committed Metabase dashboard (analytics/metabase/dashboard.yml) in lockstep with
+        # the models: validates the spec and runs every card's SQL against the just-built marts.
+        run: |
+          python metabase/provision.py --dry-run   # build every Metabase API payload (no network)
+          python metabase/verify_spec.py --run-sql # run each card's SQL against the marts
+      - name: Unit-test the orchestration pipeline planner
+        # Fast, infra-free check of the pipeline plan (order, seed toggle, failure semantics). The
+        # full Prefect flow runs on a schedule in analytics-nightly.yml, not on every PR.
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest orchestration/test_pipeline.py -q
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
