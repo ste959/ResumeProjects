@@ -58,6 +58,10 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()                    // read-only market-data push
+                // The standalone matching-engine terminal and crypto-market are login-less public
+                // sandboxes (interactive "play with the engine" demos, no real desk state), so their
+                // writes are public too. The regulated OMS desk below still requires a role.
+                .requestMatchers("/api/exchange/**", "/api/market/**").permitAll()
                 .requestMatchers("/api/v1/auth/me").authenticated()       // who am I → must be logged in
                 // All GET reads are public in this DEMO — quotes/order books AND the blotter, positions,
                 // and paper-account views. That's a deliberate read-only public surface (no real customer

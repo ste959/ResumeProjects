@@ -40,16 +40,18 @@ stateless — no server session):
   Redis-selectable store as the idempotency keys.
 - **Machines** authenticate with an `X-API-Key` (constant-time compared) and get `ROLE_SERVICE`.
 - **Authorization** is role-based (`VIEWER` / `TRADER` / `ADMIN` for humans, `SERVICE` for machines).
-  Reads are public; **every state-changing write requires a role**, enforced with method security
-  (`@EnableMethodSecurity` + `@PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")`) on **every** write
-  endpoint across all desks (orders, exchange, market, strategies, RFQ, rates, tax, rebalance) — so a
-  `VIEWER` cannot mutate anything even by calling the API directly. A denied write is a clean `403` (not a
-  masked `500`); an unauthenticated write is `401`. Enforcement is **always on** — no config flag disables it.
-- **Public reads (a deliberate demo choice).** Every `GET` is public — not only quotes/order books but
-  also the blotter, positions, and the (paper) account view. This is intentional for a read-only public
-  demo over seeded/paper data (no real customer information), and it's called out here rather than left
-  implicit: a real deployment should move the blotter/position/account reads behind `authenticated()` or a
-  role. Writes are never public.
+  Every write on the **regulated OMS desk** — order entry and lifecycle, strategies, RFQ, rates, tax,
+  rebalance, backtest — **requires a role**, enforced with method security (`@EnableMethodSecurity` +
+  `@PreAuthorize("hasAnyRole('TRADER','ADMIN','SERVICE')")`), so a `VIEWER` cannot mutate desk state even
+  by calling the API directly. A denied write is a clean `403` (not a masked `500`); an unauthenticated
+  write is `401`. Enforcement is **always on** — no config flag disables it.
+- **Public sandboxes (a deliberate demo choice).** The standalone **matching-engine terminal**
+  (`/api/exchange/**`) and **crypto-market** (`/api/market/**`) are login-less, interactive "play with the
+  engine" demos over simulated/paper state — so their *writes* are public, matching their no-login UIs.
+  This is scoped authz (gate the regulated desk, not the toy sandboxes), not an oversight. Likewise every
+  `GET` is public — including the blotter, positions, and the paper account view — intentional for a
+  read-only public demo over seeded/paper data (no real customer information). A real deployment would put
+  the account/blotter reads and the sandbox writes behind `authenticated()`.
 - Signing keys are generated at startup (a production deployment would source them from a managed key
   store / HSM); the `X-API-Key` and any JWT config come from the **environment only**, never committed.
   Demo users (`admin`/`trader`/`viewer`) are seeded for local use behind `OMS_SEED_DEMO_USERS` and
