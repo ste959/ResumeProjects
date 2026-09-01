@@ -147,16 +147,22 @@ jobs:
       - name: Build frontend image
         run: docker build -t bonddesk/frontend:ci ./frontend
       - name: Scan backend image (Trivy)
-        # Pinned to a release whose internal setup-trivy is referenced by immutable SHA;
-        # v0.28–v0.30 pin deleted setup-trivy tags (v0.2.x) and fail to resolve at "Set up job".
-        uses: aquasecurity/trivy-action@v0.32.0
-        with:
-          image-ref: bonddesk/oms-backend:ci
-          format: sarif
-          output: trivy-backend.sarif
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "0"          # report-only: surface findings without failing the build
+        # Run Trivy from its official pinned container against the image exported as a tarball
+        # (docker save → --input), rather than the trivy-action + setup-trivy path. That path
+        # downloads the latest Trivy binary at runtime via an install script, which fails on
+        # shared-runner GitHub API rate limits ("found version 0.64.1" → exit 1) and drags in
+        # setup-trivy tags that upstream deletes. A pinned image is reproducible and needs no
+        # binary install or docker socket. Report-only (--exit-code 0): surface findings, never
+        # fail the build; GITHUB_TOKEN lifts the anonymous rate limit on the vuln-DB pull.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker save bonddesk/oms-backend:ci -o oms-backend.tar
+          docker run --rm -e GITHUB_TOKEN -v "${{ github.workspace }}:/work" -w /work \
+            aquasec/trivy:0.64.1 image \
+              --input oms-backend.tar \
+              --format sarif --output trivy-backend.sarif \
+              --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0
       - name: Upload Trivy results
         if: always()
         uses: github/codeql-action/upload-sarif@v3
