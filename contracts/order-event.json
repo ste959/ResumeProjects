@@ -1,6 +1,6 @@
 {
   "topic": "order-events",
-  "description": "SUPERSEDED by schemas/avro/order-event.avsc (see docs/adr/0009). The order-events topic is now Avro governed by a Confluent Schema Registry, which enforces BACKWARD compatibility; both services generate their OrderEvent type from that one schema. This file is retained only as a human-readable field reference.",
+  "description": "SUPERSEDED by each service's src/main/avro/order-event.avsc (see docs/adr/0009). The order-events topic is now Avro governed by a Confluent Schema Registry, which enforces BACKWARD compatibility; both services generate their OrderEvent type from that one schema. This file is retained only as a human-readable field reference.",
   "producer": "backend (com.bonddesk.oms.event.OrderEvent)",
   "consumer": "risk-service (com.bonddesk.risk.OrderEvent)",
   "fields": ["type", "orderRef", "cusip", "portfolio", "status", "quantity", "filledQuantity", "occurredAt"],

@@ -150,7 +150,7 @@
         </dependency>
 
         <!-- Avro + Confluent Schema Registry for the order-events topic. The wire schema
-             (schemas/avro/order-event.avsc) is generated into SpecificRecord types (avro-maven-plugin,
+             (src/main/avro/order-event.avsc) is generated into SpecificRecord types (avro-maven-plugin,
              below) and the registry enforces BACKWARD compatibility on every change. -->
         <dependency>
             <groupId>org.apache.avro</groupId>
@@ -232,8 +232,10 @@
 
     <build>
         <plugins>
-            <!-- Generate SpecificRecord types from the shared canonical schema (../schemas/avro). The
-                 risk service generates from the same file, so both derive one identical wire type. -->
+            <!-- Generate SpecificRecord types from this module's copy of the canonical schema
+                 (src/main/avro). The risk service keeps a byte-identical copy and generates from it,
+                 so both derive one identical wire type; the copies stay in lockstep and the Schema
+                 Registry rejects any drift at registration time. -->
             <plugin>
                 <groupId>org.apache.avro</groupId>
                 <artifactId>avro-maven-plugin</artifactId>
@@ -245,7 +247,7 @@
                             <goal>schema</goal>
                         </goals>
                         <configuration>
-                            <sourceDirectory>${project.basedir}/../schemas/avro</sourceDirectory>
+                            <sourceDirectory>${project.basedir}/src/main/avro</sourceDirectory>
                             <outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
                             <stringType>String</stringType>
                             <enableDecimalLogicalType>true</enableDecimalLogicalType>

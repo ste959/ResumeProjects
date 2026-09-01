@@ -20,8 +20,11 @@ This is exactly the "Schema Management Platform for Protobuf and Avro" problem a
 Make the topic's wire format **Avro, governed by a Confluent Schema Registry**, with the schema as the
 single source of truth:
 
-- **One canonical schema** (`schemas/avro/order-event.avsc`) is the contract. Both services generate their
-  `OrderEventRecord` from *the same file* (avro-maven-plugin), so the wire type can't drift between them.
+- **One canonical schema** is the contract. Each service keeps a byte-identical copy at
+  `src/main/avro/order-event.avsc` — a copy per module so the schema sits inside each Docker build
+  context — and both generate their `OrderEventRecord` from it (avro-maven-plugin). The registry (below)
+  is what actually prevents drift: a change registered from one service that isn't BACKWARD-compatible
+  with the other's copy is rejected at runtime.
   Fields use real types: `enum` for the event type/status (with a `default` symbol for forward tolerance),
   `decimal(19,2)` for notionals (exact, not floating point), and `timestamp-micros` for the event time.
 - **Internal model stays separate from the wire.** The OMS keeps its domain `OrderEvent`; a mapper +

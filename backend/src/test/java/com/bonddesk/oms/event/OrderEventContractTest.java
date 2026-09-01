@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Producer-side structural check for the {@code order-events} event. The enforced wire contract is now
- * the Avro schema ({@code schemas/avro/order-event.avsc}), whose compatibility the Schema Registry
+ * the Avro schema ({@code src/main/avro/order-event.avsc}), whose compatibility the Schema Registry
  * guarantees (see {@code OrderEventSchemaCompatibilityTest} + ADR-0009); this test is the lighter
  * companion that keeps the producer's {@code OrderEvent} field/enum names in step with the human-readable
  * field reference in {@code /contracts/order-event.json}, so a rename shows up here too.

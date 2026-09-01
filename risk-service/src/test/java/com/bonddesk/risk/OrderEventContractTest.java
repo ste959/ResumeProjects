@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Consumer half of the {@code order-events} contract. The wire format is now the shared Avro schema
- * ({@code schemas/avro/order-event.avsc}); the deserializer hands the listener an {@link OrderEventRecord}
+ * ({@code src/main/avro/order-event.avsc}); the deserializer hands the listener an {@link OrderEventRecord}
  * and {@link OrderEventAvroMapper} turns it into the risk service's own {@link OrderEvent}. This proves
  * that mapping handles every event type and status the schema can carry, and that a mapped event
  * aggregates — so a registry-accepted producer change can't surprise the consumer, and a break in the

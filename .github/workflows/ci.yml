@@ -147,7 +147,7 @@ jobs:
       - name: Build frontend image
         run: docker build -t bonddesk/frontend:ci ./frontend
       - name: Scan backend image (Trivy)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.30.0
         with:
           image-ref: bonddesk/oms-backend:ci
           format: sarif

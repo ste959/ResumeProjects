@@ -2,7 +2,7 @@
   "type": "record",
   "name": "OrderEventRecord",
   "namespace": "com.bonddesk.contracts",
-  "doc": "Wire contract for the order-events Kafka topic. This schema is the single source of truth shared by the OMS producer and the risk-service consumer: both generate their types from this file, and the Schema Registry enforces BACKWARD compatibility on every registered change, so an incompatible edit is rejected before it can mis-aggregate risk downstream.",
+  "doc": "Wire contract for the order-events Kafka topic. Shared by the OMS producer and the risk-service consumer, which each keep a byte-identical copy in their own module (src/main/avro) so the schema is present in each Docker build context; both generate their types from it, and the Schema Registry enforces BACKWARD compatibility on every registered change, so an incompatible edit is rejected before it can mis-aggregate risk downstream.",
   "fields": [
     {
       "name": "type",

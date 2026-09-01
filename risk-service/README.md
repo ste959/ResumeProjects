@@ -17,7 +17,7 @@ stream — the consumer half of the platform's event-driven architecture.
   (`KafkaErrorHandlingConfig`).
 - Consumer `concurrency` > 1 (one partition per thread preserves per-key ordering).
 - Its own `OrderEvent` record — coupled to the producer only by the shared **Avro schema**
-  (`schemas/avro/order-event.avsc`), whose backward compatibility the Schema Registry enforces;
+  (`src/main/avro/order-event.avsc`, byte-identical to the OMS copy), whose backward compatibility the Schema Registry enforces;
   `OrderEventContractTest` checks the mapping from the Avro record into this service's own model.
 
 ## Run / test
