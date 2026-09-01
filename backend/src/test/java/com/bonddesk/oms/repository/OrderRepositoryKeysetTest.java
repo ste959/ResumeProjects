@@ -35,6 +35,10 @@ class OrderRepositoryKeysetTest {
     private SecurityRepository securities;
 
     private static final Instant BASE = Instant.parse("2026-01-01T00:00:00Z");
+    // First-page cursor sentinel (mirrors OrderService.FIRST_PAGE_CURSOR_TS): the query takes a concrete
+    // cursor, never null, so Postgres can type the bind.
+    private static final Instant FIRST_PAGE = Instant.parse("9999-12-31T23:59:59Z");
+    private static final long MAX_ID = Long.MAX_VALUE;
 
     @Test
     void pagesNewestFirstThroughACursorWithoutGapsOrOverlaps() {
@@ -45,8 +49,8 @@ class OrderRepositoryKeysetTest {
         }
 
         List<String> pagedRefs = new ArrayList<>();
-        Instant cursorTs = null;
-        Long cursorId = null;
+        Instant cursorTs = FIRST_PAGE;
+        Long cursorId = MAX_ID;
         for (int guard = 0; guard < 10; guard++) {
             List<Order> page = orders.findBlotterPage(null, null, cursorTs, cursorId, PageRequest.of(0, 3));
             if (page.isEmpty()) {
@@ -70,7 +74,7 @@ class OrderRepositoryKeysetTest {
         Order b = persistOrder(sec, "tie-b", OrderStatus.NEW, BASE);
         Order c = persistOrder(sec, "tie-c", OrderStatus.NEW, BASE);
 
-        List<Order> firstTwo = orders.findBlotterPage(null, null, null, null, PageRequest.of(0, 2));
+        List<Order> firstTwo = orders.findBlotterPage(null, null, FIRST_PAGE, MAX_ID, PageRequest.of(0, 2));
         assertThat(firstTwo).extracting(Order::getId).containsExactly(c.getId(), b.getId());
 
         // Continue from the second row — the keyset must resume at the third, not repeat b.
@@ -86,7 +90,7 @@ class OrderRepositoryKeysetTest {
         persistOrder(sec, "filled-1", OrderStatus.FILLED, BASE.plusSeconds(2));
         persistOrder(sec, "new-2", OrderStatus.NEW, BASE.plusSeconds(3));
 
-        List<Order> filled = orders.findBlotterPage(OrderStatus.FILLED, null, null, null, PageRequest.of(0, 10));
+        List<Order> filled = orders.findBlotterPage(OrderStatus.FILLED, null, FIRST_PAGE, MAX_ID, PageRequest.of(0, 10));
         assertThat(filled).extracting(Order::getOrderRef).containsExactly("filled-1");
     }
 

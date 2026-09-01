@@ -54,6 +54,10 @@ public class OrderService {
     static final int DEFAULT_PAGE_SIZE = 50;
     static final int MAX_PAGE_SIZE = 200;
 
+    /** First-page keyset cursor: a timestamp after any real order (within Postgres's timestamptz range),
+     *  so {@code createdAt < sentinel} matches every row without needing a null bind. */
+    static final Instant FIRST_PAGE_CURSOR_TS = Instant.parse("9999-12-31T23:59:59Z");
+
     private final OrderRepository orders;
     private final SecurityRepository securities;
     private final ComplianceService compliance;
@@ -97,8 +101,10 @@ public class OrderService {
     public PagedResponse<OrderSummaryResponse> listPage(OrderStatus status, String portfolio,
                                                         String cursor, int size) {
         int limit = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        Instant cursorCreatedAt = null;
-        Long cursorId = null;
+        // The query never takes a null cursor (Postgres can't type a null bind); the first page uses a
+        // max sentinel so the keyset predicate matches every row.
+        Instant cursorCreatedAt = FIRST_PAGE_CURSOR_TS;
+        Long cursorId = Long.MAX_VALUE;
         if (cursor != null && !cursor.isBlank()) {
             Cursor decoded = Cursor.decode(cursor);   // 400 on a malformed token
             cursorCreatedAt = decoded.createdAt();

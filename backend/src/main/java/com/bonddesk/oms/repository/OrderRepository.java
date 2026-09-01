@@ -23,14 +23,19 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * {@code executions} collection is deliberately not fetched, so the {@code Pageable} limit is a real
      * SQL {@code LIMIT} rather than an in-memory slice. Pass a {@code Pageable} with no sort — the query
      * owns the ordering.
+     *
+     * <p>No parameter is ever null: optional filters use {@code COALESCE(:param, o.col)} (a null filter
+     * matches everything), and the cursor is always concrete — the service passes a max sentinel for the
+     * first page. This is deliberate: the {@code (:param IS NULL OR ...)} form binds untyped nulls that H2
+     * tolerates but PostgreSQL rejects ("could not determine data type of parameter"), so it would pass in
+     * an H2 unit test yet 500 against real Postgres. Keeping every bind typed closes that fidelity gap.
      */
     @Query("""
             SELECT o FROM Order o
             JOIN FETCH o.security
-            WHERE (:status IS NULL OR o.status = :status)
-              AND (:portfolio IS NULL OR o.portfolio = :portfolio)
-              AND (:cursorCreatedAt IS NULL
-                   OR o.createdAt < :cursorCreatedAt
+            WHERE o.status = COALESCE(:status, o.status)
+              AND o.portfolio = COALESCE(:portfolio, o.portfolio)
+              AND (o.createdAt < :cursorCreatedAt
                    OR (o.createdAt = :cursorCreatedAt AND o.id < :cursorId))
             ORDER BY o.createdAt DESC, o.id DESC
             """)
