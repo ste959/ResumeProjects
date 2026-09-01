@@ -147,7 +147,9 @@ jobs:
       - name: Build frontend image
         run: docker build -t bonddesk/frontend:ci ./frontend
       - name: Scan backend image (Trivy)
-        uses: aquasecurity/trivy-action@v0.30.0
+        # Pinned to a release whose internal setup-trivy is referenced by immutable SHA;
+        # v0.28–v0.30 pin deleted setup-trivy tags (v0.2.x) and fail to resolve at "Set up job".
+        uses: aquasecurity/trivy-action@v0.32.0
         with:
           image-ref: bonddesk/oms-backend:ci
           format: sarif
