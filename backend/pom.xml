@@ -22,7 +22,7 @@
         <springdoc.version>2.6.0</springdoc.version>
         <avro.version>1.11.3</avro.version>
         <!-- Confluent 7.6.x aligns with the Kafka 3.7 clients pulled in by Spring Boot 3.3. -->
-        <confluent.version>7.6.1</confluent.version>
+        <confluent.version>8.3.1</confluent.version>
     </properties>
 
     <!-- The Confluent Schema Registry client + Avro serializer are not on Maven Central. -->
